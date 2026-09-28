@@ -97,6 +97,7 @@ async function main() {
         zoneIdentifier: 'PLATFORM_ADSTERRA_BANNER_001',
         scriptReference: 'platform-adsterra-banner-001',  // sanitized key — actual script emitted by Renderer
         isActive: true,
+        verificationState: 'UNVERIFIED',  // admin must verify before ads render
       },
     })
   }
@@ -111,6 +112,7 @@ async function main() {
         zoneIdentifier: 'PLATFORM_MONETAG_INPAGE_001',
         scriptReference: 'platform-monetag-inpage-001',
         isActive: true,
+        verificationState: 'UNVERIFIED',  // admin must verify before ads render
       },
     })
   }

@@ -365,17 +365,46 @@ model Campaign {
 
 model PlatformAdNetworkIntegration {
   // Layer 2: platform's own Adsterra/Monetag publisher account
-  // Renders platform-managed ad inventory on eligible Special Pages
-  id              String   @id @default(cuid())
-  adNetworkId     String
-  integrationType IntegrationType
-  zoneIdentifier  String
-  scriptReference String   // sanitized
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  // Renders platform-managed ad inventory on eligible Special Pages.
+  //
+  // Verification lifecycle (separate from user AdIntegration lifecycle):
+  //   UNVERIFIED → VERIFYING → VERIFIED → SUSPENDED → UNVERIFIED
+  //
+  // The admin must:
+  //   1. Add the platform domain to their ad-network publisher account
+  //   2. Verify site ownership (DNS TXT / meta tag) at the ad network
+  //   3. Create an ad zone and obtain the zone ID
+  //   4. Enter the zone ID + sanitized script reference here
+  //   5. Click "Run test" to simulate a test request
+  //   6. Click "Verify" once they've confirmed the integration works
+  //
+  // Only VERIFIED integrations are eligible to render ads on Special Pages.
+  id                String                  @id @default(cuid())
+  adNetworkId       String
+  integrationType   IntegrationType
+  zoneIdentifier    String
+  scriptReference   String                  // sanitized
+  isActive          Boolean                 @default(true)
+  verificationState PlatformVerificationState @default(UNVERIFIED)
+  verifiedAt        DateTime?
+  verifiedById      String?
+  lastTestedAt      DateTime?
+  lastTestResult    String?                 // JSON: { ok: boolean, status?: number, message: string, latencyMs?: number }
+  verificationNotes String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 
-  adNetwork       AdNetwork @relation(fields: [adNetworkId], references: [id])
+  adNetwork         AdNetwork @relation(fields: [adNetworkId], references: [id])
+
+  @@index([verificationState])
+  @@index([isActive])
+}
+
+enum PlatformVerificationState {
+  UNVERIFIED
+  VERIFYING
+  VERIFIED
+  SUSPENDED
 }
 
 model CreatorSubscription {
