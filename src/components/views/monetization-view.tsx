@@ -5,15 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { ShieldCheck, ExternalLink, Plus, ChevronLeft, AlertCircle } from 'lucide-react'
+  ShieldCheck, ExternalLink, Plus, ChevronLeft, AlertCircle, Wallet, Sparkles,
+  Send, Pause, Lock, Info, TrendingUp, Globe2,
+} from 'lucide-react'
 import type { View, CurrentUser } from '@/app/page'
 
 type AdNetwork = {
@@ -33,13 +35,13 @@ type Disclaimer = {
   version: string; text: string; acknowledged: boolean; acknowledgedAt: string | null
 }
 
-const STATE_LABELS: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
-  DRAFT: { label: 'Draft', variant: 'secondary' },
-  PENDING_REVIEW: { label: 'Pending Review', variant: 'secondary' },
-  APPROVED: { label: 'Approved', variant: 'default' },
-  DISABLED: { label: 'Disabled', variant: 'secondary' },
-  REVOKED: { label: 'Revoked', variant: 'destructive' },
-  DELETED: { label: 'Deleted', variant: 'destructive' },
+const STATE_CONFIG: Record<string, { label: string; cls: string; icon: React.ReactNode }> = {
+  DRAFT:          { label: 'Draft',          cls: 'pill-draft',     icon: <Info className="h-3 w-3" /> },
+  PENDING_REVIEW: { label: 'Pending Review', cls: 'pill-pending',   icon: <Sparkles className="h-3 w-3" /> },
+  APPROVED:       { label: 'Approved',       cls: 'pill-approved',  icon: <ShieldCheck className="h-3 w-3" /> },
+  DISABLED:       { label: 'Disabled',       cls: 'pill-restricted', icon: <Pause className="h-3 w-3" /> },
+  REVOKED:        { label: 'Revoked',        cls: 'pill-revoked',   icon: <AlertCircle className="h-3 w-3" /> },
+  DELETED:        { label: 'Deleted',        cls: 'pill-banned',   icon: <AlertCircle className="h-3 w-3" /> },
 }
 
 export default function MonetizationView({
@@ -75,31 +77,46 @@ export default function MonetizationView({
   async function acknowledgeDisclaimer() {
     const res = await fetch('/api/monetization/disclaimer', { method: 'POST' })
     if (res.ok) {
-      const d = await res.json()
       setDisclaimer(prev => prev ? { ...prev, acknowledged: true, acknowledgedAt: new Date().toISOString() } : prev)
-      if (!d.alreadyAcknowledged) {
-        // refresh
-        const updated = await fetch('/api/monetization/disclaimer').then(r => r.json())
-        setDisclaimer(updated)
-      }
+      const updated = await fetch('/api/monetization/disclaimer').then(r => r.json())
+      setDisclaimer(updated)
     }
+  }
+
+  async function reload() {
+    const i = await fetch('/api/monetization/integrations').then(r => r.json())
+    setIntegrations(i.integrations || [])
   }
 
   if (loading) return <div className="container mx-auto px-4 py-8">Loading…</div>
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
+    <div className="view-fade container mx-auto px-4 py-6 max-w-4xl">
       <div className="flex items-center gap-3 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
           <ChevronLeft className="h-4 w-4" /> Back
         </Button>
-        <h1 className="text-2xl font-bold">Monetization</h1>
+      </div>
+
+      {/* Hero header */}
+      <div className="mb-8 relative overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-gold/10 via-background to-berry/5 p-6 md:p-8">
+        <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-gold/20 blur-3xl" />
+        <Badge variant="outline" className="mb-3 border-gold/40 text-gold-dark bg-gold/5">
+          <Wallet className="h-3 w-3 mr-1" /> Monetization Center
+        </Badge>
+        <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight mb-2">
+          Connect your ad network.
+        </h1>
+        <p className="text-muted-foreground max-w-2xl">
+          Link your own Adsterra or Monetag publisher account. The platform stores only sanitized
+          identifiers — never raw JavaScript. Each integration goes through manual review.
+        </p>
       </div>
 
       {/* Compliance notice */}
-      <Alert className="mb-6">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>The platform does not pay you.</AlertTitle>
+      <Alert className="mb-6 border-cranberry/30 bg-cranberry/5">
+        <AlertCircle className="h-4 w-4 text-cranberry" />
+        <AlertTitle className="text-cranberry">The platform does not pay you.</AlertTitle>
         <AlertDescription>
           Earnings from ads on your Special Pages come from your own Adsterra or Monetag publisher account.
           The platform cannot guarantee any level of earnings, or any earnings at all.
@@ -109,95 +126,122 @@ export default function MonetizationView({
 
       {/* Disclaimer gate */}
       {disclaimer && !disclaimer.acknowledged && (
-        <Card className="mb-6 border-primary">
+        <Card className="mb-6 border-gold/40 shadow-gold">
+          <div className="h-1.5 w-full bg-gradient-to-r from-gold via-gold-dark to-gold rounded-t-xl" />
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5" />
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-gold-dark" />
               Acknowledge the earnings disclaimer
             </CardTitle>
             <CardDescription>You must acknowledge this before connecting an ad network.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-muted-foreground whitespace-pre-line bg-muted/50 p-4 rounded-md max-h-64 overflow-y-auto">
+            <div className="text-sm text-muted-foreground whitespace-pre-line bg-muted/30 p-4 rounded-lg max-h-64 overflow-y-auto border border-border/60">
               {disclaimer.text}
             </div>
-            <Button className="mt-4" onClick={acknowledgeDisclaimer}>I acknowledge</Button>
+            <Button className="mt-4 bg-evergreen text-cream hover:bg-evergreen-dark" onClick={acknowledgeDisclaimer}>
+              <ShieldCheck className="h-4 w-4 mr-2" /> I acknowledge
+            </Button>
           </CardContent>
         </Card>
       )}
 
       {/* Existing integrations */}
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Your ad integrations</h2>
-        <Button onClick={() => setShowCreate(true)} disabled={!disclaimer?.acknowledged}>
-          <Plus className="h-4 w-4 mr-1" /> Connect ad network
+        <h2 className="font-serif text-2xl font-bold">Your ad integrations</h2>
+        <Button
+          onClick={() => setShowCreate(true)}
+          disabled={!disclaimer?.acknowledged}
+          className="bg-evergreen text-cream hover:bg-evergreen-dark"
+        >
+          <Plus className="h-4 w-4 mr-1.5" /> Connect ad network
         </Button>
       </div>
 
       {integrations.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            No ad integrations connected yet.
-            {!disclaimer?.acknowledged && <div className="text-xs mt-2">Acknowledge the disclaimer above to enable.</div>}
+        <Card className="border-dashed">
+          <CardContent className="py-16 text-center">
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-evergreen/10 mb-3">
+              <Wallet className="h-6 w-6 text-evergreen" />
+            </div>
+            <p className="font-medium mb-1">No ad integrations connected yet.</p>
+            {!disclaimer?.acknowledged && (
+              <p className="text-xs text-muted-foreground mt-2">Acknowledge the disclaimer above to enable.</p>
+            )}
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
-          {integrations.map(int => (
-            <Card key={int.id}>
-              <CardContent className="py-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold">{int.adNetwork.displayName}</span>
-                      <Badge variant={(STATE_LABELS[int.lifecycleState] || { variant: 'secondary' }).variant as any}>
-                        {(STATE_LABELS[int.lifecycleState] || { label: int.lifecycleState }).label}
-                      </Badge>
+          {integrations.map(int => {
+            const cfg = STATE_CONFIG[int.lifecycleState] || { label: int.lifecycleState, cls: 'pill-draft', icon: null }
+            return (
+              <Card key={int.id} className="overflow-hidden transition-all hover:shadow-festive">
+                <div className={`h-1 w-full ${
+                  int.lifecycleState === 'APPROVED' ? 'bg-gradient-to-r from-evergreen to-evergreen-light' :
+                  int.lifecycleState === 'PENDING_REVIEW' ? 'bg-gradient-to-r from-gold to-gold-dark' :
+                  int.lifecycleState === 'REVOKED' ? 'bg-gradient-to-r from-cranberry to-berry' :
+                  'bg-gradient-to-r from-muted-foreground/30 to-muted-foreground/10'
+                }`} />
+                <CardContent className="py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <NetworkBadge code={int.adNetwork.code} name={int.adNetwork.displayName} />
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.cls}`}>
+                          {cfg.icon}{cfg.label}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-mono text-xs">{int.integrationType}</span> · Zone: <span className="font-mono text-xs">{int.zoneIdentifier || '—'}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Site: <span className="font-mono">{int.siteIdentifier || '—'}</span> · Created {new Date(int.createdAt).toLocaleDateString()}
+                      </p>
+                      {int.rejectionReason && (
+                        <p className="text-xs text-cranberry mt-1.5 flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3" /> Reason: {int.rejectionReason}
+                        </p>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {int.integrationType} · Zone: {int.zoneIdentifier || '—'}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Site: {int.siteIdentifier || '—'} · Created {new Date(int.createdAt).toLocaleDateString()}
-                    </p>
-                    {int.rejectionReason && (
-                      <p className="text-xs text-destructive mt-1">Reason: {int.rejectionReason}</p>
-                    )}
+                    <div className="flex gap-2 flex-shrink-0">
+                      {int.lifecycleState === 'DRAFT' && (
+                        <SubmitButton integrationId={int.id} onDone={reload} />
+                      )}
+                      {int.lifecycleState === 'APPROVED' && (
+                        <DisableButton integrationId={int.id} onDone={reload} />
+                      )}
+                      {int.adNetwork.policyDocUrl && (
+                        <Button variant="ghost" size="sm" asChild>
+                          <a href={int.adNetwork.policyDocUrl} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="h-3 w-3" /> Rules
+                          </a>
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    {int.lifecycleState === 'DRAFT' && (
-                      <SubmitButton integrationId={int.id} onDone={() => reload()} />
-                    )}
-                    {int.lifecycleState === 'APPROVED' && (
-                      <DisableButton integrationId={int.id} onDone={() => reload()} />
-                    )}
-                    {int.adNetwork.policyDocUrl && (
-                      <Button variant="ghost" size="sm" asChild>
-                        <a href={int.adNetwork.policyDocUrl} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-3 w-3" /> Network rules
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
 
-      {/* Educational note */}
-      <Card className="mt-8 bg-muted/30">
+      {/* Educational section */}
+      <Card className="mt-8 overflow-hidden border-evergreen/20">
+        <div className="h-1 w-full bg-gradient-to-r from-evergreen via-gold to-berry" />
         <CardHeader>
-          <CardTitle className="text-base">How to get legitimate visitors</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-evergreen" />
+            How to get legitimate visitors
+          </CardTitle>
           <CardDescription>Ad networks prohibit bot and incentivized traffic. Build real audiences.</CardDescription>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>• Share your page naturally with people who would actually want to see it.</p>
-          <p>• Create useful content — visitors who find value will return and share.</p>
-          <p>• Use basic SEO: descriptive page title, clear URL slug, relevant content blocks.</p>
-          <p>• Don&apos;t ask friends to click ads. Don&apos;t use traffic exchanges. Don&apos;t use bots.</p>
-          <p>• If your ad-network account is suspended, the platform will automatically disable your integration.</p>
+        <CardContent className="space-y-3 text-sm">
+          <Tip icon={<Globe2 className="h-4 w-4" />} text="Share your page naturally with people who would actually want to see it." />
+          <Tip icon={<Sparkles className="h-4 w-4" />} text="Create useful content — visitors who find value will return and share." />
+          <Tip icon={<TrendingUp className="h-4 w-4" />} text="Use basic SEO: descriptive page title, clear URL slug, relevant content blocks." />
+          <Tip icon={<AlertCircle className="h-4 w-4" />} text="Don't ask friends to click ads. Don't use traffic exchanges. Don't use bots." />
+          <Tip icon={<Lock className="h-4 w-4" />} text="If your ad-network account is suspended, the platform will automatically disable your integration." />
         </CardContent>
       </Card>
 
@@ -210,11 +254,25 @@ export default function MonetizationView({
       )}
     </div>
   )
+}
 
-  async function reload() {
-    const i = await fetch('/api/monetization/integrations').then(r => r.json())
-    setIntegrations(i.integrations || [])
+function NetworkBadge({ code, name }: { code: string; name: string }) {
+  const colors: Record<string, string> = {
+    adsterra: 'bg-gold/15 text-gold-dark border-gold/30',
+    monetag:  'bg-berry/15 text-berry border-berry/30',
+    platform: 'bg-evergreen/15 text-evergreen border-evergreen/30',
   }
+  const cls = colors[code] || 'bg-muted text-muted-foreground'
+  return <Badge variant="outline" className={cls}>{name}</Badge>
+}
+
+function Tip({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="rounded-lg bg-evergreen/10 p-1.5 mt-0.5 text-evergreen">{icon}</div>
+      <p className="text-muted-foreground">{text}</p>
+    </div>
+  )
 }
 
 function SubmitButton({ integrationId, onDone }: { integrationId: string; onDone: () => void }) {
@@ -229,7 +287,9 @@ function SubmitButton({ integrationId, onDone }: { integrationId: string; onDone
         onDone()
       }}
       disabled={loading}
+      className="bg-gold text-cream hover:bg-gold-dark"
     >
+      <Send className="h-3 w-3 mr-1" />
       {loading ? 'Submitting…' : 'Submit for review'}
     </Button>
   )
@@ -249,6 +309,7 @@ function DisableButton({ integrationId, onDone }: { integrationId: string; onDon
       }}
       disabled={loading}
     >
+      <Pause className="h-3 w-3 mr-1" />
       {loading ? 'Disabling…' : 'Disable'}
     </Button>
   )
@@ -296,29 +357,35 @@ function CreateIntegrationDialog({
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Connect an ad network</DialogTitle>
+          <DialogTitle className="font-serif text-xl flex items-center gap-2">
+            <Plus className="h-5 w-5 text-evergreen" /> Connect an ad network
+          </DialogTitle>
           <DialogDescription>
             Submit your ad-network account details. The platform stores only sanitized identifiers —
             never raw JavaScript. Your integration starts in Draft; you must submit it for review.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
-            <Label>Ad network</Label>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Ad network</Label>
             <Select value={networkId} onValueChange={(v) => { setNetworkId(v); setIntegrationType('') }}>
-              <SelectTrigger><SelectValue placeholder="Choose network" /></SelectTrigger>
+              <SelectTrigger className="mt-1"><SelectValue placeholder="Choose network" /></SelectTrigger>
               <SelectContent>
-                {networks.map(n => <SelectItem key={n.id} value={n.id}>{n.displayName}</SelectItem>)}
+                {networks.map(n => (
+                  <SelectItem key={n.id} value={n.id}>
+                    <span className="mr-2">●</span> {n.displayName}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
           {selectedNetwork && (
             <div>
-              <Label>Integration type</Label>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Integration type</Label>
               <Select value={integrationType} onValueChange={setIntegrationType}>
-                <SelectTrigger><SelectValue placeholder="Choose type" /></SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Choose type" /></SelectTrigger>
                 <SelectContent>
                   {selectedNetwork.integrationTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
@@ -327,11 +394,12 @@ function CreateIntegrationDialog({
           )}
 
           <div>
-            <Label>Site identifier (your website/domain registered with the network)</Label>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Site identifier</Label>
             <Input
               placeholder="e.g. yourplatform.com/p/your-page"
               value={siteIdentifier}
               onChange={e => setSiteIdentifier(e.target.value)}
+              className="mt-1 font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground mt-1">
               For Adsterra/Monetag, this is the page URL you added to your publisher account.
@@ -339,23 +407,33 @@ function CreateIntegrationDialog({
           </div>
 
           <div>
-            <Label>Zone identifier</Label>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Zone identifier</Label>
             <Input
               placeholder="e.g. zone-1234567"
               value={zoneIdentifier}
               onChange={e => setZoneIdentifier(e.target.value)}
+              className="mt-1 font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground mt-1">
               The zone ID or tag key from your ad-network dashboard.
             </p>
           </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={submit} disabled={loading || !networkId || !integrationType || !siteIdentifier || !zoneIdentifier}>
+          <Button
+            onClick={submit}
+            disabled={loading || !networkId || !integrationType || !siteIdentifier || !zoneIdentifier}
+            className="bg-evergreen text-cream hover:bg-evergreen-dark"
+          >
             {loading ? 'Creating…' : 'Create draft integration'}
           </Button>
         </DialogFooter>

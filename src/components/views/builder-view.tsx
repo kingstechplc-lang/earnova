@@ -175,53 +175,97 @@ export default function BuilderView({
   if (!page) return <div className="container mx-auto px-4 py-8">Page not found.</div>
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
+    <div className="view-fade container mx-auto px-4 py-6 max-w-4xl">
       <div className="flex items-center gap-3 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
           <ChevronLeft className="h-4 w-4" /> Back
         </Button>
         <div className="flex-1" />
-        {saving && <span className="text-sm text-muted-foreground">Saving…</span>}
-        <Button variant="outline" size="sm" onClick={() => {
-          window.location.hash = `/p/${page.slug}`
-          navigate({ name: 'public', slug: page.slug })
-        }}>
+        {saving && (
+          <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-gold animate-pulse" />
+            Saving…
+          </span>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            window.location.hash = `/p/${page.slug}`
+            navigate({ name: 'public', slug: page.slug })
+          }}
+          className="border-evergreen/30 text-evergreen hover:bg-evergreen/5"
+        >
           <Eye className="h-4 w-4 mr-1" /> Preview
         </Button>
-        <Button size="sm" onClick={togglePublish}>
+        <Button
+          size="sm"
+          onClick={togglePublish}
+          className={
+            page.publishedAt
+              ? 'bg-cranberry text-cream hover:bg-cranberry/80'
+              : 'bg-evergreen text-cream hover:bg-evergreen-dark shadow-festive'
+          }
+        >
           {page.publishedAt ? 'Unpublish' : 'Publish'}
         </Button>
       </div>
 
-      <Card className="mb-6">
-        <CardHeader><CardTitle className="text-base">Page settings</CardTitle></CardHeader>
+      <Card className="mb-6 overflow-hidden border-evergreen/20 shadow-festive">
+        <div className="h-1.5 w-full bg-gradient-to-r from-evergreen via-gold to-berry" />
+        <CardHeader>
+          <CardTitle className="font-serif text-lg flex items-center gap-2">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-evergreen/10 text-evergreen">⚙</span>
+            Page settings
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3">
           <div>
-            <Label className="text-xs">Title</Label>
-            <Input value={title} onChange={e => setTitle(e.target.value)} />
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Title</Label>
+            <Input value={title} onChange={e => setTitle(e.target.value)} className="mt-1 font-serif text-lg" />
           </div>
           <div>
-            <Label className="text-xs">Description</Label>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Description</Label>
             <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} />
           </div>
-          <div className="flex items-center gap-3">
-            <Badge variant="outline">/p/{page.slug}</Badge>
-            <Badge variant="outline">{page.pageType}</Badge>
-            <Badge variant="outline">{page.moderationState}</Badge>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Badge variant="outline" className="bg-evergreen/5 text-evergreen border-evergreen/30 font-mono">/p/{page.slug}</Badge>
+            <Badge variant="outline" className="bg-muted/40">{page.pageType.replace('_', ' ')}</Badge>
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              page.moderationState === 'APPROVED' ? 'pill-approved' :
+              page.moderationState === 'PENDING' ? 'pill-pending' :
+              page.moderationState === 'BANNED' ? 'pill-banned' : 'pill-draft'
+            }`}>
+              {page.moderationState}
+            </span>
             <div className="flex-1" />
-            <Button size="sm" variant="outline" onClick={saveMetadata}>Save settings</Button>
+            <Button size="sm" variant="outline" onClick={saveMetadata} className="border-evergreen/30 text-evergreen hover:bg-evergreen/5">
+              Save settings
+            </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Block palette */}
-      <Card className="mb-6">
-        <CardHeader><CardTitle className="text-base">Add a content block</CardTitle></CardHeader>
+      <Card className="mb-6 overflow-hidden border-gold/30">
+        <div className="h-1 w-full bg-gradient-to-r from-gold to-gold-dark" />
+        <CardHeader>
+          <CardTitle className="font-serif text-lg flex items-center gap-2">
+            <Plus className="h-5 w-5 text-gold-dark" />
+            Add a content block
+          </CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
             {BLOCK_TYPES.map(([type, label]) => (
-              <Button key={type} size="sm" variant="outline" onClick={() => addBlock(type)}>
-                <Plus className="h-3 w-3 mr-1" /> {label}
+              <Button
+                key={type}
+                size="sm"
+                variant="outline"
+                onClick={() => addBlock(type)}
+                className="border-evergreen/20 hover:bg-evergreen/5 hover:border-evergreen/40"
+              >
+                <Plus className="h-3 w-3 mr-1 text-evergreen" /> {label}
               </Button>
             ))}
           </div>
@@ -244,9 +288,11 @@ export default function BuilderView({
           </SortableContext>
         </DndContext>
         {page.blocks.length === 0 && (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              No blocks yet. Add one above.
+          <Card className="border-dashed">
+            <CardContent className="py-16 text-center">
+              <Plus className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+              <p className="font-medium">No blocks yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Add one above.</p>
             </CardContent>
           </Card>
         )}
@@ -270,19 +316,26 @@ function SortableBlock({
   }
 
   return (
-    <Card ref={setNodeRef} style={style}>
+    <Card ref={setNodeRef} style={style} className="overflow-hidden transition-all hover:shadow-festive hover:border-evergreen/30">
       <CardContent className="py-3">
         <div className="flex items-start gap-3">
-          <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing mt-2 text-muted-foreground">
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing mt-2 p-1 rounded hover:bg-muted text-muted-foreground hover:text-evergreen transition-colors"
+            aria-label="Drag to reorder"
+          >
             <GripVertical className="h-4 w-4" />
           </button>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
-              <Badge variant="secondary" className="text-xs">{block.type}</Badge>
+              <Badge variant="outline" className="text-xs bg-evergreen/5 text-evergreen border-evergreen/30 uppercase tracking-wide">
+                {block.type.replace('_', ' ')}
+              </Badge>
             </div>
             <BlockEditor block={block} onUpdate={(d) => onUpdate(block.id, d)} onSave={() => onSave(block.id, block.data)} />
           </div>
-          <Button variant="ghost" size="sm" onClick={() => onDelete(block.id)}>
+          <Button variant="ghost" size="sm" onClick={() => onDelete(block.id)} className="text-muted-foreground hover:text-cranberry hover:bg-cranberry/5">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>

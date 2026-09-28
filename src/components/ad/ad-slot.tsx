@@ -1,18 +1,5 @@
 'use client'
-import { Badge } from '@/components/ui/badge'
-import { Lock } from 'lucide-react'
-
-// AdSlot — renders a placeholder for an ad placement on a Special Page.
-//
-// In production, this component would:
-//   1. Check the visitor's consent state (Consent Layer from Chapter 3 of the spec)
-//   2. Emit the appropriate ad-network tag based on the placement source and ad-network code
-//   3. Forward the IAB TCF v2.2 consent string to the ad-network request
-//
-// In this MVP demo, we render a visible placeholder so the architecture is clear:
-//   - Platform placements (Layer 2) render the platform's own Adsterra/Monetag inventory
-//   - User placements render the page owner's approved Adsterra/Monetag integration
-//   - The placement engine has already filtered which placements may render (Chapter 2)
+import { Lock, Layers, Sparkles, User } from 'lucide-react'
 
 type Placement = {
   id: string
@@ -24,11 +11,16 @@ type Placement = {
   priority: number
 }
 
+const NETWORK_LABEL: Record<string, { label: string; color: string }> = {
+  adsterra: { label: 'Adsterra', color: 'text-gold-dark' },
+  monetag:  { label: 'Monetag',  color: 'text-berry' },
+  platform: { label: 'Platform', color: 'text-evergreen' },
+}
+
 export function AdSlot({ placement }: { placement: Placement }) {
   const isPlatform = placement.source !== 'USER_INTEGRATION'
-  const label = isPlatform
-    ? `Platform ad · ${placement.adNetworkCode === 'platform' ? 'Platform' : placement.adNetworkCode}`
-    : `Creator ad · ${placement.adNetworkCode}`
+  const network = NETWORK_LABEL[placement.adNetworkCode] || { label: placement.adNetworkCode, color: 'text-muted-foreground' }
+  const label = isPlatform ? `Platform ad · ${network.label}` : `Creator ad · ${network.label}`
 
   return (
     <div
@@ -37,25 +29,56 @@ export function AdSlot({ placement }: { placement: Placement }) {
       data-ad-network={placement.adNetworkCode}
       data-ad-integration-type={placement.integrationType || ''}
       data-ad-script-ref={placement.scriptReference || ''}
-      className="relative w-full min-h-[90px] md:min-h-[120px] rounded-lg border border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-1 p-4"
+      className={`relative w-full min-h-[100px] md:min-h-[120px] rounded-2xl flex flex-col items-center justify-center gap-2 p-5 overflow-hidden ${
+        isPlatform ? 'ad-slot-platform' : 'ad-slot-user'
+      }`}
     >
-      <Badge variant={isPlatform ? 'secondary' : 'outline'} className="text-[10px] uppercase tracking-wide">
-        {label}
-      </Badge>
-      <p className="text-xs text-muted-foreground mt-1">
-        Slot: {placement.slot} · Priority {placement.priority}
-      </p>
-      <p className="text-[10px] text-muted-foreground/70 mt-1 flex items-center gap-1">
-        <Lock className="h-2 w-2" />
-        {placement.scriptReference ? `Ref: ${placement.scriptReference}` : 'No active inventory'}
+      {/* Decorative corner accents */}
+      <div className="absolute top-2 left-2 h-2 w-2 rounded-full bg-current opacity-20" />
+      <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-current opacity-20" />
+      <div className="absolute bottom-2 left-2 h-2 w-2 rounded-full bg-current opacity-20" />
+      <div className="absolute bottom-2 right-2 h-2 w-2 rounded-full bg-current opacity-20" />
+
+      {/* Engine badge */}
+      <div className="absolute top-2.5 right-3 flex items-center gap-1.5">
+        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] uppercase tracking-wider font-bold ${
+          isPlatform
+            ? 'bg-evergreen/15 text-evergreen'
+            : 'bg-berry/15 text-berry'
+        }`}>
+          {isPlatform ? <Layers className="h-2.5 w-2.5" /> : <User className="h-2.5 w-2.5" />}
+          {isPlatform ? 'Platform engine' : 'User engine'}
+        </span>
+      </div>
+
+      {/* Main label */}
+      <div className="flex items-center gap-2">
+        <Sparkles className={`h-4 w-4 ${isPlatform ? 'text-gold-dark' : 'text-berry'}`} />
+        <span className={`text-xs uppercase tracking-wider font-bold ${network.color}`}>
+          {label}
+        </span>
+      </div>
+
+      {/* Slot metadata */}
+      <p className="text-xs text-muted-foreground">
+        Slot: <span className="font-mono font-medium">{placement.slot}</span> · Priority {placement.priority}
       </p>
 
-      {/* The actual ad-network tag would be emitted here in production.
-          For MVP demo, we render a visible placeholder so reviewers can see
-          exactly where each placement lives and which engine owns it. */}
-      <div className="absolute top-1 right-2 text-[9px] text-muted-foreground/40">
-        {placement.source === 'USER_INTEGRATION' ? 'USER' : 'PLATFORM'} ENGINE
-      </div>
+      {/* Sanitized ref */}
+      <p className="text-[10px] text-muted-foreground/70 flex items-center gap-1 mt-1">
+        <Lock className="h-2.5 w-2.5" />
+        {placement.scriptReference ? (
+          <span className="font-mono">Ref: {placement.scriptReference}</span>
+        ) : (
+          <span>No active inventory</span>
+        )}
+      </p>
+
+      {placement.integrationType && (
+        <p className="text-[10px] text-muted-foreground/60 font-mono">
+          {placement.integrationType}
+        </p>
+      )}
     </div>
   )
 }
