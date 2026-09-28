@@ -1,0 +1,438 @@
+// Global Earning Pages — Refined Architecture v2.0 (Prisma Schema)
+// Implements the data model from chapters 2,3,4,5,7,8 of the architecture spec.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USERS & AUTH ────────────────────────────────────────────────────────────
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String?
+  passwordHash    String?
+  image           String?
+  role            UserRole @default(USER)
+  bio             String?
+  locale          String   @default("en")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  pages           SpecialPage[]
+  adIntegrations  AdIntegration[]
+  subscriptions    CreatorSubscription[]
+  moderationActions ModerationEvent[]
+  disclaimerAcks  EarningsDisclaimerAck[]
+  sessions        Session[]
+
+  @@index([role])
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  @@index([userId])
+}
+
+// ─── AD NETWORKS & COMPATIBILITY (Chapter 2) ─────────────────────────────────
+
+model AdNetwork {
+  id                      String   @id @default(cuid())
+  code                    String   @unique  // "adsterra", "monetag", "platform"
+  displayName             String
+  integrationTypes        String   // JSON array as string (sqlite limitation)
+  requiresSiteVerification Boolean @default(true)
+  policyDocUrl             String?
+  status                  AdNetworkStatus @default(ACTIVE)
+  tcfVendorId             Int?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  integrations    AdIntegration[]
+  compatA         AdNetworkCompatibility[] @relation("compatA")
+  compatB         AdNetworkCompatibility[] @relation("compatB")
+  vendorMappings  AdNetworkVendorMapping[]
+  platformIntegrations PlatformAdNetworkIntegration[]
+
+  @@index([status])
+}
+
+enum AdNetworkStatus {
+  ACTIVE
+  DEPRECATED
+  BANNED
+}
+
+model AdNetworkCompatibility {
+  id                       String   @id @default(cuid())
+  networkAId               String
+  networkBId               String
+  verdict                  CompatibilityVerdict
+  maxSimultaneousUnits     Int?
+  minVerticalSeparationPx  Int?
+  requiredContentClassBetween String?
+  notes                    String?
+  updatedAt                DateTime @updatedAt
+
+  networkA   AdNetwork @relation("compatA", fields: [networkAId], references: [id], onDelete: Cascade)
+  networkB   AdNetwork @relation("compatB", fields: [networkBId], references: [id], onDelete: Cascade)
+
+  @@unique([networkAId, networkBId])
+}
+
+enum CompatibilityVerdict {
+  ALLOWED
+  ALLOWED_WITH_LIMITS
+  FORBIDDEN
+}
+
+model AdPlacementPolicy {
+  id                       String   @id @default(cuid())
+  name                     String   @unique  // "global"
+  maxAdUnitsPerPage        Int      @default(4)
+  maxPlatformAdsPerPage    Int      @default(2)
+  maxUserAdsPerPage        Int      @default(2)
+  minContentBetweenAdsPx   Int      @default(200)
+  platformAdsEnabled       Boolean  @default(true)
+  userAdsEnabled           Boolean  @default(true)
+  newIntegrationsManual    Boolean  @default(true)
+  globalKillSwitch         Boolean  @default(false)
+  updatedAt                DateTime @updatedAt
+}
+
+// ─── CONSENT (Chapter 3) ─────────────────────────────────────────────────────
+
+model ConsentRecord {
+  id           String   @id @default(cuid())
+  visitorId    String   // first-party anonymous ID
+  tcString     String   // IAB TCF v2.2 consent string (or simplified)
+  jurisdiction String   // EU, UK, CA, OTHER
+  source       String   // "banner", "prior", "default_grant"
+  capturedAt   DateTime @default(now())
+  expiresAt    DateTime
+
+  @@index([visitorId])
+  @@index([expiresAt])
+}
+
+model AdNetworkVendorMapping {
+  id              String   @id @default(cuid())
+  adNetworkId     String
+  tcfVendorId     Int
+  purposes        String   // JSON array
+  adNetwork       AdNetwork @relation(fields: [adNetworkId], references: [id], onDelete: Cascade)
+  @@unique([adNetworkId, tcfVendorId])
+}
+
+// ─── SPECIAL PAGES & CONTENT BLOCKS ──────────────────────────────────────────
+
+model SpecialPage {
+  id              String   @id @default(cuid())
+  slug            String   @unique  // e.g. "kingsley-christmas"
+  title           String
+  description     String?
+  pageType        PageType @default(PERSONAL)
+  ownerId         String
+  campaignId      String?
+  moderationState ModerationState @default(PENDING)
+  consentRequired Boolean  @default(true)
+  publishedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  campaign        Campaign? @relation(fields: [campaignId], references: [id])
+  blocks          ContentBlock[]
+  placements      AdPlacement[]
+  trustScores     TrustScore[]
+  moderationEvents ModerationEvent[]
+  analytics       PageAnalytics?
+
+  @@index([ownerId])
+  @@index([campaignId])
+  @@index([moderationState])
+}
+
+enum PageType {
+  PERSONAL
+  CREATOR
+  MUSIC
+  GAMING
+  PHOTOGRAPHY
+  BLOGGER
+  BUSINESS
+  STUDENT
+  EVENT
+  CELEBRATION
+  PROFESSIONAL
+  LINK_HUB
+}
+
+enum ModerationState {
+  PENDING
+  APPROVED
+  RESTRICTED
+  SUSPENDED
+  BANNED
+}
+
+model ContentBlock {
+  id          String   @id @default(cuid())
+  pageId      String
+  type        BlockType
+  data        String   // JSON blob with block-specific content
+  order       Int      // 0-indexed sort order
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  page        SpecialPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, order])
+}
+
+enum BlockType {
+  TEXT
+  IMAGE
+  VIDEO
+  LINK
+  SOCIAL_LINK
+  MUSIC
+  POLL
+  QUOTE
+  STATISTICS
+  EVENT
+  LOCATION
+  PRODUCT
+  HEADING
+  DIVIDER
+}
+
+// ─── AD INTEGRATIONS & PLACEMENTS (Chapter 7 — Lifecycle) ────────────────────
+
+model AdIntegration {
+  id                String   @id @default(cuid())
+  userId            String
+  adNetworkId       String
+  integrationType   IntegrationType
+  siteIdentifier    String?   // the website/domain registered at the network
+  zoneIdentifier    String?   // zone/tag ID from the network
+  scriptReference   String?   // sanitized reference to ad code (NEVER raw JS)
+  lifecycleState    IntegrationLifecycle @default(DRAFT)
+  rejectionReason   String?
+  approvedAt        DateTime?
+  approvedById      String?
+  disabledAt        DateTime?
+  revokedAt         DateTime?
+  revokedReason     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adNetwork         AdNetwork  @relation(fields: [adNetworkId], references: [id])
+  placements        AdPlacement[]
+  approvals         ModerationEvent[]
+
+  @@index([userId])
+  @@index([lifecycleState])
+  @@index([adNetworkId])
+}
+
+enum IntegrationType {
+  SCRIPT
+  DIRECT_LINK
+  NATIVE
+  BANNER
+  IN_PAGE
+  VIGNETTE
+  PUSH
+  MULTITAG
+}
+
+enum IntegrationLifecycle {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  DISABLED
+  REVOKED
+  DELETED
+}
+
+model AdPlacement {
+  id              String   @id @default(cuid())
+  pageId          String
+  integrationId   String?  // null if this is a platform placement
+  source          PlacementSource
+  slot            PlacementSlot
+  priority        Int      @default(50)  // lower = higher priority
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  page            SpecialPage    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  integration     AdIntegration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  @@index([pageId])
+  @@index([integrationId])
+}
+
+enum PlacementSource {
+  USER_INTEGRATION
+  PLATFORM_DIRECT
+  PLATFORM_NETWORK
+}
+
+enum PlacementSlot {
+  HEADER
+  AFTER_FIRST_BLOCK
+  MID_CONTENT
+  BEFORE_FOOTER
+  FOOTER
+  SIDEBAR
+}
+
+// ─── TRUST SCORE & MODERATION (Chapter 4) ───────────────────────────────────
+
+model TrustScore {
+  id              String   @id @default(cuid())
+  pageId          String
+  trafficQuality  Int      // 0-100
+  contentRisk     Int      // 0-100 (higher = worse)
+  adRisk          Int
+  spamRisk        Int
+  composite       Int
+  signalBreakdown String   // JSON
+  computedAt      DateTime @default(now())
+
+  page            SpecialPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, computedAt])
+}
+
+model ModerationEvent {
+  id              String   @id @default(cuid())
+  pageId          String?
+  integrationId   String?
+  fromState       String?
+  toState         String
+  reason          String
+  triggerSignals  String?  // JSON
+  triggeredById   String?
+  triggeredBy     String   // "automated" or userId
+  createdAt       DateTime @default(now())
+
+  page            SpecialPage?   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  integration     AdIntegration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  moderator       User?          @relation(fields: [triggeredById], references: [id])
+
+  @@index([pageId])
+  @@index([integrationId])
+  @@index([createdAt])
+}
+
+// ─── CAMPAIGNS (Christmas 2026 etc.) ─────────────────────────────────────────
+
+model Campaign {
+  id              String   @id @default(cuid())
+  slug            String   @unique  // "christmas-2026"
+  title           String
+  description     String?
+  startsAt        DateTime
+  endsAt          DateTime
+  isActive        Boolean  @default(true)
+  featured        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  pages           SpecialPage[]
+}
+
+// ─── REVENUE LAYERS (Chapter 5) ─────────────────────────────────────────────
+
+model PlatformAdNetworkIntegration {
+  // Layer 2: platform's own Adsterra/Monetag publisher account
+  // Renders platform-managed ad inventory on eligible Special Pages
+  id              String   @id @default(cuid())
+  adNetworkId     String
+  integrationType IntegrationType
+  zoneIdentifier  String
+  scriptReference String   // sanitized
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  adNetwork       AdNetwork @relation(fields: [adNetworkId], references: [id])
+}
+
+model CreatorSubscription {
+  // Layer 4: creator tooling (premium features, custom domain, etc.)
+  id              String   @id @default(cuid())
+  userId          String
+  tier            SubscriptionTier
+  status          SubscriptionStatus @default(ACTIVE)
+  startedAt       DateTime @default(now())
+  endsAt          DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum SubscriptionTier {
+  FREE
+  CREATOR_PRO
+  CREATOR_BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+}
+
+// ─── ANALYTICS ───────────────────────────────────────────────────────────────
+
+model PageAnalytics {
+  // Aggregated per-page analytics, recomputed nightly (MVP: mock)
+  id              String   @id @default(cuid())
+  pageId          String   @unique
+  visitors7d      Int      @default(0)
+  visitors30d     Int      @default(0)
+  pageViews7d     Int      @default(0)
+  pageViews30d    Int      @default(0)
+  uniqueVisitors30d Int    @default(0)
+  returningVisitors30d Int @default(0)
+  topCountries    String   // JSON: {"GH": 31, "NG": 19, ...}
+  topDevices      String   // JSON
+  topSources      String   // JSON
+  updatedAt       DateTime @updatedAt
+
+  page            SpecialPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+}
+
+// ─── COMPLIANCE (Chapter 6) ──────────────────────────────────────────────────
+
+model EarningsDisclaimerAck {
+  id              String   @id @default(cuid())
+  userId          String
+  disclaimerVersion String
+  acknowledgedAt  DateTime @default(now())
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
