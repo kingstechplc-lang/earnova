@@ -13,6 +13,7 @@ import {
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
 import { safeFetch } from '@/lib/safe-fetch'
+import { useConfetti } from '@/components/animated/confetti'
 import type { View, CurrentUser } from '@/app/page'
 
 type Integration = {
@@ -39,6 +40,7 @@ export default function AdminView({
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [acting, setActing] = useState<string | null>(null)
+  const { fire: fireConfetti, ConfettiLayer } = useConfetti()
 
   const load = async () => {
     setLoading(true)
@@ -58,12 +60,16 @@ export default function AdminView({
 
   async function act(integrationId: string, action: 'APPROVE' | 'REJECT' | 'REVOKE') {
     setActing(integrationId)
-    await safeFetch(`/api/admin/integrations/${integrationId}`, {
+    const res = await safeFetch(`/api/admin/integrations/${integrationId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
     })
     setActing(null)
+    // Celebrate when admin approves a creator's integration
+    if (action === 'APPROVE' && !res.error) {
+      fireConfetti({ count: 150, spread: 80, y: 0.3 })
+    }
     load()
   }
 
@@ -82,6 +88,7 @@ export default function AdminView({
 
   return (
     <div className="view-fade container mx-auto px-4 py-6 max-w-4xl">
+      {ConfettiLayer}
       <FadeIn>
         <div className="flex items-center gap-3 mb-6">
           <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>

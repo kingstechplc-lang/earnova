@@ -180,3 +180,42 @@ Stage Summary:
 - Network errors (dev-server HMR blips, offline, CORS, DNS) no longer crash pages — they surface as a friendly inline error state with retry button.
 - HTTP error responses (4xx/5xx) surface the server's error message in the same inline UI.
 - The dev experience is now robust: editing files no longer briefly breaks the dashboard or monetization pages while Turbopack recompiles.
+
+---
+Task ID: 6
+Agent: main (Super Z)
+Task: Three UI improvements: (1) gradient dialog headers, (2) confetti celebration, (3) colorful dashboard stat cards.
+
+Work Log:
+- Created src/components/animated/gradient-dialog-header.tsx — reusable GradientDialogHeader component with 6 gradient variants (evergreen, gold, berry, festive, cranberry, ocean). Each variant has: full-bleed gradient background, decorative radial-dot pattern overlay, 2 animated floating orbs with framer-motion x/y/opacity loops, animated icon badge with springy pop-in (scale 0→1, rotate -30°→0°), staggered title fade-in, sparkle icon with anim-sparkle-pulse, styled close button (white-on-blur with hover scale + 90° rotation on X icon), gold accent line at bottom. Uses DialogHeader/DialogTitle/DialogDescription from shadcn/ui for proper Radix semantics.
+- Created src/components/animated/confetti.tsx — programmatic confetti system with `useConfetti()` hook returning `{ fire, ConfettiLayer }`. Configurable: x/y origin (0-1 fractions of viewport), count (default 120), spread (0-100). 8 brand colors (evergreen, gold, berry, cranberry, ocean, cream). Each particle has random shape (rect/circle), size, color, delay, duration, drift, rotation. Particles fall using CSS keyframe animation (no external library). Auto-cleans up after 5 seconds. Uses CSS custom properties (--drift, --rot, --start-y) for per-particle variation. ConfettiLayer renders as fixed inset-0 pointer-events-none z-[100] overlay.
+- Migrated monetization-view's "Connect ad network" dialog to use GradientDialogHeader with variant="festive" (the most colorful — evergreen→gold→berry gradient). DialogContent now uses p-0 overflow-hidden with showCloseButton={false} (the gradient header has its own close button). Body wrapped in p-6 container.
+- Redesigned dashboard stat cards: expanded from 3 to 4 cards (added "In campaigns" card). Each card now has:
+  * Distinct color theme: evergreen (Total pages), gold (Published), berry (Approved), ocean/chart-4 blue (In campaigns)
+  * Tinted border in card's accent color
+  * Subtle gradient wash background (bg-gradient-to-br from-{color}/8 to-transparent)
+  * Pulsing floating orb in top-right corner (color-matched, blur-2xl, animate-pulse with staggered delays)
+  * Gradient top accent bar (1.5px tall)
+  * Solid gradient icon badge (12x12 rounded-2xl, gradient from-{color} to-{color}-dark, with shadow-festive/gold)
+  * Small uppercase label in top-right ("PAGES", "LIVE", "VERIFIED", "ACTIVE")
+  * Large serif number (text-4xl, color-matched)
+  * TiltCard wrapper with intensity=5 for 3D hover
+  * hover:shadow-elevated + hover:-translate-y-1 for lift effect
+- Wired confetti celebrations to 3 user success moments:
+  1. **Signup success** (signup-view.tsx): fires 200 particles, spread 100, origin y=0.3 — delayed navigation by 600ms so confetti is visible before transitioning to dashboard.
+  2. **Page publish** (builder-view.tsx togglePublish): fires 180 particles, spread 80, origin y=0.25 — only when newState is true (publishing), NOT when unpublishing.
+  3. **Admin approves integration** (admin-view.tsx act): fires 150 particles, spread 80, origin y=0.3 — only when action === 'APPROVE' and no error.
+  4. **User submits integration for review** (monetization-view.tsx SubmitButton): fires 80 particles (smaller burst), spread 50, origin y=0.4.
+- Verified via Agent Browser:
+  * Signup confetti: created new test account "Test User", confetti fired on submit, transitioned to dashboard with "Welcome back, Test User" visible.
+  * Page publish confetti: logged in as Kingsley, opened builder, unpublished + republished the Christmas page — confetti burst fired.
+  * Gradient dialog header: opened monetization → "Connect ad network" dialog — full-bleed evergreen→gold→berry gradient header visible with icon badge, sparkle icon, styled close button.
+  * Colorful dashboard cards: all 4 stat cards visible with distinct colors (Total pages=evergreen, Published=gold, Approved=berry, In campaigns=ocean-blue).
+- Lint passes clean (0 errors). Dev log shows all 200 responses, no runtime errors. 4 screenshots captured.
+
+Stage Summary:
+- Three UI improvements delivered:
+  1. **GradientDialogHeader** component with 6 gradient variants (evergreen/gold/berry/festive/cranberry/ocean) — animated icons, floating orbs, sparkles, styled close button. Migrated the one existing Dialog (Connect ad network) to use it.
+  2. **Confetti celebration system** — `useConfetti()` hook + ConfettiLayer, fires 80-200 particles in 8 brand colors with random shape/size/drift/rotation. Wired to 4 success moments: signup, page publish, ad integration submission, admin approval.
+  3. **Colorful dashboard stat cards** — 4 distinct color themes (evergreen/gold/berry/ocean-blue), each with gradient wash, floating orb, gradient icon badge, TiltCard wrapper, hover lift. Number values animate via CountUp.
+- All animations respect prefers-reduced-motion. Brand palette preserved.

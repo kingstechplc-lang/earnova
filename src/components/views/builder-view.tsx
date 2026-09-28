@@ -18,6 +18,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Plus, GripVertical, Trash2, ChevronLeft, Eye } from 'lucide-react'
 import { safeFetch } from '@/lib/safe-fetch'
+import { useConfetti } from '@/components/animated/confetti'
 import type { View, CurrentUser } from '@/app/page'
 
 type Block = {
@@ -51,6 +52,7 @@ export default function BuilderView({
   const [page, setPage] = useState<Page | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const { fire: fireConfetti, ConfettiLayer } = useConfetti()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [dirty, setDirty] = useState(false)
@@ -165,6 +167,10 @@ export default function BuilderView({
     })
     if (res.data?.page) {
       setPage(prev => prev ? { ...prev, publishedAt: res.data!.page!.publishedAt } : null)
+      // Confetti celebration only when publishing (not unpublishing)
+      if (newState) {
+        fireConfetti({ count: 180, spread: 80, y: 0.25 })
+      }
     }
     setSaving(false)
   }
@@ -174,6 +180,7 @@ export default function BuilderView({
 
   return (
     <div className="view-fade container mx-auto px-4 py-6 max-w-4xl">
+      {ConfettiLayer}
       <div className="flex items-center gap-3 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
           <ChevronLeft className="h-4 w-4" /> Back

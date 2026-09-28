@@ -8,6 +8,7 @@ import { AlertCircle, Sparkles, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { safeFetch } from '@/lib/safe-fetch'
+import { useConfetti } from '@/components/animated/confetti'
 import type { View, CurrentUser } from '@/app/page'
 
 export default function SignupView({
@@ -21,6 +22,7 @@ export default function SignupView({
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const { fire: fireConfetti, ConfettiLayer } = useConfetti()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -36,7 +38,10 @@ export default function SignupView({
       setError(res.error || 'Sign up failed')
       return
     }
-    onAuth(res.data.user)
+    // Celebrate the new account creation!
+    fireConfetti({ count: 200, spread: 100, y: 0.3 })
+    // Delay navigation slightly so confetti is visible
+    setTimeout(() => onAuth(res.data!.user!), 600)
   }
 
   const perks = [
@@ -48,6 +53,7 @@ export default function SignupView({
 
   return (
     <div className="relative min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12 overflow-hidden">
+      {ConfettiLayer}
       {/* Animated background */}
       <div className="absolute inset-0 mesh-bg" />
       <FloatingOrbs count={4} colors={['evergreen', 'gold', 'berry', 'sage']} />

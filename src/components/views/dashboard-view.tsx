@@ -14,7 +14,7 @@ import { StaggerContainer, StaggerItem, FadeIn } from '@/components/animated/mot
 import { safeFetch } from '@/lib/safe-fetch'
 import { TiltCard } from '@/components/animated/tilt-card'
 import {
-  Plus, Eye, Edit3, BarChart3, Wallet, FileText, Sparkles, TrendingUp,
+  Plus, Eye, Edit3, BarChart3, Wallet, FileText, Sparkles, TrendingUp, Globe2, Heart,
 } from 'lucide-react'
 import type { View, CurrentUser } from '@/app/page'
 
@@ -122,58 +122,93 @@ export default function DashboardView({
         </div>
       </FadeIn>
 
-      {/* Quick stats with CountUp */}
-      <StaggerContainer className="grid gap-4 mb-8 md:grid-cols-3">
+      {/* Quick stats — colorful gradient cards, one per metric */}
+      <StaggerContainer className="grid gap-4 mb-8 grid-cols-2 lg:grid-cols-4">
         <StaggerItem>
-          <TiltCard intensity={4}>
-            <Card className="overflow-hidden transition-all hover:shadow-elevated">
-              <div className="h-1 w-full bg-gradient-to-r from-evergreen to-evergreen-light" />
-              <CardContent className="py-4 flex items-center gap-4">
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-evergreen/10 text-evergreen anim-pulse-glow">
-                  <FileText className="h-5 w-5" />
+          <TiltCard intensity={5}>
+            <Card className="relative overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-1 border-evergreen/30">
+              {/* Gradient background wash */}
+              <div className="absolute inset-0 bg-gradient-to-br from-evergreen/8 via-evergreen/3 to-transparent" />
+              {/* Floating orb */}
+              <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-evergreen/15 blur-2xl animate-pulse" />
+              <div className="h-1.5 w-full bg-gradient-to-r from-evergreen to-evergreen-light" />
+              <CardContent className="relative py-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-evergreen to-evergreen-dark text-cream shadow-festive">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider text-evergreen/60 font-bold">Pages</span>
                 </div>
-                <div>
-                  <p className="text-3xl font-bold font-serif text-evergreen">
-                    <CountUp value={pages.length} duration={1200} />
-                  </p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Total pages</p>
-                </div>
+                <p className="text-4xl font-bold font-serif text-evergreen-dark leading-none">
+                  <CountUp value={pages.length} duration={1200} />
+                </p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mt-1.5">Total pages</p>
               </CardContent>
             </Card>
           </TiltCard>
         </StaggerItem>
+
         <StaggerItem>
-          <TiltCard intensity={4}>
-            <Card className="overflow-hidden transition-all hover:shadow-elevated">
-              <div className="h-1 w-full bg-gradient-to-r from-gold to-gold-dark" />
-              <CardContent className="py-4 flex items-center gap-4">
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gold/15 text-gold-dark anim-pulse-glow" style={{ animationDelay: '0.5s' }}>
-                  <Eye className="h-5 w-5" />
+          <TiltCard intensity={5}>
+            <Card className="relative overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-1 border-gold/30">
+              <div className="absolute inset-0 bg-gradient-to-br from-gold/12 via-gold/4 to-transparent" />
+              <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-gold/20 blur-2xl animate-pulse" style={{ animationDelay: '0.5s' }} />
+              <div className="h-1.5 w-full bg-gradient-to-r from-gold-light via-gold to-gold-dark" />
+              <CardContent className="relative py-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-gold to-gold-dark text-cream shadow-gold">
+                    <Eye className="h-5 w-5" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider text-gold-dark/60 font-bold">Live</span>
                 </div>
-                <div>
-                  <p className="text-3xl font-bold font-serif text-gold-dark">
-                    <CountUp value={publishedCount} duration={1200} delay={0} />
-                  </p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Published</p>
-                </div>
+                <p className="text-4xl font-bold font-serif text-gold-dark leading-none">
+                  <CountUp value={publishedCount} duration={1200} />
+                </p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mt-1.5">Published</p>
               </CardContent>
             </Card>
           </TiltCard>
         </StaggerItem>
+
         <StaggerItem>
-          <TiltCard intensity={4}>
-            <Card className="overflow-hidden transition-all hover:shadow-elevated">
-              <div className="h-1 w-full bg-gradient-to-r from-berry to-berry/70" />
-              <CardContent className="py-4 flex items-center gap-4">
-                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-berry/10 text-berry anim-pulse-glow" style={{ animationDelay: '1s' }}>
-                  <Sparkles className="h-5 w-5" />
+          <TiltCard intensity={5}>
+            <Card className="relative overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-1 border-berry/30">
+              <div className="absolute inset-0 bg-gradient-to-br from-berry/10 via-berry/3 to-transparent" />
+              <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-berry/20 blur-2xl animate-pulse" style={{ animationDelay: '1s' }} />
+              <div className="h-1.5 w-full bg-gradient-to-r from-berry via-berry/80 to-berry/60" />
+              <CardContent className="relative py-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-berry to-berry/70 text-cream shadow-festive">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider text-berry/60 font-bold">Verified</span>
                 </div>
-                <div>
-                  <p className="text-3xl font-bold font-serif text-berry">
-                    <CountUp value={approvedCount} duration={1200} delay={0} />
-                  </p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Approved</p>
+                <p className="text-4xl font-bold font-serif text-berry leading-none">
+                  <CountUp value={approvedCount} duration={1200} />
+                </p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mt-1.5">Approved</p>
+              </CardContent>
+            </Card>
+          </TiltCard>
+        </StaggerItem>
+
+        <StaggerItem>
+          <TiltCard intensity={5}>
+            <Card className="relative overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-1 border-chart-4/30">
+              <div className="absolute inset-0 bg-gradient-to-br from-chart-4/10 via-chart-4/3 to-transparent" />
+              <div className="absolute -top-6 -right-6 h-20 w-20 rounded-full bg-chart-4/20 blur-2xl animate-pulse" style={{ animationDelay: '1.5s' }} />
+              <div className="h-1.5 w-full bg-gradient-to-r from-chart-4 via-chart-4/80 to-evergreen-light" />
+              <CardContent className="relative py-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-chart-4 to-chart-4/70 text-cream shadow-festive">
+                    <TrendingUp className="h-5 w-5" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wider text-chart-4/60 font-bold">Active</span>
                 </div>
+                <p className="text-4xl font-bold font-serif text-chart-4 leading-none">
+                  <CountUp value={pages.filter(p => p.campaign).length} duration={1200} />
+                </p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mt-1.5">In campaigns</p>
               </CardContent>
             </Card>
           </TiltCard>

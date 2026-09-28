@@ -9,6 +9,8 @@ import { motion } from 'framer-motion'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
 import { safeFetch } from '@/lib/safe-fetch'
+import { GradientDialogHeader } from '@/components/animated/gradient-dialog-header'
+import { useConfetti } from '@/components/animated/confetti'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -297,21 +299,29 @@ function Tip({ icon, text }: { icon: React.ReactNode; text: string }) {
 
 function SubmitButton({ integrationId, onDone }: { integrationId: string; onDone: () => void }) {
   const [loading, setLoading] = useState(false)
+  const { fire: fireConfetti, ConfettiLayer } = useConfetti()
   return (
-    <Button
-      size="sm"
-      onClick={async () => {
-        setLoading(true)
-        await safeFetch(`/api/monetization/integrations/${integrationId}/submit`, { method: 'POST' })
-        setLoading(false)
-        onDone()
-      }}
-      disabled={loading}
-      className="bg-gold text-cream hover:bg-gold-dark"
-    >
-      <Send className="h-3 w-3 mr-1" />
-      {loading ? 'Submitting…' : 'Submit for review'}
-    </Button>
+    <>
+      {ConfettiLayer}
+      <Button
+        size="sm"
+        onClick={async () => {
+          setLoading(true)
+          const res = await safeFetch(`/api/monetization/integrations/${integrationId}/submit`, { method: 'POST' })
+          setLoading(false)
+          if (!res.error) {
+            // Small celebration when submitting for review
+            fireConfetti({ count: 80, spread: 50, y: 0.4 })
+          }
+          onDone()
+        }}
+        disabled={loading}
+        className="bg-gold text-cream hover:bg-gold-dark"
+      >
+        <Send className="h-3 w-3 mr-1" />
+        {loading ? 'Submitting…' : 'Submit for review'}
+      </Button>
+    </>
   )
 }
 
@@ -374,18 +384,16 @@ function CreateIntegrationDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="font-serif text-xl flex items-center gap-2">
-            <Plus className="h-5 w-5 text-evergreen" /> Connect an ad network
-          </DialogTitle>
-          <DialogDescription>
-            Submit your ad-network account details. The platform stores only sanitized identifiers —
-            never raw JavaScript. Your integration starts in Draft; you must submit it for review.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-lg p-0 overflow-hidden" showCloseButton={false}>
+        <GradientDialogHeader
+          variant="festive"
+          icon={Plus}
+          title="Connect an ad network"
+          description="Submit your ad-network account details. The platform stores only sanitized identifiers — never raw JavaScript. Your integration starts in Draft; you must submit it for review."
+          onClose={onClose}
+        />
 
-        <div className="space-y-4">
+        <div className="p-6 space-y-4">
           <div>
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Ad network</Label>
             <Select value={networkId} onValueChange={(v) => { setNetworkId(v); setIntegrationType('') }}>
@@ -444,18 +452,18 @@ function CreateIntegrationDialog({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button
-            onClick={submit}
-            disabled={loading || !networkId || !integrationType || !siteIdentifier || !zoneIdentifier}
-            className="bg-evergreen text-cream hover:bg-evergreen-dark"
-          >
-            {loading ? 'Creating…' : 'Create draft integration'}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button
+              onClick={submit}
+              disabled={loading || !networkId || !integrationType || !siteIdentifier || !zoneIdentifier}
+              className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden"
+            >
+              {loading ? 'Creating…' : 'Create draft integration'}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
