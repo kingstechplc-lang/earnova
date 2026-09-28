@@ -8,6 +8,7 @@ import { AlertCircle, Sparkles } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { Sparkles as SparklesComponent } from '@/components/animated/sparkles'
+import { safeFetch } from '@/lib/safe-fetch'
 import type { View, CurrentUser } from '@/app/page'
 
 export default function LoginView({
@@ -25,18 +26,17 @@ export default function LoginView({
     e.preventDefault()
     setError('')
     setLoading(true)
-    const res = await fetch('/api/auth/login', {
+    const res = await safeFetch<{ user?: CurrentUser; error?: string }>('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     })
-    const data = await res.json()
     setLoading(false)
-    if (!res.ok) {
-      setError(data.error || 'Login failed')
+    if (res.error || !res.data?.user) {
+      setError(res.error || 'Login failed')
       return
     }
-    onAuth(data.user)
+    onAuth(res.data.user)
   }
 
   return (

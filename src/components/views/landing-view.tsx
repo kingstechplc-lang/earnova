@@ -9,6 +9,7 @@ import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { Sparkles as SparklesComponent } from '@/components/animated/sparkles'
 import { CountUp } from '@/components/animated/count-up'
 import { StaggerContainer, StaggerItem, FadeIn } from '@/components/animated/motion'
+import { safeFetch } from '@/lib/safe-fetch'
 import {
   Sparkles, ArrowRight, Eye, Globe2, Layers, ShieldCheck, Share2,
   Wallet, TrendingUp, Star, Gift, Image as ImageIcon, Quote, Zap, Clock, Users,
@@ -28,7 +29,13 @@ export default function LandingView({
 }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   useEffect(() => {
-    fetch('/api/campaigns').then(r => r.json()).then(d => setCampaigns(d.campaigns || []))
+    let cancelled = false
+    ;(async () => {
+      const res = await safeFetch<{ campaigns?: Campaign[] }>('/api/campaigns')
+      if (cancelled) return
+      setCampaigns(res.data?.campaigns || [])
+    })()
+    return () => { cancelled = true }
   }, [])
 
   return (

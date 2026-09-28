@@ -10,6 +10,7 @@ import {
 import { CountUp } from '@/components/animated/count-up'
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
+import { safeFetch } from '@/lib/safe-fetch'
 import type { View, CurrentUser } from '@/app/page'
 
 type Analytics = {
@@ -40,12 +41,11 @@ export default function AnalyticsView({
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      const res = await fetch(`/api/analytics/${pageId}`)
+      const res = await safeFetch<{ analytics?: Analytics; trustScore?: TrustScore }>(`/api/analytics/${pageId}`)
       if (cancelled) return
-      if (res.ok) {
-        const d = await res.json()
-        setAnalytics(d.analytics)
-        setTrustScore(d.trustScore)
+      if (res.data) {
+        setAnalytics(res.data.analytics || null)
+        setTrustScore(res.data.trustScore || null)
       }
       setLoading(false)
     })()
@@ -54,10 +54,9 @@ export default function AnalyticsView({
 
   async function recomputeScore() {
     setRecomputing(true)
-    const res = await fetch(`/api/analytics/${pageId}`, { method: 'POST' })
-    if (res.ok) {
-      const d = await res.json()
-      setTrustScore(d.trustScore)
+    const res = await safeFetch<{ trustScore?: TrustScore }>(`/api/analytics/${pageId}`, { method: 'POST' })
+    if (res.data?.trustScore) {
+      setTrustScore(res.data.trustScore)
     }
     setRecomputing(false)
   }

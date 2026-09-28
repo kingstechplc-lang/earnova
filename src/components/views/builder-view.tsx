@@ -17,6 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Plus, GripVertical, Trash2, ChevronLeft, Eye } from 'lucide-react'
+import { safeFetch } from '@/lib/safe-fetch'
 import type { View, CurrentUser } from '@/app/page'
 
 type Block = {
@@ -58,13 +59,12 @@ export default function BuilderView({
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      const res = await fetch(`/api/pages/${pageId}`)
-      const data = await res.json()
+      const res = await safeFetch<{ page?: Page }>(`/api/pages/${pageId}`)
       if (cancelled) return
-      if (res.ok) {
-        setPage(data.page)
-        setTitle(data.page.title)
-        setDescription(data.page.description || '')
+      if (res.data?.page) {
+        setPage(res.data.page)
+        setTitle(res.data.page.title)
+        setDescription(res.data.page.description || '')
       }
       setLoading(false)
     })()
@@ -72,12 +72,11 @@ export default function BuilderView({
   }, [pageId])
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/pages/${pageId}`)
-    const data = await res.json()
-    if (res.ok) {
-      setPage(data.page)
-      setTitle(data.page.title)
-      setDescription(data.page.description || '')
+    const res = await safeFetch<{ page?: Page }>(`/api/pages/${pageId}`)
+    if (res.data?.page) {
+      setPage(res.data.page)
+      setTitle(res.data.page.title)
+      setDescription(res.data.page.description || '')
     }
   }, [pageId])
 
@@ -94,7 +93,7 @@ export default function BuilderView({
     const reordered = arrayMove(page.blocks, oldIdx, newIdx)
     setPage({ ...page, blocks: reordered })
     setSaving(true)
-    await fetch(`/api/page-builder/${pageId}/blocks`, {
+    await safeFetch(`/api/page-builder/${pageId}/blocks`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderedIds: reordered.map(b => b.id) }),
@@ -112,7 +111,7 @@ export default function BuilderView({
       SOCIAL_LINK: { platform: 'whatsapp', url: '', label: '' },
       DIVIDER: {},
     }
-    await fetch(`/api/page-builder/${pageId}/blocks`, {
+    await safeFetch(`/api/page-builder/${pageId}/blocks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, data: defaultData[type] || {} }),
@@ -130,7 +129,7 @@ export default function BuilderView({
 
   async function saveBlock(blockId: string, data: any) {
     setSaving(true)
-    await fetch(`/api/page-builder/${pageId}/blocks/${blockId}`, {
+    await safeFetch(`/api/page-builder/${pageId}/blocks/${blockId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ data }),
@@ -141,13 +140,13 @@ export default function BuilderView({
 
   async function deleteBlock(blockId: string) {
     if (!page) return
-    await fetch(`/api/page-builder/${pageId}/blocks/${blockId}`, { method: 'DELETE' })
+    await safeFetch(`/api/page-builder/${pageId}/blocks/${blockId}`, { method: 'DELETE' })
     load()
   }
 
   async function saveMetadata() {
     setSaving(true)
-    await fetch(`/api/pages/${pageId}`, {
+    await safeFetch(`/api/pages/${pageId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, description }),
@@ -159,14 +158,13 @@ export default function BuilderView({
     if (!page) return
     const newState = !page.publishedAt
     setSaving(true)
-    const res = await fetch(`/api/pages/${pageId}/publish`, {
+    const res = await safeFetch<{ page?: { publishedAt: string | null } }>(`/api/pages/${pageId}/publish`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ publish: newState }),
     })
-    if (res.ok) {
-      const data = await res.json()
-      setPage(prev => prev ? { ...prev, publishedAt: data.page.publishedAt } : null)
+    if (res.data?.page) {
+      setPage(prev => prev ? { ...prev, publishedAt: res.data!.page!.publishedAt } : null)
     }
     setSaving(false)
   }

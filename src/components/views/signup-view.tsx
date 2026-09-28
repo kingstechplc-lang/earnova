@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AlertCircle, Sparkles, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
+import { safeFetch } from '@/lib/safe-fetch'
 import type { View, CurrentUser } from '@/app/page'
 
 export default function SignupView({
@@ -25,18 +26,17 @@ export default function SignupView({
     e.preventDefault()
     setError('')
     setLoading(true)
-    const res = await fetch('/api/auth/register', {
+    const res = await safeFetch<{ user?: CurrentUser; error?: string }>('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, name, password }),
     })
-    const data = await res.json()
     setLoading(false)
-    if (!res.ok) {
-      setError(data.error || 'Sign up failed')
+    if (res.error || !res.data?.user) {
+      setError(res.error || 'Sign up failed')
       return
     }
-    onAuth(data.user)
+    onAuth(res.data.user)
   }
 
   const perks = [

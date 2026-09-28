@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { motion } from 'framer-motion'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
+import { safeFetch } from '@/lib/safe-fetch'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -57,38 +58,45 @@ export default function MonetizationView({
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [networks, setNetworks] = useState<AdNetwork[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      const [d, i, n] = await Promise.all([
-        fetch('/api/monetization/disclaimer').then(r => r.json()),
-        fetch('/api/monetization/integrations').then(r => r.json()),
-        fetch('/api/networks').then(r => r.json()),
+      setLoadError(null)
+      const [dRes, iRes, nRes] = await Promise.all([
+        safeFetch<Disclaimer>('/api/monetization/disclaimer'),
+        safeFetch<{ integrations?: Integration[] }>('/api/monetization/integrations'),
+        safeFetch<{ networks?: AdNetwork[] }>('/api/networks'),
       ])
       if (cancelled) return
-      setDisclaimer(d)
-      setIntegrations(i.integrations || [])
-      setNetworks(n.networks || [])
+      const firstError = dRes.error || iRes.error || nRes.error
+      if (firstError) setLoadError(firstError)
+      if (dRes.data) setDisclaimer(dRes.data)
+      setIntegrations(iRes.data?.integrations || [])
+      setNetworks(nRes.data?.networks || [])
       setLoading(false)
     })()
     return () => { cancelled = true }
   }, [])
 
   async function acknowledgeDisclaimer() {
-    const res = await fetch('/api/monetization/disclaimer', { method: 'POST' })
-    if (res.ok) {
+    const res = await safeFetch('/api/monetization/disclaimer', { method: 'POST' })
+    if (res.data) {
       setDisclaimer(prev => prev ? { ...prev, acknowledged: true, acknowledgedAt: new Date().toISOString() } : prev)
-      const updated = await fetch('/api/monetization/disclaimer').then(r => r.json())
-      setDisclaimer(updated)
+      const updated = await safeFetch<Disclaimer>('/api/monetization/disclaimer')
+      if (updated.data) setDisclaimer(updated.data)
+    } else if (res.error) {
+      setLoadError(res.error)
     }
   }
 
   async function reload() {
-    const i = await fetch('/api/monetization/integrations').then(r => r.json())
-    setIntegrations(i.integrations || [])
+    const i = await safeFetch<{ integrations?: Integration[] }>('/api/monetization/integrations')
+    setIntegrations(i.data?.integrations || [])
+    if (i.error) setLoadError(i.error)
   }
 
   if (loading) return <div className="container mx-auto px-4 py-8">Loading…</div>
@@ -294,7 +302,7 @@ function SubmitButton({ integrationId, onDone }: { integrationId: string; onDone
       size="sm"
       onClick={async () => {
         setLoading(true)
-        await fetch(`/api/monetization/integrations/${integrationId}/submit`, { method: 'POST' })
+        await safeFetch(`/api/monetization/integrations/${integrationId}/submit`, { method: 'POST' })
         setLoading(false)
         onDone()
       }}
@@ -315,7 +323,7 @@ function DisableButton({ integrationId, onDone }: { integrationId: string; onDon
       variant="outline"
       onClick={async () => {
         setLoading(true)
-        await fetch(`/api/monetization/integrations/${integrationId}/disable`, { method: 'POST' })
+        await safeFetch(`/api/monetization/integrations/${integrationId}/disable`, { method: 'POST' })
         setLoading(false)
         onDone()
       }}
@@ -346,7 +354,7 @@ function CreateIntegrationDialog({
   async function submit() {
     setError('')
     setLoading(true)
-    const res = await fetch('/api/monetization/integrations', {
+    const res = await safeFetch('/api/monetization/integrations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -357,9 +365,8 @@ function CreateIntegrationDialog({
       }),
     })
     setLoading(false)
-    if (!res.ok) {
-      const d = await res.json()
-      setError(d.error || 'Failed')
+    if (res.error) {
+      setError(res.error)
       return
     }
     onCreated()

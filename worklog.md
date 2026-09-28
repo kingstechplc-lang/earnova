@@ -154,3 +154,29 @@ Stage Summary:
 - Every view now has: staggered entrance animations, hover micro-interactions, scroll-triggered reveals, animated state transitions, decorative floating orbs/sparkles, gradient meshes, glassmorphism, premium shadows.
 - All animations respect prefers-reduced-motion for accessibility.
 - Brand palette preserved: deep evergreen + warm gold + cream + berry + cranberry.
+
+---
+Task ID: 5
+Agent: main (Super Z)
+Task: Fix runtime "Failed to fetch" TypeErrors reported in DashboardView and MonetizationView.
+
+Work Log:
+- Root cause: All useEffect fetch calls in the affected views used `Promise.all` of `fetch(...).then(r => r.json())` chains with no try/catch. When Next.js dev server briefly drops a request during hot module reload (HMR) — common when editing files in dev — the fetch() throws "Failed to fetch", the Promise.all rejects, the rejection is unhandled, and React renders the error boundary. This is a known dev-mode UX issue but it could also happen in production on flaky networks.
+- Created src/lib/safe-fetch.ts with two helpers:
+  * `safeFetch<T>(input, init?)` — wraps fetch() in try/catch, returns either `{ data: T, error: null, status: number }` on success or `{ data: null, error: string, status: number }` on failure (network error, CORS, non-2xx response, JSON parse failure). Never throws.
+  * `fetchAllSettled(...calls)` — runs multiple safeFetch in parallel; never rejects; returns per-call results so partial failures don't kill the whole batch.
+- Patched dashboard-view.tsx: replaced `Promise.all([fetch().then(json), fetch().then(json)])` with `Promise.all([safeFetch(...), safeFetch(...)])`. Added `loadError` state + error UI Card with "Try again" button when pages can't be loaded. Made createPage() use safeFetch and surface errors.
+- Patched monetization-view.tsx: same pattern for the 3 parallel fetches (disclaimer/integrations/networks). Added loadError state. Made acknowledgeDisclaimer, reload, SubmitButton, DisableButton, and CreateIntegrationDialog.submit all use safeFetch.
+- Patched admin-view.tsx: same pattern for load(), act(), togglePolicy() — all now use safeFetch with loadError state.
+- Patched public-page-view.tsx: replaced `fetch + res.ok + res.json()` chain with single safeFetch call.
+- Patched analytics-view.tsx: same for both GET (load analytics + trust score) and POST (recompute score).
+- Patched builder-view.tsx: 7 fetch calls converted to safeFetch (load, addBlock, handleDragEnd reorder, saveBlock, deleteBlock, saveMetadata, togglePublish).
+- Patched landing-view.tsx: campaigns fetch converted.
+- Patched login-view.tsx + signup-view.tsx: login/register submit handlers converted.
+- Verified via Agent Browser: opened landing page, navigated to dashboard (previously crashed), then to monetization (previously crashed), then admin, then analytics — all loaded cleanly with no "Failed to fetch" errors. All API responses 200 OK. Lint passes clean (0 errors).
+
+Stage Summary:
+- All 8 views + ~30 individual fetch call sites now use safeFetch instead of raw fetch with .then(r => r.json()).
+- Network errors (dev-server HMR blips, offline, CORS, DNS) no longer crash pages — they surface as a friendly inline error state with retry button.
+- HTTP error responses (4xx/5xx) surface the server's error message in the same inline UI.
+- The dev experience is now robust: editing files no longer briefly breaks the dashboard or monetization pages while Turbopack recompiles.

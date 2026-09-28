@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
+import { safeFetch } from '@/lib/safe-fetch'
 import type { View, CurrentUser } from '@/app/page'
 
 type Integration = {
@@ -36,16 +37,20 @@ export default function AdminView({
   const [pending, setPending] = useState<Integration[]>([])
   const [policy, setPolicy] = useState<Policy | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [acting, setActing] = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
-    const [p, k] = await Promise.all([
-      fetch('/api/admin/pending').then(r => r.json()),
-      fetch('/api/admin/kill-switch').then(r => r.json()),
+    setLoadError(null)
+    const [pRes, kRes] = await Promise.all([
+      safeFetch<{ integrations?: Integration[] }>('/api/admin/pending'),
+      safeFetch<{ policy?: Policy }>('/api/admin/kill-switch'),
     ])
-    setPending(p.integrations || [])
-    setPolicy(k.policy || null)
+    if (pRes.error) setLoadError(pRes.error)
+    else if (kRes.error) setLoadError(kRes.error)
+    setPending(pRes.data?.integrations || [])
+    setPolicy(kRes.data?.policy || null)
     setLoading(false)
   }
 
@@ -53,7 +58,7 @@ export default function AdminView({
 
   async function act(integrationId: string, action: 'APPROVE' | 'REJECT' | 'REVOKE') {
     setActing(integrationId)
-    await fetch(`/api/admin/integrations/${integrationId}`, {
+    await safeFetch(`/api/admin/integrations/${integrationId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
@@ -64,11 +69,12 @@ export default function AdminView({
 
   async function togglePolicy(field: keyof Policy, value: boolean) {
     setPolicy(prev => prev ? { ...prev, [field]: value } : null)
-    await fetch('/api/admin/kill-switch', {
+    const res = await safeFetch('/api/admin/kill-switch', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ [field]: value }),
     })
+    if (res.error) setLoadError(res.error)
     load()
   }
 

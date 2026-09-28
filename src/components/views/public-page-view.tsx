@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import { Sparkles as SparklesComponent } from '@/components/animated/sparkles'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
+import { safeFetch } from '@/lib/safe-fetch'
 import {
   Share2, ExternalLink, Lock, Sparkles, ChevronLeft, Info,
 } from 'lucide-react'
@@ -55,16 +56,14 @@ export default function PublicPageView({
     ;(async () => {
       setLoading(true)
       setError('')
-      const res = await fetch(`/api/p/${slug}`)
+      const res = await safeFetch<ApiResponse>(`/api/p/${slug}`)
       if (cancelled) return
-      if (!res.ok) {
-        const d = await res.json()
-        setError(d.error || 'Page not found')
+      if (res.error) {
+        setError(res.error)
         setLoading(false)
         return
       }
-      const d = await res.json()
-      setData(d)
+      setData(res.data)
       setLoading(false)
     })()
     return () => { cancelled = true }

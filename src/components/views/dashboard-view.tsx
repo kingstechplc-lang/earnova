@@ -11,6 +11,7 @@ import {
 import { motion } from 'framer-motion'
 import { CountUp } from '@/components/animated/count-up'
 import { StaggerContainer, StaggerItem, FadeIn } from '@/components/animated/motion'
+import { safeFetch } from '@/lib/safe-fetch'
 import { TiltCard } from '@/components/animated/tilt-card'
 import {
   Plus, Eye, Edit3, BarChart3, Wallet, FileText, Sparkles, TrendingUp,
@@ -46,6 +47,7 @@ export default function DashboardView({
   const [pages, setPages] = useState<Page[]>([])
   const [campaigns, setCampaigns] = useState<Array<{ id: string; title: string }>>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newType, setNewType] = useState('PERSONAL')
@@ -55,13 +57,17 @@ export default function DashboardView({
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      const [p, c] = await Promise.all([
-        fetch('/api/pages').then(r => r.json()),
-        fetch('/api/campaigns').then(r => r.json()),
+      setLoadError(null)
+      const [pagesRes, campaignsRes] = await Promise.all([
+        safeFetch<{ pages?: Page[] }>('/api/pages'),
+        safeFetch<{ campaigns?: Array<{ id: string; title: string }> }>('/api/campaigns'),
       ])
       if (cancelled) return
-      setPages(p.pages || [])
-      setCampaigns((c.campaigns || []).map((cmp: any) => ({ id: cmp.id, title: cmp.title })))
+      // Surface the first error, but still set whatever we got
+      const firstError = pagesRes.error || campaignsRes.error
+      if (firstError) setLoadError(firstError)
+      setPages(pagesRes.data?.pages || [])
+      setCampaigns((campaignsRes.data?.campaigns || []).map((cmp: any) => ({ id: cmp.id, title: cmp.title })))
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -70,7 +76,7 @@ export default function DashboardView({
   async function createPage() {
     if (!newTitle.trim()) return
     setCreating(true)
-    const res = await fetch('/api/pages', {
+    const res = await safeFetch<{ page: { id: string } }>('/api/pages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -80,9 +86,10 @@ export default function DashboardView({
       }),
     })
     setCreating(false)
-    if (res.ok) {
-      const data = await res.json()
-      navigate({ name: 'builder', pageId: data.page.id })
+    if (res.data?.page?.id) {
+      navigate({ name: 'builder', pageId: res.data.page.id })
+    } else if (res.error) {
+      setLoadError(res.error)
     }
   }
 
@@ -255,6 +262,19 @@ export default function DashboardView({
             <div key={i} className="h-24 rounded-xl shimmer-bg" />
           ))}
         </div>
+      ) : loadError && pages.length === 0 ? (
+        <Card className="border-dashed border-cranberry/40">
+          <CardContent className="py-16 text-center">
+            <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-cranberry/10 mb-3">
+              <FileText className="h-7 w-7 text-cranberry" />
+            </div>
+            <p className="font-medium text-foreground mb-1">Couldn&apos;t load your pages</p>
+            <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">{loadError}</p>
+            <Button variant="outline" size="sm" onClick={() => location.reload()}>
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
       ) : pages.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-16 text-center">
