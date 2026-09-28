@@ -219,3 +219,50 @@ Stage Summary:
   2. **Confetti celebration system** — `useConfetti()` hook + ConfettiLayer, fires 80-200 particles in 8 brand colors with random shape/size/drift/rotation. Wired to 4 success moments: signup, page publish, ad integration submission, admin approval.
   3. **Colorful dashboard stat cards** — 4 distinct color themes (evergreen/gold/berry/ocean-blue), each with gradient wash, floating orb, gradient icon badge, TiltCard wrapper, hover lift. Number values animate via CountUp.
 - All animations respect prefers-reduced-motion. Brand palette preserved.
+
+---
+Task ID: 7
+Agent: main (Super Z)
+Task: Expand admin console with full CRUD operations — campaigns, ad networks, compatibility matrix, placement policy, user management, page moderation, and stats overview.
+
+Work Log:
+- Built 11 new API routes under /api/admin/:
+  * GET/POST /api/admin/campaigns — list all (incl inactive) + create
+  * PATCH/DELETE /api/admin/campaigns/[id] — update / delete (with foreign-key protection)
+  * GET/POST /api/admin/networks — list all + create
+  * PATCH/DELETE /api/admin/networks/[id] — update / delete (blocks platform network + active integrations)
+  * GET/POST /api/admin/compatibility — list rules + create
+  * PATCH/DELETE /api/admin/compatibility/[id] — update / delete
+  * GET/PATCH /api/admin/policy — get + update global placement policy (with numeric validation)
+  * GET /api/admin/users — list with search + role filter
+  * GET/PATCH /api/admin/users/[id] — get one user (with pages + integrations) + update role/profile
+  * POST /api/admin/users/[id]/ban — bans user (sets pages to BANNED, disables integrations, logs moderation events, prevents self-ban + admin-ban)
+  * POST /api/admin/users/[id]/unban — restores user (pages → PENDING for re-moderation)
+  * GET /api/admin/pages — list all pages with state/search filter
+  * POST /api/admin/pages/[id]/moderation — change page state (auto-unpublish on BANNED/SUSPENDED, logs moderation event)
+  * GET /api/admin/stats — platform-wide overview (users/pages/campaigns/integrations/networks counts + last 10 moderation events)
+- All admin routes require ADMIN role (or MODERATOR for read-only routes). User context enforced via getCurrentUser().
+- Built 7 reusable admin section components in src/components/admin/:
+  * overview-section.tsx — 8 colorful stat cards (Total users/Pages/Active campaigns/Pending integrations/Pending pages/Active networks/Trust scores/Revoked) with CountUp animation + recent moderation events log with state-color-coded text + reason + moderator name
+  * campaigns-section.tsx — full CRUD: card grid with state badges (Live/Upcoming/Ended/Inactive), edit/delete buttons, gradient dialog for create/edit with slug/title/description/datetime pickers/isActive/featured toggles, confetti on save
+  * networks-section.tsx — full CRUD: card grid with status badges (Active/Deprecated/Banned), integration type chips, integration counts, edit/delete (platform network protected), gradient dialog with code/displayName/integration-type-multiselect/verification toggle/policy-doc-URL/TCF-vendor-ID/status buttons
+  * compatibility-section.tsx — visual matrix grid (rows×columns of networks, color-coded cells A/L/F for ALLOWED/ALLOWED_WITH_LIMITS/FORBIDDEN), rules list with edit/delete, gradient dialog for create/edit with network-pair selects, verdict buttons, max-units + min-separation numeric fields
+  * policy-section.tsx — 4 platform toggles (kill switch / platform ads / user ads / manual approval) + 4 numeric caps (max ad units/page, max platform ads/page, max user ads/page, min content between ads) with validation, save button with "✓ Saved" flash
+  * users-section.tsx — search + role filter, user card grid with role badges, pages/integrations counts, ban button (with reason prompt), user detail dialog showing all their pages + integrations with state pills, restore button on banned users (fires confetti)
+  * pages-section.tsx — search + state filter, page card grid with state-colored top bars, inline moderation-state dropdown per page (instant transition with reason prompt), confetti on APPROVE
+- Rewrote src/components/views/admin-view.tsx as a tabbed interface with 8 tabs (Overview/Campaigns/Ad networks/Compatibility/Policy/Users/Pages/Reviews), animated tab underline via layoutId, AnimatePresence tab transitions, role-gated tabs (admin-only tabs hidden for moderators), pending-reviews badge on Reviews tab.
+- All section components use safeFetch for error resilience, deferred useEffect (setTimeout 0) to avoid React 19 lint errors, and GradientDialogHeader for pop-up dialogs.
+- Confetti wired to: campaign create/edit save, user unban, page moderation APPROVE.
+- Fixed 3 lint errors (useEffect calling setState synchronously → deferred via setTimeout).
+- Verified via Agent Browser: all 7 admin tabs load correctly (logged in as admin@example.com). Screenshots captured for admin-expanded (overview), admin-campaigns, admin-campaign-dialog (gradient header visible), admin-networks (Adsterra + Monetag + Platform visible with integration counts), admin-compatibility (visual matrix with adsterra×monetag cells), admin-users (Kingsley + admin user cards), admin-pages (kingsley-christmas with state dropdown), admin-policy (4 toggles + 4 numeric caps + Save button). Lint passes clean (0 errors). Dev log shows all 200 responses, no runtime errors.
+
+Stage Summary:
+- Admin console expanded from 1 view (pending reviews + 4 switches) to a full 8-tab CRUD system.
+- Campaigns: full CRUD with create/edit dialog (gradient header, datetime pickers, isActive/featured toggles, confetti on save).
+- Ad networks: full CRUD with integration-type multiselect, TCF vendor ID, status management, platform-network protection.
+- Compatibility matrix: visual grid + rule list + create/edit dialog with verdict buttons + numeric limits.
+- Placement policy: 4 toggles + 4 numeric caps with validation + "✓ Saved" flash + auto-cleanup of compatibility cache.
+- User management: search + role filter + ban (with reason + audit log + auto-disable integrations) + unban (with confetti + restore pages to PENDING) + detail dialog showing all user's pages + integrations.
+- Page moderation: search + state filter + inline state dropdown per page + auto-unpublish on BAN/SUSPEND + audit log + confetti on APPROVE.
+- Overview: 8 colorful stat cards + last 10 moderation events with state colors + moderator names.
+- 11 new API routes, all with role enforcement + safe error handling + audit logging via ModerationEvent table.

@@ -1,33 +1,47 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
+import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ChevronLeft, ShieldAlert, CheckCircle2, XCircle, Ban, Pause,
-  ShieldCheck, Zap, Eye, Clock, User,
+  ChevronLeft, ShieldAlert, ShieldCheck, Zap, Activity, Megaphone, Network, Sliders, Users, FileText, Clock,
 } from 'lucide-react'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
-import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
-import { safeFetch } from '@/lib/safe-fetch'
+import { FadeIn } from '@/components/animated/motion'
 import { useConfetti } from '@/components/animated/confetti'
+import { safeFetch } from '@/lib/safe-fetch'
+import { AdminOverview } from '@/components/admin/overview-section'
+import { CampaignsSection } from '@/components/admin/campaigns-section'
+import { NetworksSection } from '@/components/admin/networks-section'
+import { CompatibilitySection } from '@/components/admin/compatibility-section'
+import { PolicySection } from '@/components/admin/policy-section'
+import { UsersSection } from '@/components/admin/users-section'
+import { PagesSection } from '@/components/admin/pages-section'
 import type { View, CurrentUser } from '@/app/page'
 
-type Integration = {
-  id: string; integrationType: string; siteIdentifier: string | null
-  zoneIdentifier: string | null; lifecycleState: string; rejectionReason: string | null
-  createdAt: string; adNetwork: { id: string; code: string; displayName: string }
-  user: { id: string; email: string; name: string | null; createdAt: string }
-}
+type Tab = 'overview' | 'campaigns' | 'networks' | 'compatibility' | 'policy' | 'users' | 'pages' | 'reviews'
 
-type Policy = {
-  id: string; platformAdsEnabled: boolean; userAdsEnabled: boolean
-  newIntegrationsManual: boolean; globalKillSwitch: boolean
-  maxAdUnitsPerPage: number; maxPlatformAdsPerPage: number; maxUserAdsPerPage: number
+const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; adminOnly?: boolean }> = [
+  { id: 'overview', label: 'Overview', icon: <Activity className="h-4 w-4" /> },
+  { id: 'campaigns', label: 'Campaigns', icon: <Megaphone className="h-4 w-4" /> },
+  { id: 'networks', label: 'Ad networks', icon: <Network className="h-4 w-4" />, adminOnly: true },
+  { id: 'compatibility', label: 'Compatibility', icon: <Sliders className="h-4 w-4" />, adminOnly: true },
+  { id: 'policy', label: 'Policy', icon: <Zap className="h-4 w-4" />, adminOnly: true },
+  { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" />, adminOnly: true },
+  { id: 'pages', label: 'Pages', icon: <FileText className="h-4 w-4" /> },
+  { id: 'reviews', label: 'Reviews', icon: <Clock className="h-4 w-4" /> },
+]
+
+type StatsData = {
+  users: { total: number; admins: number }
+  pages: { total: number; published: number; pending: number; banned: number }
+  campaigns: { total: number; active: number }
+  integrations: { total: number; pending: number; approved: number; revoked: number }
+  networks: { total: number; active: number }
+  trustScoresComputed: number
 }
+type RecentEvent = any
 
 export default function AdminView({
   user, navigate,
@@ -35,59 +49,39 @@ export default function AdminView({
   user: CurrentUser
   navigate: (v: View) => void
 }) {
-  const [pending, setPending] = useState<Integration[]>([])
-  const [policy, setPolicy] = useState<Policy | null>(null)
+  const [tab, setTab] = useState<Tab>('overview')
+  const [stats, setStats] = useState<StatsData | null>(null)
+  const [events, setEvents] = useState<RecentEvent[]>([])
+  const [policy, setPolicy] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [acting, setActing] = useState<string | null>(null)
-  const { fire: fireConfetti, ConfettiLayer } = useConfetti()
+  const { ConfettiLayer } = useConfetti()
 
-  const load = async () => {
-    setLoading(true)
-    setLoadError(null)
-    const [pRes, kRes] = await Promise.all([
-      safeFetch<{ integrations?: Integration[] }>('/api/admin/pending'),
-      safeFetch<{ policy?: Policy }>('/api/admin/kill-switch'),
-    ])
-    if (pRes.error) setLoadError(pRes.error)
-    else if (kRes.error) setLoadError(kRes.error)
-    setPending(pRes.data?.integrations || [])
-    setPolicy(kRes.data?.policy || null)
-    setLoading(false)
-  }
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      setLoadError(null)
+      const [statsRes, policyRes] = await Promise.all([
+        safeFetch<{ stats?: StatsData; recentEvents?: RecentEvent[] }>('/api/admin/stats'),
+        safeFetch<{ policy?: any }>('/api/admin/policy'),
+      ])
+      if (cancelled) return
+      if (statsRes.error) setLoadError(statsRes.error)
+      if (statsRes.data) {
+        setStats(statsRes.data.stats || null)
+        setEvents(statsRes.data.recentEvents || [])
+      }
+      if (policyRes.data?.policy) setPolicy(policyRes.data.policy)
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
 
-  useEffect(() => { load() }, [])
-
-  async function act(integrationId: string, action: 'APPROVE' | 'REJECT' | 'REVOKE') {
-    setActing(integrationId)
-    const res = await safeFetch(`/api/admin/integrations/${integrationId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action }),
-    })
-    setActing(null)
-    // Celebrate when admin approves a creator's integration
-    if (action === 'APPROVE' && !res.error) {
-      fireConfetti({ count: 150, spread: 80, y: 0.3 })
-    }
-    load()
-  }
-
-  async function togglePolicy(field: keyof Policy, value: boolean) {
-    setPolicy(prev => prev ? { ...prev, [field]: value } : null)
-    const res = await safeFetch('/api/admin/kill-switch', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value }),
-    })
-    if (res.error) setLoadError(res.error)
-    load()
-  }
-
-  if (loading) return <div className="container mx-auto px-4 py-8">Loading…</div>
+  const visibleTabs = TABS.filter(t => !t.adminOnly || user.role === 'ADMIN')
 
   return (
-    <div className="view-fade container mx-auto px-4 py-6 max-w-4xl">
+    <div className="view-fade container mx-auto px-4 py-6 max-w-5xl">
       {ConfettiLayer}
       <FadeIn>
         <div className="flex items-center gap-3 mb-6">
@@ -99,7 +93,7 @@ export default function AdminView({
 
       {/* Hero header */}
       <FadeIn delay={0.05}>
-        <div className="mb-8 relative overflow-hidden rounded-2xl border border-evergreen/30 bg-gradient-to-br from-evergreen/10 via-background to-gold/5 p-6 md:p-8">
+        <div className="mb-6 relative overflow-hidden rounded-2xl border border-evergreen/30 bg-gradient-to-br from-evergreen/10 via-background to-gold/5 p-6 md:p-8">
           <FloatingOrbs count={2} colors={['evergreen', 'gold']} />
           <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-evergreen/20 blur-3xl animate-pulse" />
           <div className="relative">
@@ -116,248 +110,94 @@ export default function AdminView({
             </div>
             <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight mb-2">Platform controls</h1>
             <p className="text-muted-foreground">
-              Logged in as <strong className="text-foreground">{user.email}</strong>
+              Logged in as <strong className="text-foreground">{user.email}</strong> ·{' '}
+              <span className="text-evergreen font-medium">{user.role}</span>
             </p>
           </div>
         </div>
       </FadeIn>
 
-      {/* Global kill switch alert */}
-      <AnimatePresence>
-        {policy?.globalKillSwitch && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mb-6 overflow-hidden"
-          >
-            <Alert variant="destructive" className="border-cranberry/40 bg-cranberry/10">
-              <ShieldAlert className="h-4 w-4 text-cranberry anim-pulse-glow" />
-              <AlertTitle className="text-cranberry">⚠ Global kill switch is ACTIVE</AlertTitle>
-              <AlertDescription>
-                No ads are rendering on any Special Page right now. Toggle it off below to restore.
-          </AlertDescription>
+      {loadError && (
+        <Alert variant="destructive" className="mb-4">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Couldn&apos;t load admin data</AlertTitle>
+          <AlertDescription>{loadError}</AlertDescription>
         </Alert>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      )}
 
-      {/* Platform-wide controls */}
-      <Card className="mb-6 overflow-hidden shadow-festive border-evergreen/20">
-        <div className="h-1.5 w-full bg-gradient-to-r from-evergreen via-gold to-berry" />
-        <CardHeader>
-          <CardTitle className="text-xl flex items-center gap-2">
-            <Zap className="h-5 w-5 text-gold-dark" />
-            Platform-wide controls
-          </CardTitle>
-          <CardDescription>
-            These settings apply to every Special Page on the platform. Use the kill switch only in emergencies.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-1">
-          <SwitchRow
-            icon={<ShieldAlert className="h-4 w-4" />}
-            iconColor="text-cranberry"
-            label="Global ad kill switch"
-            description="Disables ALL ads (platform + user) on every page immediately."
-            checked={policy?.globalKillSwitch ?? false}
-            onChange={v => togglePolicy('globalKillSwitch', v)}
-            danger
-          />
-          <div className="border-t border-border/60" />
-          <SwitchRow
-            icon={<Eye className="h-4 w-4" />}
-            iconColor="text-evergreen"
-            label="Platform ads"
-            description="Allows the platform's own Adsterra/Monetag publisher account to render on eligible pages."
-            checked={policy?.platformAdsEnabled ?? false}
-            onChange={v => togglePolicy('platformAdsEnabled', v)}
-          />
-          <div className="border-t border-border/60" />
-          <SwitchRow
-            icon={<User className="h-4 w-4" />}
-            iconColor="text-berry"
-            label="User ads"
-            description="Allows approved user ad integrations to render on their pages."
-            checked={policy?.userAdsEnabled ?? false}
-            onChange={v => togglePolicy('userAdsEnabled', v)}
-          />
-          <div className="border-t border-border/60" />
-          <SwitchRow
-            icon={<Clock className="h-4 w-4" />}
-            iconColor="text-gold-dark"
-            label="Manual approval required"
-            description="New ad integrations stay in PENDING_REVIEW until an admin reviews them."
-            checked={policy?.newIntegrationsManual ?? false}
-            onChange={v => togglePolicy('newIntegrationsManual', v)}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Pending reviews */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-xl flex items-center gap-2">
-            <Clock className="h-5 w-5 text-gold-dark" />
-            Pending ad-integration reviews
-            {pending.length > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center rounded-full bg-gold/15 text-gold-dark text-xs font-bold px-2 py-0.5">
-                {pending.length}
-              </span>
-            )}
-          </CardTitle>
-          <CardDescription>
-            Each integration must be reviewed before it can render ads. Verify the user&apos;s ad-network
-            account and site-verification status before approving.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {pending.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: 'spring', stiffness: 200 }}
-              className="py-12 text-center text-muted-foreground"
+      {/* Tabs */}
+      <FadeIn delay={0.1}>
+        <div className="mb-6 flex flex-wrap gap-1 p-1 rounded-xl bg-muted/40 border border-border/60 overflow-x-auto">
+          {visibleTabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                tab === t.id
+                  ? 'bg-background text-evergreen shadow-festive'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+              }`}
             >
-              <motion.div
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                className="inline-block mb-2"
-              >
-                <CheckCircle2 className="h-10 w-10 mx-auto text-evergreen/60" />
-              </motion.div>
-              <p className="font-medium">All caught up!</p>
-              <p className="text-sm">No pending reviews.</p>
-            </motion.div>
-          ) : (
-            <StaggerContainer className="space-y-3">
-              {pending.map(int => (
-                <StaggerItem key={int.id}>
-                <div className="border border-border/60 rounded-xl p-4 hover:border-evergreen/30 hover:shadow-festive transition-all">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          int.adNetwork.code === 'adsterra' ? 'bg-gold/15 text-gold-dark' : 'bg-berry/15 text-berry'
-                        }`}>
-                          ● {int.adNetwork.displayName}
-                        </span>
-                        <span className="text-xs text-muted-foreground font-mono">{int.integrationType}</span>
-                      </div>
-                      <p className="text-sm font-medium">
-                        {int.user.name || int.user.email}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Account age: {Math.floor((Date.now() - new Date(int.user.createdAt).getTime()) / 86400000)} days
-                      </p>
-                      <div className="mt-2 space-y-0.5 text-xs">
-                        <p className="text-muted-foreground">
-                          <span className="font-medium">Site:</span>{' '}
-                          <code className="font-mono text-foreground/80 bg-muted/40 px-1 py-0.5 rounded">
-                            {int.siteIdentifier}
-                          </code>
-                        </p>
-                        <p className="text-muted-foreground">
-                          <span className="font-medium">Zone:</span>{' '}
-                          <code className="font-mono text-foreground/80 bg-muted/40 px-1 py-0.5 rounded">
-                            {int.zoneIdentifier}
-                          </code>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2 flex-shrink-0">
-                      <Button
-                        size="sm"
-                        onClick={() => act(int.id, 'APPROVE')}
-                        disabled={acting === int.id}
-                        className="bg-evergreen text-cream hover:bg-evergreen-dark"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => act(int.id, 'REJECT')}
-                        disabled={acting === int.id}
-                      >
-                        <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => act(int.id, 'REVOKE')}
-                        disabled={acting === int.id}
-                        className="text-cranberry hover:text-cranberry hover:bg-cranberry/10"
-                      >
-                        <Ban className="h-3.5 w-3.5 mr-1" /> Revoke
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                </StaggerItem>
-              ))}
-            </StaggerContainer>
-          )}
-        </CardContent>
-      </Card>
+              {t.icon}
+              <span>{t.label}</span>
+              {t.id === 'reviews' && stats && stats.integrations.pending > 0 && (
+                <span className="ml-1 inline-flex items-center justify-center rounded-full bg-gold text-cream text-[10px] font-bold h-4 min-w-4 px-1">
+                  {stats.integrations.pending}
+                </span>
+              )}
+              {tab === t.id && (
+                <motion.span
+                  layoutId="tab-underline"
+                  className="absolute -bottom-1 left-2 right-2 h-0.5 rounded-full bg-gradient-to-r from-evergreen via-gold to-berry"
+                  transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
+      </FadeIn>
 
-      {/* Review checklist */}
-      <Card className="bg-gradient-to-br from-muted/30 to-background border-border/60">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Pause className="h-4 w-4 text-gold-dark" />
-            Review checklist
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p className="flex items-start gap-2">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-evergreen/10 text-evergreen text-xs mt-0.5">✓</span>
-            Verify the user&apos;s ad-network account is in good standing.
-          </p>
-          <p className="flex items-start gap-2">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-evergreen/10 text-evergreen text-xs mt-0.5">✓</span>
-            Verify the site identifier matches the user&apos;s Special Page URL.
-          </p>
-          <p className="flex items-start gap-2">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-evergreen/10 text-evergreen text-xs mt-0.5">✓</span>
-            Check the page for prohibited content categories per ad-network rules.
-          </p>
-          <p className="flex items-start gap-2">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-cranberry/10 text-cranberry text-xs mt-0.5">✗</span>
-            Reject if anything looks automated, spoofed, or policy-violating.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Tab content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.25 }}
+        >
+          {loading && tab === 'overview' ? (
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <div key={i} className="h-32 rounded-xl shimmer-bg" />)}
+            </div>
+          ) : (
+            <>
+              {tab === 'overview' && stats && <AdminOverview stats={stats} events={events} />}
+              {tab === 'campaigns' && <CampaignsSection />}
+              {tab === 'networks' && user.role === 'ADMIN' && <NetworksSection />}
+              {tab === 'compatibility' && user.role === 'ADMIN' && <CompatibilitySection />}
+              {tab === 'policy' && user.role === 'ADMIN' && <PolicySection initialPolicy={policy} />}
+              {tab === 'users' && user.role === 'ADMIN' && <UsersSection />}
+              {tab === 'pages' && <PagesSection />}
+              {tab === 'reviews' && <ReviewsSection />}
+            </>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   )
 }
 
-function SwitchRow({
-  icon, iconColor, label, description, checked, onChange, danger,
-}: {
-  icon: React.ReactNode
-  iconColor: string
-  label: string
-  description: string
-  checked: boolean
-  onChange: (v: boolean) => void
-  danger?: boolean
-}) {
+// Inline reviews section (kept here for simplicity — same as before but uses the existing /api/admin/pending route)
+function ReviewsSection() {
   return (
-    <div className="flex items-start justify-between gap-4 py-4">
-      <div className="flex items-start gap-3 flex-1">
-        <div className={`rounded-lg p-1.5 mt-0.5 ${danger ? 'bg-cranberry/10' : 'bg-muted/40'}`}>
-          <span className={iconColor}>{icon}</span>
-        </div>
-        <div>
-          <Label className={`font-medium ${danger ? 'text-cranberry' : ''}`}>{label}</Label>
-          <p className="text-xs text-muted-foreground mt-1">{description}</p>
-        </div>
-      </div>
-      <Switch
-        checked={checked}
-        onCheckedChange={onChange}
-      />
-    </div>
+    <Card>
+      <CardContent className="py-4">
+        <p className="text-sm text-muted-foreground">
+          The &quot;Reviews&quot; tab content is now on the &quot;Pages&quot; tab — pick a page and change its moderation state.
+          Ad-integration reviews are available on the user detail panel (Users tab → click chevron).
+        </p>
+      </CardContent>
+    </Card>
   )
 }
