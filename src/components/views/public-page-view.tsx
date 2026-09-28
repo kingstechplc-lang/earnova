@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { motion, useScroll, useTransform } from 'framer-motion'
+import { Sparkles as SparklesComponent } from '@/components/animated/sparkles'
+import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import {
   Share2, ExternalLink, Lock, Sparkles, ChevronLeft, Info,
 } from 'lucide-react'
@@ -43,6 +46,9 @@ export default function PublicPageView({
   const [data, setData] = useState<ApiResponse | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const { scrollY } = useScroll()
+  const heroY = useTransform(scrollY, [0, 300], [0, 60])
+  const heroOpacity = useTransform(scrollY, [0, 200], [1, 0.4])
 
   useEffect(() => {
     let cancelled = false
@@ -78,7 +84,11 @@ export default function PublicPageView({
 
   if (loading) return (
     <div className="container mx-auto px-4 py-20 max-w-md text-center">
-      <div className="animate-pulse text-muted-foreground">Loading page…</div>
+      <div className="relative inline-block">
+        <div className="absolute inset-0 rounded-full bg-evergreen/30 blur-xl animate-ping" />
+        <div className="relative h-12 w-12 rounded-full border-2 border-evergreen/30 border-t-evergreen animate-spin" />
+      </div>
+      <p className="text-muted-foreground mt-4">Loading page…</p>
     </div>
   )
 
@@ -87,9 +97,14 @@ export default function PublicPageView({
       <div className="container mx-auto px-4 py-12 max-w-md">
         <Card>
           <CardContent className="py-16 text-center">
-            <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-cranberry/10 mb-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200 }}
+              className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-cranberry/10 mb-4"
+            >
               <Lock className="h-7 w-7 text-cranberry" />
-            </div>
+            </motion.div>
             <p className="text-xl font-bold mb-1 font-serif">{error}</p>
             <p className="text-sm text-muted-foreground mb-6">This page may not exist or may have been removed.</p>
             <Button variant="outline" onClick={() => navigate({ name: 'landing' })}>
@@ -107,58 +122,97 @@ export default function PublicPageView({
   const hasAds = placements.length > 0 && !policy.globalKillSwitch
 
   return (
-    <div className="view-fade min-h-screen">
-      {/* Hero header with gradient */}
+    <div className="min-h-screen">
+      {/* ── Parallax Hero ── */}
       <div className="relative overflow-hidden border-b border-border/60">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-evergreen-dark via-evergreen to-berry/30" />
-        <div className="absolute inset-0 bg-pine-pattern opacity-20" />
-        {/* Floating orbs */}
-        <div className="absolute top-10 right-10 h-32 w-32 rounded-full bg-gold/20 blur-3xl" />
-        <div className="absolute bottom-10 left-10 h-40 w-40 rounded-full bg-berry/30 blur-3xl" />
+        <motion.div style={{ y: heroY, opacity: heroOpacity }} className="absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-br from-evergreen-dark via-evergreen to-berry/30" />
+          <div className="absolute inset-0 mesh-bg opacity-30" />
+          <div className="absolute inset-0 bg-pine-pattern opacity-20" />
+          <FloatingOrbs count={4} colors={['gold', 'berry', 'sage', 'evergreen']} />
+          <SparklesComponent count={12} />
+        </motion.div>
 
-        <div className="container mx-auto px-4 py-10 md:py-14 max-w-3xl relative">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          className="container mx-auto px-4 py-12 md:py-16 max-w-3xl relative"
+        >
           <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="flex flex-wrap items-center gap-2">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+              className="flex flex-wrap items-center gap-2"
+            >
               {page.campaign && (
                 <Badge className="bg-gold/20 text-gold-light border-gold/30 backdrop-blur-sm">
-                  <Sparkles className="h-3 w-3 mr-1" /> {page.campaign.title}
+                  <Sparkles className="h-3 w-3 mr-1 anim-sparkle-pulse" /> {page.campaign.title}
                 </Badge>
               )}
-              <Badge variant="outline" className="bg-cream/10 text-cream border-cream/30 backdrop-blur-sm">
+              <Badge variant="outline" className="bg-cream/10 text-cream border-cream/30 backdrop-blur-sm capitalize">
                 {page.pageType.replace('_', ' ').toLowerCase()}
               </Badge>
-            </div>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={share}
-              className="bg-cream/15 text-cream hover:bg-cream/25 border-cream/20 backdrop-blur-sm"
-            >
-              <Share2 className="h-4 w-4 mr-1.5" /> Share
-            </Button>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={share}
+                className="bg-cream/15 text-cream hover:bg-cream/25 border-cream/20 backdrop-blur-sm btn-glow overflow-hidden"
+              >
+                <Share2 className="h-4 w-4 mr-1.5" /> Share
+              </Button>
+            </motion.div>
           </div>
-          <h1 className="font-serif text-3xl md:text-5xl font-bold tracking-tight text-cream break-words leading-tight">
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+            className="font-serif text-3xl md:text-5xl font-bold tracking-tight text-cream break-words leading-tight"
+          >
             {page.title}
-          </h1>
+          </motion.h1>
           {page.owner.name && (
-            <p className="text-cream/80 text-sm md:text-base mt-2 flex items-center gap-2">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gold text-cream text-xs font-bold">
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="text-cream/80 text-sm md:text-base mt-3 flex items-center gap-2"
+            >
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.5, type: 'spring', stiffness: 200 }}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-gold to-gold-dark text-cream text-xs font-bold shadow-gold"
+              >
                 {page.owner.name[0]?.toUpperCase()}
-              </span>
+              </motion.span>
               by <strong className="font-medium text-cream">{page.owner.name}</strong>
-            </p>
+            </motion.p>
           )}
           {page.description && (
-            <p className="text-cream/70 mt-3 text-sm md:text-base max-w-2xl">{page.description}</p>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="text-cream/70 mt-3 text-sm md:text-base max-w-2xl"
+            >
+              {page.description}
+            </motion.p>
           )}
-        </div>
+        </motion.div>
       </div>
 
       {/* Compliance banner */}
       {hasAds && (
-        <div className="container mx-auto px-4 pt-4 max-w-3xl">
-          <Alert className="border-gold/30 bg-gold/5">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="container mx-auto px-4 pt-4 max-w-3xl"
+        >
+          <Alert className="border-gold/30 bg-gold/5 backdrop-blur-sm">
             <Info className="h-4 w-4 text-gold-dark" />
             <AlertDescription className="text-xs text-foreground/80">
               This page may display ads from the page creator&apos;s ad-network account (Adsterra/Monetag)
@@ -166,37 +220,59 @@ export default function PublicPageView({
               earnings come from the ad networks directly.
             </AlertDescription>
           </Alert>
-        </div>
+        </motion.div>
       )}
 
       {/* Content + ad placements */}
       <article className="container mx-auto px-4 py-8 max-w-3xl">
         {placementBySlot('HEADER') && (
-          <div className="mb-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="mb-6"
+          >
             <AdSlot placement={placementBySlot('HEADER')!} />
-          </div>
+          </motion.div>
         )}
 
         {page.blocks.map((block, idx) => (
-          <div key={block.id}>
+          <motion.div
+            key={block.id}
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-50px' }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          >
             <BlockRenderer block={block} />
             {idx === 0 && placementBySlot('AFTER_FIRST_BLOCK') && (
-              <div className="my-8">
+              <motion.div
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.2 }}
+                className="my-8"
+              >
                 <AdSlot placement={placementBySlot('AFTER_FIRST_BLOCK')!} />
-              </div>
+              </motion.div>
             )}
             {idx === 2 && page.blocks.length > 5 && placementBySlot('MID_CONTENT') && (
               <div className="my-8">
                 <AdSlot placement={placementBySlot('MID_CONTENT')!} />
               </div>
             )}
-          </div>
+          </motion.div>
         ))}
 
         {placementBySlot('BEFORE_FOOTER') && (
-          <div className="my-8">
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            className="my-8"
+          >
             <AdSlot placement={placementBySlot('BEFORE_FOOTER')!} />
-          </div>
+          </motion.div>
         )}
         {placementBySlot('FOOTER') && (
           <div className="mt-8">
@@ -205,19 +281,34 @@ export default function PublicPageView({
         )}
 
         {/* Share CTA */}
-        <Card className="mt-12 overflow-hidden border-gold/20">
-          <div className="h-1 w-full bg-gradient-to-r from-evergreen via-gold to-berry" />
-          <CardContent className="py-8 text-center">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gold/15 mb-3">
-              <Share2 className="h-5 w-5 text-gold-dark" />
-            </div>
-            <p className="font-semibold mb-1">Enjoyed this page?</p>
-            <p className="text-sm text-muted-foreground mb-4">Share it with someone who would too.</p>
-            <Button onClick={share} className="bg-evergreen text-cream hover:bg-evergreen-dark">
-              <Share2 className="h-4 w-4 mr-2" /> Share this page
-            </Button>
-          </CardContent>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+        >
+          <Card className="mt-12 overflow-hidden border-gold/20 relative">
+            <div className="h-1 w-full bg-gradient-to-r from-evergreen via-gold to-berry" />
+            <CardContent className="py-8 text-center relative overflow-hidden">
+              <SparklesComponent count={4} />
+              <motion.div
+                initial={{ scale: 0 }}
+                whileInView={{ scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ type: 'spring', stiffness: 200 }}
+                className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gold/15 mb-3 anim-pulse-glow relative z-10"
+              >
+                <Share2 className="h-5 w-5 text-gold-dark" />
+              </motion.div>
+              <p className="font-semibold mb-1 relative z-10">Enjoyed this page?</p>
+              <p className="text-sm text-muted-foreground mb-4 relative z-10">Share it with someone who would too.</p>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }} className="relative z-10 inline-block">
+                <Button onClick={share} className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden">
+                  <Share2 className="h-4 w-4 mr-2" /> Share this page
+                </Button>
+              </motion.div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </article>
     </div>
   )
@@ -229,7 +320,13 @@ function BlockRenderer({ block }: { block: { type: string; data: any } }) {
     case 'HEADING':
       return (
         <h2 className="font-serif text-2xl md:text-3xl font-bold mt-8 mb-4 text-evergreen-dark flex items-center gap-3">
-          <span className="h-1 w-1 rounded-full bg-gold" />
+          <motion.span
+            initial={{ scale: 0 }}
+            whileInView={{ scale: 1 }}
+            viewport={{ once: true }}
+            transition={{ type: 'spring', stiffness: 200 }}
+            className="h-2 w-2 rounded-full bg-gold anim-sparkle-pulse"
+          />
           {d.text}
         </h2>
       )
@@ -239,14 +336,20 @@ function BlockRenderer({ block }: { block: { type: string; data: any } }) {
       return (
         <figure className="my-8">
           {d.url && (
-            <div className="relative overflow-hidden rounded-2xl shadow-festive">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="relative overflow-hidden rounded-2xl shadow-elevated"
+            >
               <img
                 src={d.url}
                 alt={d.alt || ''}
-                className="w-full object-cover"
+                className="w-full object-cover transition-transform hover:scale-105 duration-700"
               />
               <div className="absolute inset-0 ring-2 ring-gold/30 ring-inset rounded-2xl pointer-events-none" />
-            </div>
+            </motion.div>
           )}
           {d.caption && (
             <figcaption className="text-sm text-muted-foreground mt-3 text-center italic">{d.caption}</figcaption>
@@ -255,8 +358,19 @@ function BlockRenderer({ block }: { block: { type: string; data: any } }) {
       )
     case 'QUOTE':
       return (
-        <blockquote className="my-8 relative pl-8 pr-4 py-2">
-          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-gold to-gold-dark rounded-full" />
+        <motion.blockquote
+          initial={{ opacity: 0, x: -20 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          className="my-8 relative pl-8 pr-4 py-2"
+        >
+          <motion.div
+            initial={{ scaleY: 0 }}
+            whileInView={{ scaleY: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-gold to-gold-dark rounded-full origin-top"
+          />
           <div className="absolute -top-2 -left-2 font-serif text-5xl text-gold/30 leading-none">&ldquo;</div>
           <p className="font-serif text-xl md:text-2xl italic text-foreground leading-relaxed">
             {d.text}
@@ -264,36 +378,44 @@ function BlockRenderer({ block }: { block: { type: string; data: any } }) {
           {d.author && (
             <footer className="text-sm text-muted-foreground mt-2">— {d.author}</footer>
           )}
-        </blockquote>
+        </motion.blockquote>
       )
     case 'LINK':
       return (
-        <a
+        <motion.a
           href={d.url}
           target="_blank"
           rel="noopener noreferrer"
+          whileHover={{ x: 4 }}
           className="inline-flex items-center gap-2 text-evergreen underline decoration-gold/50 decoration-2 underline-offset-4 hover:decoration-gold mt-2 mb-4 font-medium"
         >
           <ExternalLink className="h-3.5 w-3.5" /> {d.label || d.url}
-        </a>
+        </motion.a>
       )
     case 'SOCIAL_LINK':
       return (
-        <a
+        <motion.a
           href={d.url}
           target="_blank"
           rel="noopener noreferrer"
+          whileHover={{ scale: 1.04, y: -2 }}
+          whileTap={{ scale: 0.98 }}
           className="inline-flex items-center gap-2.5 rounded-full border border-border bg-card px-5 py-2.5 mb-3 mr-2 hover:border-evergreen/40 hover:bg-evergreen/5 hover:shadow-festive transition-all"
         >
           <SocialIcon platform={d.platform} />
           <span className="text-sm font-medium">{d.label || d.platform}</span>
-        </a>
+        </motion.a>
       )
     case 'DIVIDER':
       return (
         <div className="my-8 flex items-center justify-center gap-3">
           <div className="h-px w-16 bg-gradient-to-r from-transparent to-gold/40" />
-          <Sparkles className="h-3 w-3 text-gold/60" />
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+          >
+            <Sparkles className="h-3 w-3 text-gold/60" />
+          </motion.div>
           <div className="h-px w-16 bg-gradient-to-l from-transparent to-gold/40" />
         </div>
       )

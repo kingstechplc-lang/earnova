@@ -8,8 +8,12 @@ import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { motion } from 'framer-motion'
+import { CountUp } from '@/components/animated/count-up'
+import { StaggerContainer, StaggerItem, FadeIn } from '@/components/animated/motion'
+import { TiltCard } from '@/components/animated/tilt-card'
 import {
-  Plus, Eye, Edit3, BarChart3, Wallet, FileText, Sparkles,
+  Plus, Eye, Edit3, BarChart3, Wallet, FileText, Sparkles, TrendingUp,
 } from 'lucide-react'
 import type { View, CurrentUser } from '@/app/page'
 
@@ -82,128 +86,195 @@ export default function DashboardView({
     }
   }
 
-  return (
-    <div className="view-fade container mx-auto px-4 py-8 max-w-6xl">
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-        <div>
-          <Badge variant="outline" className="mb-2 border-gold/40 text-gold-dark bg-gold/5">
-            <Sparkles className="h-3 w-3 mr-1" /> Creator dashboard
-          </Badge>
-          <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight">
-            Welcome back, {user.name || user.email.split('@')[0]}
-          </h1>
-          <p className="text-muted-foreground mt-1">Manage your Special Pages and grow your audience.</p>
-        </div>
-        <Button
-          onClick={() => navigate({ name: 'monetization' })}
-          className="bg-evergreen text-cream hover:bg-evergreen-dark shadow-festive"
-        >
-          <Wallet className="h-4 w-4 mr-2" />
-          Monetization
-        </Button>
-      </div>
+  const publishedCount = pages.filter(p => p.publishedAt).length
+  const approvedCount = pages.filter(p => p.moderationState === 'APPROVED').length
 
-      {/* Quick stats */}
-      <div className="grid gap-4 mb-8 md:grid-cols-3">
-        <QuickStat
-          icon={<FileText className="h-4 w-4" />}
-          label="Total pages"
-          value={pages.length.toString()}
-          accent="evergreen"
-        />
-        <QuickStat
-          icon={<Eye className="h-4 w-4" />}
-          label="Published"
-          value={pages.filter(p => p.publishedAt).length.toString()}
-          accent="gold"
-        />
-        <QuickStat
-          icon={<Sparkles className="h-4 w-4" />}
-          label="Approved"
-          value={pages.filter(p => p.moderationState === 'APPROVED').length.toString()}
-          accent="berry"
-        />
-      </div>
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {/* Header */}
+      <FadeIn>
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+          <div>
+            <Badge variant="outline" className="mb-2 border-gold/40 text-gold-dark bg-gold/5">
+              <Sparkles className="h-3 w-3 mr-1" /> Creator dashboard
+            </Badge>
+            <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight">
+              Welcome back, <span className="gradient-text-evergreen">{user.name || user.email.split('@')[0]}</span>
+            </h1>
+            <p className="text-muted-foreground mt-1">Manage your Special Pages and grow your audience.</p>
+          </div>
+          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+            <Button
+              onClick={() => navigate({ name: 'monetization' })}
+              className="bg-evergreen text-cream hover:bg-evergreen-dark shadow-festive btn-glow overflow-hidden"
+            >
+              <Wallet className="h-4 w-4 mr-2" />
+              Monetization
+            </Button>
+          </motion.div>
+        </div>
+      </FadeIn>
+
+      {/* Quick stats with CountUp */}
+      <StaggerContainer className="grid gap-4 mb-8 md:grid-cols-3">
+        <StaggerItem>
+          <TiltCard intensity={4}>
+            <Card className="overflow-hidden transition-all hover:shadow-elevated">
+              <div className="h-1 w-full bg-gradient-to-r from-evergreen to-evergreen-light" />
+              <CardContent className="py-4 flex items-center gap-4">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-evergreen/10 text-evergreen anim-pulse-glow">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold font-serif text-evergreen">
+                    <CountUp value={pages.length} duration={1200} />
+                  </p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Total pages</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TiltCard>
+        </StaggerItem>
+        <StaggerItem>
+          <TiltCard intensity={4}>
+            <Card className="overflow-hidden transition-all hover:shadow-elevated">
+              <div className="h-1 w-full bg-gradient-to-r from-gold to-gold-dark" />
+              <CardContent className="py-4 flex items-center gap-4">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gold/15 text-gold-dark anim-pulse-glow" style={{ animationDelay: '0.5s' }}>
+                  <Eye className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold font-serif text-gold-dark">
+                    <CountUp value={publishedCount} duration={1200} delay={0} />
+                  </p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Published</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TiltCard>
+        </StaggerItem>
+        <StaggerItem>
+          <TiltCard intensity={4}>
+            <Card className="overflow-hidden transition-all hover:shadow-elevated">
+              <div className="h-1 w-full bg-gradient-to-r from-berry to-berry/70" />
+              <CardContent className="py-4 flex items-center gap-4">
+                <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-berry/10 text-berry anim-pulse-glow" style={{ animationDelay: '1s' }}>
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold font-serif text-berry">
+                    <CountUp value={approvedCount} duration={1200} delay={0} />
+                  </p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Approved</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TiltCard>
+        </StaggerItem>
+      </StaggerContainer>
 
       {/* Create new page */}
-      <Card className="mb-8 border-evergreen/20 shadow-festive">
-        <div className="h-1 w-full bg-gradient-to-r from-evergreen via-gold to-berry rounded-t-xl" />
-        <CardHeader>
-          <CardTitle className="font-serif text-xl flex items-center gap-2">
-            <Plus className="h-5 w-5 text-evergreen" />
-            Create a new Special Page
-          </CardTitle>
-          <CardDescription>
-            Each page gets its own URL like <code className="text-evergreen font-mono">/p/your-page-title</code>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto]">
-            <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Title</Label>
-              <Input
-                value={newTitle}
-                onChange={e => setNewTitle(e.target.value)}
-                placeholder="My Christmas Hub"
-                className="mt-1"
-              />
+      <FadeIn delay={0.2}>
+        <Card className="mb-8 border-evergreen/20 shadow-festive overflow-hidden">
+          <div className="h-1.5 w-full bg-gradient-to-r from-evergreen via-gold to-berry" />
+          <CardHeader>
+            <CardTitle className="font-serif text-xl flex items-center gap-2">
+              <Plus className="h-5 w-5 text-evergreen" />
+              Create a new Special Page
+            </CardTitle>
+            <CardDescription>
+              Each page gets its own URL like <code className="text-evergreen font-mono bg-evergreen/5 px-1 py-0.5 rounded">/p/your-page-title</code>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto]">
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Title</Label>
+                <Input
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  placeholder="My Christmas Hub"
+                  className="mt-1 transition-all focus:ring-2 focus:ring-gold/40 focus:border-gold"
+                />
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Page type</Label>
+                <Select value={newType} onValueChange={setNewType}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAGE_TYPES.map(([v, l, emoji]) => (
+                      <SelectItem key={v} value={v}>
+                        <span className="mr-2">{emoji}</span> {l}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Campaign</Label>
+                <Select value={newCampaignId} onValueChange={setNewCampaignId}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
+                    {campaigns.map(c => <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  onClick={createPage}
+                  disabled={creating || !newTitle.trim()}
+                  className="bg-evergreen text-cream hover:bg-evergreen-dark shadow-festive btn-glow overflow-hidden"
+                >
+                  {creating ? (
+                    <>
+                      <span className="h-4 w-4 border-2 border-cream/30 border-t-cream rounded-full animate-spin mr-1.5" />
+                      Creating…
+                    </>
+                  ) : (
+                    <>
+                      Create page
+                      <Plus className="h-4 w-4 ml-1" />
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
-            <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Page type</Label>
-              <Select value={newType} onValueChange={setNewType}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAGE_TYPES.map(([v, l, emoji]) => (
-                    <SelectItem key={v} value={v}>
-                      <span className="mr-2">{emoji}</span> {l}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Campaign</Label>
-              <Select value={newCampaignId} onValueChange={setNewCampaignId}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="None" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— None —</SelectItem>
-                  {campaigns.map(c => <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button
-                onClick={createPage}
-                disabled={creating || !newTitle.trim()}
-                className="bg-evergreen text-cream hover:bg-evergreen-dark shadow-festive"
-              >
-                {creating ? 'Creating…' : 'Create page'}
-                {!creating && <Plus className="h-4 w-4 ml-1" />}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </FadeIn>
 
       {/* Pages list */}
-      <div className="mb-6">
+      <FadeIn delay={0.3}>
         <h2 className="font-serif text-2xl font-bold mb-4">Your pages</h2>
-        {loading ? (
-          <Card><CardContent className="py-12 text-center text-muted-foreground">Loading…</CardContent></Card>
-        ) : pages.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-16 text-center">
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
-              <p className="font-medium text-foreground mb-1">No pages yet</p>
-              <p className="text-sm text-muted-foreground mb-4">Create your first Special Page above to get started.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3">
-            {pages.map(p => (
-              <Card key={p.id} className="overflow-hidden transition-all hover:shadow-festive hover:-translate-y-0.5">
-                {/* Left accent bar */}
+      </FadeIn>
+
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-24 rounded-xl shimmer-bg" />
+          ))}
+        </div>
+      ) : pages.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-16 text-center">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200 }}
+              className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-evergreen/10 mb-3"
+            >
+              <FileText className="h-7 w-7 text-evergreen/60" />
+            </motion.div>
+            <p className="font-medium text-foreground mb-1">No pages yet</p>
+            <p className="text-sm text-muted-foreground mb-4">Create your first Special Page above to get started.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <StaggerContainer className="grid gap-3">
+          {pages.map(p => (
+            <StaggerItem key={p.id} y={15}>
+              <Card className="overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-0.5 hover:border-evergreen/30">
                 <div className={`h-1 w-full ${
                   p.moderationState === 'APPROVED' ? 'bg-gradient-to-r from-evergreen to-evergreen-light' :
                   p.moderationState === 'PENDING' ? 'bg-gradient-to-r from-gold to-gold-dark' :
@@ -217,7 +288,7 @@ export default function DashboardView({
                       <ModBadge state={p.moderationState} />
                       {p.publishedAt ? (
                         <Badge variant="outline" className="bg-evergreen/5 text-evergreen border-evergreen/30">
-                          <span className="h-1.5 w-1.5 rounded-full bg-evergreen mr-1.5" /> Published
+                          <span className="h-1.5 w-1.5 rounded-full bg-evergreen mr-1.5 animate-pulse" /> Published
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="bg-muted-foreground/5 text-muted-foreground border-muted-foreground/30">
@@ -230,15 +301,15 @@ export default function DashboardView({
                     </p>
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
-                    <Button size="sm" variant="ghost" onClick={() => navigate({ name: 'analytics', pageId: p.id })}>
+                    <Button size="sm" variant="ghost" onClick={() => navigate({ name: 'analytics', pageId: p.id })} className="hover:bg-evergreen/5 hover:text-evergreen">
                       <BarChart3 className="h-4 w-4 mr-1" /> Analytics
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate({ name: 'builder', pageId: p.id })}>
+                    <Button size="sm" variant="outline" onClick={() => navigate({ name: 'builder', pageId: p.id })} className="border-evergreen/30 text-evergreen hover:bg-evergreen/5">
                       <Edit3 className="h-4 w-4 mr-1" /> Edit
                     </Button>
                     <Button
                       size="sm"
-                      className="bg-evergreen text-cream hover:bg-evergreen-dark"
+                      className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden"
                       onClick={() => {
                         window.location.hash = `/p/${p.slug}`
                         navigate({ name: 'public', slug: p.slug })
@@ -249,34 +320,11 @@ export default function DashboardView({
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
-      </div>
+            </StaggerItem>
+          ))}
+        </StaggerContainer>
+      )}
     </div>
-  )
-}
-
-function QuickStat({ icon, label, value, accent }: {
-  icon: React.ReactNode; label: string; value: string; accent: 'evergreen' | 'gold' | 'berry'
-}) {
-  const accents = {
-    evergreen: 'bg-evergreen/10 text-evergreen',
-    gold: 'bg-gold/15 text-gold-dark',
-    berry: 'bg-berry/10 text-berry',
-  }
-  return (
-    <Card>
-      <CardContent className="py-4 flex items-center gap-4">
-        <div className={`inline-flex h-11 w-11 items-center justify-center rounded-xl ${accents[accent]}`}>
-          {icon}
-        </div>
-        <div>
-          <p className="text-2xl font-bold font-serif">{value}</p>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
   )
 }
 

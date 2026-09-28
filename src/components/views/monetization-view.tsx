@@ -5,6 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { motion } from 'framer-motion'
+import { FloatingOrbs } from '@/components/animated/floating-orbs'
+import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -92,26 +95,33 @@ export default function MonetizationView({
 
   return (
     <div className="view-fade container mx-auto px-4 py-6 max-w-4xl">
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
-          <ChevronLeft className="h-4 w-4" /> Back
-        </Button>
-      </div>
+      <FadeIn>
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
+            <ChevronLeft className="h-4 w-4" /> Back
+          </Button>
+        </div>
+      </FadeIn>
 
       {/* Hero header */}
-      <div className="mb-8 relative overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-gold/10 via-background to-berry/5 p-6 md:p-8">
-        <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-gold/20 blur-3xl" />
-        <Badge variant="outline" className="mb-3 border-gold/40 text-gold-dark bg-gold/5">
-          <Wallet className="h-3 w-3 mr-1" /> Monetization Center
-        </Badge>
-        <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight mb-2">
-          Connect your ad network.
-        </h1>
-        <p className="text-muted-foreground max-w-2xl">
-          Link your own Adsterra or Monetag publisher account. The platform stores only sanitized
-          identifiers — never raw JavaScript. Each integration goes through manual review.
-        </p>
-      </div>
+      <FadeIn delay={0.05}>
+        <div className="mb-8 relative overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-gold/10 via-background to-berry/5 p-6 md:p-8">
+          <FloatingOrbs count={2} colors={['gold', 'berry']} />
+          <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-gold/20 blur-3xl animate-pulse" />
+          <div className="relative">
+            <Badge variant="outline" className="mb-3 border-gold/40 text-gold-dark bg-gold/5">
+              <Wallet className="h-3 w-3 mr-1" /> Monetization Center
+            </Badge>
+            <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight mb-2">
+              Connect your <span className="gradient-text-gold">ad network.</span>
+            </h1>
+            <p className="text-muted-foreground max-w-2xl">
+              Link your own Adsterra or Monetag publisher account. The platform stores only sanitized
+              identifiers — never raw JavaScript. Each integration goes through manual review.
+            </p>
+          </div>
+        </div>
+      </FadeIn>
 
       {/* Compliance notice */}
       <Alert className="mb-6 border-cranberry/30 bg-cranberry/5">
@@ -171,11 +181,12 @@ export default function MonetizationView({
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <StaggerContainer className="space-y-3">
           {integrations.map(int => {
             const cfg = STATE_CONFIG[int.lifecycleState] || { label: int.lifecycleState, cls: 'pill-draft', icon: null }
             return (
-              <Card key={int.id} className="overflow-hidden transition-all hover:shadow-festive">
+              <StaggerItem key={int.id}>
+              <Card className="overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-0.5">
                 <div className={`h-1 w-full ${
                   int.lifecycleState === 'APPROVED' ? 'bg-gradient-to-r from-evergreen to-evergreen-light' :
                   int.lifecycleState === 'PENDING_REVIEW' ? 'bg-gradient-to-r from-gold to-gold-dark' :
@@ -221,9 +232,10 @@ export default function MonetizationView({
                   </div>
                 </CardContent>
               </Card>
+              </StaggerItem>
             )
           })}
-        </div>
+        </StaggerContainer>
       )}
 
       {/* Educational section */}

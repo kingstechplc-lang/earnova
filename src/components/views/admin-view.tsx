@@ -5,10 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, ShieldAlert, CheckCircle2, XCircle, Ban, Pause,
   ShieldCheck, Zap, Eye, Clock, User,
 } from 'lucide-react'
+import { FloatingOrbs } from '@/components/animated/floating-orbs'
+import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
 import type { View, CurrentUser } from '@/app/page'
 
 type Integration = {
@@ -73,37 +76,58 @@ export default function AdminView({
 
   return (
     <div className="view-fade container mx-auto px-4 py-6 max-w-4xl">
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
-          <ChevronLeft className="h-4 w-4" /> Back
-        </Button>
-      </div>
+      <FadeIn>
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
+            <ChevronLeft className="h-4 w-4" /> Back
+          </Button>
+        </div>
+      </FadeIn>
 
       {/* Hero header */}
-      <div className="mb-8 relative overflow-hidden rounded-2xl border border-evergreen/30 bg-gradient-to-br from-evergreen/10 via-background to-gold/5 p-6 md:p-8">
-        <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-evergreen/20 blur-3xl" />
-        <div className="flex items-center gap-2 mb-3">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-evergreen to-evergreen-dark text-cream shadow-festive">
-            <ShieldCheck className="h-4 w-4" />
-          </span>
-          <span className="text-xs uppercase tracking-wider font-semibold text-evergreen">Admin Console</span>
+      <FadeIn delay={0.05}>
+        <div className="mb-8 relative overflow-hidden rounded-2xl border border-evergreen/30 bg-gradient-to-br from-evergreen/10 via-background to-gold/5 p-6 md:p-8">
+          <FloatingOrbs count={2} colors={['evergreen', 'gold']} />
+          <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-evergreen/20 blur-3xl animate-pulse" />
+          <div className="relative">
+            <div className="flex items-center gap-2 mb-3">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 200 }}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-evergreen to-evergreen-dark text-cream shadow-festive"
+              >
+                <ShieldCheck className="h-4 w-4" />
+              </motion.span>
+              <span className="text-xs uppercase tracking-wider font-semibold text-evergreen">Admin Console</span>
+            </div>
+            <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight mb-2">Platform controls</h1>
+            <p className="text-muted-foreground">
+              Logged in as <strong className="text-foreground">{user.email}</strong>
+            </p>
+          </div>
         </div>
-        <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight mb-2">Platform controls</h1>
-        <p className="text-muted-foreground">
-          Logged in as <strong className="text-foreground">{user.email}</strong>
-        </p>
-      </div>
+      </FadeIn>
 
       {/* Global kill switch alert */}
-      {policy?.globalKillSwitch && (
-        <Alert variant="destructive" className="mb-6 border-cranberry/40 bg-cranberry/10">
-          <ShieldAlert className="h-4 w-4 text-cranberry" />
-          <AlertTitle className="text-cranberry">⚠ Global kill switch is ACTIVE</AlertTitle>
-          <AlertDescription>
-            No ads are rendering on any Special Page right now. Toggle it off below to restore.
+      <AnimatePresence>
+        {policy?.globalKillSwitch && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-6 overflow-hidden"
+          >
+            <Alert variant="destructive" className="border-cranberry/40 bg-cranberry/10">
+              <ShieldAlert className="h-4 w-4 text-cranberry anim-pulse-glow" />
+              <AlertTitle className="text-cranberry">⚠ Global kill switch is ACTIVE</AlertTitle>
+              <AlertDescription>
+                No ads are rendering on any Special Page right now. Toggle it off below to restore.
           </AlertDescription>
         </Alert>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Platform-wide controls */}
       <Card className="mb-6 overflow-hidden shadow-festive border-evergreen/20">
@@ -176,15 +200,27 @@ export default function AdminView({
         </CardHeader>
         <CardContent>
           {pending.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              <CheckCircle2 className="h-10 w-10 mx-auto text-evergreen/40 mb-2" />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 200 }}
+              className="py-12 text-center text-muted-foreground"
+            >
+              <motion.div
+                animate={{ y: [0, -6, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                className="inline-block mb-2"
+              >
+                <CheckCircle2 className="h-10 w-10 mx-auto text-evergreen/60" />
+              </motion.div>
               <p className="font-medium">All caught up!</p>
               <p className="text-sm">No pending reviews.</p>
-            </div>
+            </motion.div>
           ) : (
-            <div className="space-y-3">
+            <StaggerContainer className="space-y-3">
               {pending.map(int => (
-                <div key={int.id} className="border border-border/60 rounded-xl p-4 hover:border-evergreen/30 transition-colors">
+                <StaggerItem key={int.id}>
+                <div className="border border-border/60 rounded-xl p-4 hover:border-evergreen/30 hover:shadow-festive transition-all">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
@@ -245,8 +281,9 @@ export default function AdminView({
                     </div>
                   </div>
                 </div>
+                </StaggerItem>
               ))}
-            </div>
+            </StaggerContainer>
           )}
         </CardContent>
       </Card>

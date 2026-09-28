@@ -104,3 +104,53 @@ Stage Summary:
 - Country flags (emoji) added to analytics breakdown.
 - View transition animations (fade-in-up) on every view.
 - All demo flows still work: login → dashboard → builder → publish → view; monetization disclaimer → connect Adsterra → submit for review; admin login → approve/reject integrations; kill switch toggles ads platform-wide in real time; analytics trust score recomputes on demand.
+
+---
+Task ID: 4
+Agent: main (Super Z)
+Task: Major UI/UX upgrade — add powerful animations, premium effects, attention-grabbing visuals.
+
+Work Log:
+- Massively expanded src/app/globals.css with 30+ keyframe animations: fade-in-up, fade-in-down, fade-in, fade-in-scale, slide-in-right, slide-in-left, slide-up-stagger, gradient-shift, aurora-rotate, mesh-shift, shimmer, shimmer-border, float, float-slow, pulse-glow, sparkle-pulse, pulse-ring, bounce-subtle, wiggle, shimmer-text, scan-line, blink, count-up, border-glow, rotate-slow, pop-in, shine, glow-pulse, marquee, confetti-fall, ping-slow, orbit. Plus animation utility classes, stagger delay classes (1-8), view-fade, shimmer effect, custom scrollbar with gold gradient, ::selection styling, animated focus rings, prefers-reduced-motion respect.
+- Added glassmorphism utilities: glass-card, glass-strong (with backdrop-filter blur+saturate), gradient-evergreen/gold/festive/hero, gradient-text-gold (animated), gradient-text-evergreen, gradient-text-festive (animated), shadow-festive/gold/elevated/glow-evergreen/glow-gold, ring-gold/evergreen, ad-slot-platform/user with animated gradient border on hover, status pills (7 variants), bg-pine-pattern decorative, aurora-bg, mesh-bg, shimmer-bg, gradient-border with animated gradient.
+- Created 5 reusable animated components in src/components/animated/:
+  * count-up.tsx — animates numbers 0→target with easeOutExpo, supports prefix/suffix/percent.
+  * tilt-card.tsx — 3D perspective tilt on mouse move with springy motion, whileHover scale.
+  * magnetic-button.tsx — button subtly follows cursor when hovered.
+  * floating-orbs.tsx — animated colored blobs floating in background, configurable count/colors/positions.
+  * sparkles.tsx — decorative sparkle particles with randomized positions/delays.
+  * motion.tsx — StaggerContainer, StaggerItem, FadeIn, PageTransition primitives for framer-motion.
+- Updated src/app/page.tsx: animated loading spinner (ring with ping glow), wrapped every view in PageTransition for smooth entrance on view change, keyed transitions by view name.
+- Redesigned src/components/layout/header.tsx: motion.button logo with scale-on-hover/tap, animated gradient overlay on logo badge, pulsing gold ring accent, animated layoutId nav underline (gradient evergreen→gold→berry) that slides between active items, animated HamburgerMenu→X icon swap with rotation, mobile menu slide-down with height animation.
+- Redesigned src/components/views/landing-view.tsx with massive visual upgrade:
+  * Hero: gradient-hero + mesh-bg + bg-pine-pattern + FloatingOrbs(4 colors) layered background
+  * Animated badge with pulsing dot + Sparkles icon
+  * Staggered fade-in hero text with gradient-text-gold animated headline
+  * MagneticButton hover effects on CTAs
+  * CountUp animated stats row (campaigns count animates from 0)
+  * TiltCard right-column mockup with floating animation, animated browser chrome dots, anim-border-glow on platform ad slot, animated skeleton content lines, staggered image grid, floating badges with springy pop-in
+  * StaggerContainer for campaign cards with TiltCard wrappers, animated gradient top bars on featured cards
+  * Connecting gradient line with scaleX animation between steps
+  * Each Step has motion icon with whileHover scale+rotate, staggered whileInView entrance
+  * Compliance callout with shimmer overlay
+  * Feature cards with whileHover icon rotation
+  * CTA section with FloatingOrbs, mesh-bg, animated Sparkles icon with pop-in + pulse-glow, animated button hover
+- Redesigned login-view + signup-view: full-bleed mesh-bg background + FloatingOrbs(4), glass-strong card with shadow-elevated, animated logo badge with gradient overlay pulse, staggered input fields with focus:ring-2 focus:ring-gold/40 focus:border-gold, animated error alerts with wiggle icon, demo account buttons with hover-to-fill effect (click to autofill), staggered perks list in signup, button with btn-glow ripple effect + loading spinner.
+- Redesigned dashboard-view: StaggerContainer for stat cards, TiltCard wrappers for each stat, CountUp animated numbers (0→value with 1.2s duration), stagger delay across cards, anim-pulse-glow on stat icons with staggered delays, shimmer-bg skeleton loaders while pages load, staggered page cards entrance, animated mod badges, view transitions.
+- Redesigned public-page-view: parallax hero with useScroll/useTransform (heroY + heroOpacity), FloatingOrbs(4 colors), SparklesComponent(12) over hero, staggered hero text entrance with springy avatar pop-in, scroll-triggered block reveals (whileInView with viewport once), animated heading with sparkled dot, image with scale-on-hover + gold ring overlay, quote with gradient bar scaleY animation, social links with whileHover scale+y, divider with rotating Sparkles icon, share CTA with Sparkles + pulse-glow icon.
+- Redesigned ad-slot.tsx: motion.div with initial scale animation, animated scan-line on hover (background-position animation), 4 corner accent dots with staggered opacity pulse, staggered entrance of label/slot/ref/type, hover scale, whileHover hint label.
+- Redesigned analytics-view: StaggerContainer for stat cards, CountUp animated numbers with delay, animated score cards with staggered icon pop-in (spring), animated SVG composite circle (strokeDasharray 0→value with 1.2s ease), animated sub-score bars with width 0→value% with delay per bar, animated breakdown bars with width animation + staggered delays per row, AnimatePresence for trust score reveal/empty state, animated "All caught up!" check icon with continuous y bob.
+- Redesigned monetization-view: FadeIn wrappers, FloatingOrbs in hero, animated gradient-text-gold headline, StaggerContainer for integration cards, hover lift + shadow-elevated on cards, animated gradient top bars per lifecycle state.
+- Redesigned admin-view: FadeIn wrappers, FloatingOrbs in hero, animated ShieldCheck logo badge with springy pop-in, AnimatePresence for kill switch alert (height+opacity animation), anim-pulse-glow on AlertCircle, StaggerContainer for pending reviews with staggered entrance, animated empty state (CheckCircle2 with continuous y bob), hover lift + shadow-festive on review cards.
+- All animations respect prefers-reduced-motion media query.
+- Verified via Agent Browser end-to-end: landing page (animated hero, mockup, count-up stats, tilt cards), public page (parallax hero, animated ad slots, scroll reveals), login (animated entrance, focus rings, demo autofill), dashboard (count-up stats, staggered cards), monetization (animated entrance, staggered integrations), analytics (count-up numbers, animated trust score reveal), admin (animated switches, staggered pending list, animated empty state). Lint passes clean (0 errors). Dev log shows all 200 responses, no runtime errors. 6 screenshots captured.
+- Fixed 1 lint error (Sparkles component setState in effect → wrapped in setTimeout).
+
+Stage Summary:
+- Massive UI/UX upgrade delivering premium animations and effects across every view.
+- 30+ keyframe animations defined in globals.css (fade, slide, gradient-shift, aurora-rotate, mesh-shift, shimmer, float, pulse-glow, sparkle-pulse, scan-line, pop-in, shine, glow-pulse, marquee, confetti-fall, ping-slow, orbit, etc.).
+- 6 reusable animated components created: CountUp, TiltCard, MagneticButton, FloatingOrbs, Sparkles, motion primitives (StaggerContainer, StaggerItem, FadeIn, PageTransition).
+- Framer Motion integrated throughout for: 3D tilt cards, magnetic buttons, layoutId nav underlines, page transitions, whileInView scroll reveals, AnimatePresence state transitions, springy pop-ins, animated SVG score circles, animated bar growth, count-up numbers.
+- Every view now has: staggered entrance animations, hover micro-interactions, scroll-triggered reveals, animated state transitions, decorative floating orbs/sparkles, gradient meshes, glassmorphism, premium shadows.
+- All animations respect prefers-reduced-motion for accessibility.
+- Brand palette preserved: deep evergreen + warm gold + cream + berry + cranberry.

@@ -2,6 +2,7 @@
 // Public Special Page is fetched via /api/p/[slug] and rendered in a "view" panel.
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { PageTransition } from '@/components/animated/motion'
 import LandingView from '@/components/views/landing-view'
 import LoginView from '@/components/views/login-view'
 import SignupView from '@/components/views/signup-view'
@@ -70,7 +71,10 @@ export default function Home() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading…</div>
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full bg-evergreen/30 blur-xl animate-ping" />
+          <div className="relative h-12 w-12 rounded-full border-2 border-evergreen/30 border-t-evergreen animate-spin" />
+        </div>
       </div>
     )
   }
@@ -79,17 +83,19 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <Header user={user} view={view} navigate={navigate} onLogout={onLogout} />
       <main className="flex-1">
-        {view.name === 'landing' && <LandingView navigate={navigate} user={user} />}
-        {view.name === 'login' && <LoginView onAuth={onAuth} navigate={navigate} />}
-        {view.name === 'signup' && <SignupView onAuth={onAuth} navigate={navigate} />}
-        {view.name === 'dashboard' && user && <DashboardView user={user} navigate={navigate} />}
-        {view.name === 'builder' && user && <BuilderView pageId={view.pageId} user={user} navigate={navigate} />}
-        {view.name === 'monetization' && user && <MonetizationView user={user} navigate={navigate} />}
-        {view.name === 'analytics' && user && <AnalyticsView pageId={view.pageId} user={user} navigate={navigate} />}
-        {view.name === 'admin' && user && (user.role === 'ADMIN' || user.role === 'MODERATOR') && (
-          <AdminView user={user} navigate={navigate} />
-        )}
-        {view.name === 'public' && <PublicPageView slug={view.slug} navigate={navigate} />}
+        <PageTransition key={view.name + ('pageId' in view ? view.pageId : '') + ('slug' in view ? view.slug : '')}>
+          {view.name === 'landing' && <LandingView navigate={navigate} user={user} />}
+          {view.name === 'login' && <LoginView onAuth={onAuth} navigate={navigate} />}
+          {view.name === 'signup' && <SignupView onAuth={onAuth} navigate={navigate} />}
+          {view.name === 'dashboard' && user && <DashboardView user={user} navigate={navigate} />}
+          {view.name === 'builder' && user && <BuilderView pageId={view.pageId} user={user} navigate={navigate} />}
+          {view.name === 'monetization' && user && <MonetizationView user={user} navigate={navigate} />}
+          {view.name === 'analytics' && user && <AnalyticsView pageId={view.pageId} user={user} navigate={navigate} />}
+          {view.name === 'admin' && user && (user.role === 'ADMIN' || user.role === 'MODERATOR') && (
+            <AdminView user={user} navigate={navigate} />
+          )}
+          {view.name === 'public' && <PublicPageView slug={view.slug} navigate={navigate} />}
+        </PageTransition>
       </main>
       <Footer />
     </div>
