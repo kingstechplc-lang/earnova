@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page { size: 794px 1123px; margin: 0; }
+    :root {
+      --c-bg: #0f1a24;
+      --c-accent: #4a9cc4;
+      --c-text: #ffffff;
+      --c-muted: #8aa6b8;
+      --c-footer: #5a7080;
+      --c-grid: rgba(74, 156, 196, 0.06);
+    }
+    html, body {
+      margin: 0; padding: 0;
+      width: 794px; height: 1123px;
+      background: var(--c-bg);
+      color: var(--c-text);
+      font-family: 'Inter', sans-serif;
+    }
+    @media screen {
+      html { height: auto; display: flex; justify-content: center; min-height: 100vh; background: var(--c-bg); }
+      body { transform-origin: top center; scale: min(1, calc(100vw / 794), calc(100vh / 1123)); margin: 0 auto; box-shadow: 0 0 60px rgba(0,0,0,0.3); }
+    }
+    .cover { width: 794px; height: 1123px; position: relative; box-sizing: border-box; }
+
+    /* Layer 1 - background grid (very subtle) */
+    .bg-layer {
+      position: absolute; inset: 0; z-index: 1;
+      overflow: hidden;
+      background-image:
+        linear-gradient(var(--c-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--c-grid) 1px, transparent 1px);
+      background-size: 50px 50px;
+    }
+
+    /* Layer 2 - structure: thick vertical anchor line */
+    .vline {
+      position: absolute; left: 76px; top: 112px; bottom: 112px;
+      width: 4px; background: var(--c-accent);
+      z-index: 2;
+    }
+
+    /* Layer 3 - content (left offset ≥ 40px from vline right edge at x=80px) */
+    .content { position: absolute; left: 128px; right: 76px; top: 0; bottom: 0; z-index: 3; }
+
+    .kicker {
+      position: absolute; top: 168px;
+      font-size: 10pt; color: var(--c-accent);
+      letter-spacing: 4px; text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .title {
+      position: absolute; top: 230px;
+      font-size: 36pt; font-weight: 700; line-height: 1.18;
+      font-family: 'Playfair Display', serif;
+      color: var(--c-text);
+      max-width: 560px;
+    }
+
+    .subtitle {
+      position: absolute; top: 470px;
+      font-size: 13pt; font-weight: 400; line-height: 1.6;
+      color: var(--c-muted);
+      max-width: 540px;
+    }
+
+    .summary {
+      position: absolute; top: 580px;
+      font-size: 11pt; line-height: 1.65;
+      color: var(--c-muted);
+      max-width: 540px;
+      opacity: 0.9;
+    }
+
+    .meta-block {
+      position: absolute; top: 800px;
+      font-size: 10pt; line-height: 1.7;
+      color: var(--c-text);
+    }
+    .meta-label {
+      color: var(--c-accent);
+      font-size: 8pt; letter-spacing: 2px;
+      text-transform: uppercase; font-weight: 500;
+      display: block; margin-bottom: 4px;
+    }
+    .meta-value { color: var(--c-text); font-weight: 400; }
+
+    .footer {
+      position: absolute; bottom: 76px; left: 0; right: 0;
+      display: flex; justify-content: space-between;
+      font-size: 9pt; color: var(--c-footer);
+      letter-spacing: 1px;
+    }
+    .footer-left { padding-left: 0; }
+    .footer-right { padding-right: 0; }
+  </style>
+</head>
+<body>
+  <div class="cover">
+    <div class="bg-layer"></div>
+    <div class="vline"></div>
+    <div class="content">
+      <div class="kicker">REFINED ARCHITECTURE SPECIFICATION</div>
+      <div class="title">Global Earning Pages<br>Architecture Refinement</div>
+      <div class="subtitle">Resolving six open issues in the platform's pivot from a Christmas-only site to a global creator-publishing and traffic-monetization infrastructure.</div>
+      <div class="summary">This document addresses ad-network co-display rules, GDPR/CCPA consent management, bot detection and traffic-quality scoring, platform-side revenue models, earnings-claim compliance language, and account lifecycle / offboarding. Each section provides the architectural decision, the data model changes required, and the operational controls needed for production.</div>
+      <div class="meta-block">
+        <span class="meta-label">Document Type</span>
+        <span class="meta-value">Technical Architecture Refinement v2</span>
+        <br><br>
+        <span class="meta-label">Status</span>
+        <span class="meta-value">For Engineering Review</span>
+      </div>
+      <div class="footer">
+        <span class="footer-left">GLOBAL EARNING PAGES</span>
+        <span class="footer-right">VERSION 2.0</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
