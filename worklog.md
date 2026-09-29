@@ -677,3 +677,30 @@ Stage Summary:
 - Loading and error states for all three views now use branded glass-card panels with the Earnova logo + shimmer progress bar (loading) or Alert with icon + retry/back button (error), all sitting on the ambient layer — no more flat bg-background for any view in the app.
 - All changes preserve existing functionality, responsive breakpoints, dark-mode tokens, and accessibility contrast ratios (semantic foreground tokens used everywhere; aria-hidden on decorative layers; preserved existing keyboard/scroll/click behaviors).
 - Already-polished components (analytics trust-score hero, public-profile parallax hero, dashboard cards, sidebar/footer/header from Task 12, builder/monetization/public-page from Task 13) were intentionally left untouched or only had minimal additive enhancements (Share button got btn-glow; "X pages" stat badge got CountUp).
+
+---
+Task ID: 15
+Agent: main (Super Z)
+Task: Apply ambient background layer to admin view — final flat-container view
+
+Work Log:
+- Checked project state after resume: all of Tasks 11-14 are pushed and verified. Local origin/main ref was stale (showed ahead 6) — fetched to confirm remote is in sync.
+- Smoke-tested the live API: GET /api/p/kingsley-christmas returns 2 placements (HEADER + BEFORE_FOOTER) with isLive=True — ad system is healthy.
+- Searched for remaining flat-container views: admin-view.tsx was the last one. Its outer container was `view-fade container mx-auto px-4 py-6 max-w-5xl` with no ambient layer (the inner hero card was already polished with gradient + FloatingOrbs, but the surrounding page was flat).
+- Applied the same ambient wrapper pattern from Tasks 13/14:
+  * Outer `<div className="relative min-h-screen">`
+  * Absolute ambient layer: `<div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" aria-hidden />`
+  * 2 evergreen/gold FloatingOrbs at opacity-20
+  * Existing container promoted to `relative z-10` so it sits above the ambient layer
+  * FloatingOrbs was already imported (line 10) — reused, no new imports needed
+- Verified: lint clean, tsc clean, build succeeds (30/30 pages), live API returns expected placements.
+
+Stage Summary:
+- Whole-app visual upgrade is now truly complete. Every view in Earnova sits on a layered ambient surface:
+  * Landing, Login, Signup — already polished (mesh-bg + FloatingOrbs + glass cards)
+  * Dashboard, Builder, Monetization, Public Page — Task 13
+  * Analytics, Profile Setup, Public Profile — Task 14
+  * Admin — Task 15 (this task)
+  * Sidebar, Header, Footer — Task 12 (dedicated background colors)
+- The admin's 8 tabs (Overview, Campaigns, Platform ads, Integrations, Ad networks, Compatibility, Slot config, Policy, Users, Pages, Reviews) all now render on the ambient surface.
+- Pushed to GitHub as commit d565be1.
