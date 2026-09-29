@@ -496,3 +496,56 @@ Stage Summary:
 - Attached-pages pills render below each integration card: green-bordered pills with FileText icon + page title + comma-separated slot list (e.g., "kingsley-christmas · HEADER, FOOTER"). Pill count header: "Attached to N pages".
 - On successful attach: green confetti burst (80 particles) + success toast via shadcn useToast. On failure: destructive Alert with server's error message inside the dialog.
 - Lint: pass (0 errors). TypeScript: pass (0 errors). No backend route changes — only the Prisma include clause.
+
+---
+Task ID: 11 (parent)
+Agent: main (Super Z)
+Task: Build admin-configurable per-slot ad system + user attach-to-page UI
+
+Work Log:
+- Investigated codebase (Task 11-a research subagent) and found:
+  * Footer ad was empty because /api/p/[slug] used `platformIntegrations[0]` for every platform slot — Adsterra's `atOptions` global var got overwritten when HEADER + BEFORE_FOOTER both used the same integration.
+  * No user ads showing because AdIntegration table was empty (no UI to "attach" approved integrations to pages).
+  * AdPlacementPolicy only had global numeric caps (maxPlatformAdsPerPage etc.) — no per-slot config.
+
+- Phase 1: Schema + Backend (done by main agent)
+  * Added AdSlotConfig model to prisma/schema.prisma — one row per (slot, source) pair with: enabled, allowedIntegrationTypes, assignedIntegrationId, defaultPriority, visibility (ALWAYS / ONLY_WHEN_AD_AVAILABLE / NEVER)
+  * Pushed schema to Neon + regenerated Prisma client
+  * Created src/lib/slot-config.ts with 60s cache + auto-seed of 12 default rows (6 slots × 2 sources)
+  * Updated src/lib/placement-engine.ts to filter placements by AdSlotConfig (skip disabled slots + verify integrationType is in allowed list)
+  * Rewrote src/app/api/p/[slug]/route.ts with slot-aware integration matching:
+    - If slot has assignedIntegrationId, use that specific one
+    - Otherwise round-robin among VERIFIED integrations with collision avoidance (don't reuse the same integration if alternatives exist)
+    - Respect allowedIntegrationTypes per slot
+    - Apply visibility rules at the end (drop slots with no live ad when visibility=ONLY_WHEN_AD_AVAILABLE)
+  * Updated src/app/api/pages/route.ts to seed placements based on AdSlotConfig defaults (replaces hardcoded HEADER + BEFORE_FOOTER)
+  * Created /api/admin/slot-config CRUD routes (GET, POST bulk, PATCH, DELETE)
+  * Ran scripts/migrate-slot-config.ts to backfill missing AdPlacement rows on existing kingsley-christmas page (added FOOTER platform placement, AFTER_FIRST_BLOCK + MID_CONTENT user placements)
+
+- Phase 2: Admin UI (Task 11-b subagent)
+  * Built src/components/admin/slot-config-section.tsx (571 lines) — 12 per-(slot, source) cards in a 2-column grid, each with: enabled switch, visibility dropdown, allowed integration types chips, assigned platform integration dropdown, default priority input. Sticky bottom save bar with "✓ Saved" flash.
+  * Wired into admin-view.tsx as new "Slot config" tab (admin-only, between Compatibility and Policy)
+
+- Phase 3: User UI (Task 11-c subagent)
+  * Updated GET /api/monetization/integrations to include placements[].page.{slug,title} relation
+  * Added "Attach to page" button + dialog in monetization-view.tsx for APPROVED integrations — lets creators pick a page + multiple slots (HEADER, AFTER_FIRST_BLOCK, MID_CONTENT, BEFORE_FOOTER, FOOTER, SIDEBAR)
+  * Added "Attached to: page-title (slots)" pills below integration cards
+  * Success toast + 80-particle confetti on attach
+
+- Phase 4: Verification
+  * Lint passes (0 errors)
+  * TypeScript passes (0 errors)
+  * Production build succeeds
+  * Live API test: GET /api/p/kingsley-christmas now returns:
+    - HEADER placement with Adsterra zone 893bf8c9735d54e46137223433 (300×250)
+    - FOOTER placement with Adsterra zone 801238d028d6aa5ed68b83e086 (320×50)
+    - BEFORE_FOOTER was filtered out by maxPlatformAdsPerPage=2 cap
+    - User placements (AFTER_FIRST_BLOCK, MID_CONTENT) filtered out by visibility rule since no APPROVED user integration exists yet
+  * Created scripts/dev.sh wrapper to force-set DATABASE_URL (parent shell exports a stale SQLite URL)
+
+Stage Summary:
+- Footer ad bug fixed: slot-aware integration matching now assigns different Adsterra zones to HEADER vs FOOTER (no more atOptions collision).
+- User ad slots now exist (AFTER_FIRST_BLOCK, MID_CONTENT) but are hidden until the page owner attaches an APPROVED integration — the visibility=ONLY_WHEN_AD_AVAILABLE rule drops them from the response automatically.
+- Admin "Slot config" tab gives full per-slot control: enable/disable, allowed integration types, assigned platform integration, default priority, visibility rule.
+- "Attach to page" UI in monetization-view lets creators attach their APPROVED integration to specific pages + slots.
+- All changes pushed to GitHub (commit 358e2e5).
