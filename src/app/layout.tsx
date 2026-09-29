@@ -20,17 +20,17 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Global Creator Pages — Create. Share. Optionally Monetize.",
-  description: "A global creator-publishing platform. Build a Special Page, share it, and optionally connect your own Adsterra or Monetag account.",
+  title: "PageNova — Create. Share. Shine.",
+  description: "A global creator platform. Build your page, share it, and optionally monetize with Adsterra or Monetag.",
   keywords: ["creator platform", "monetization", "adsterra", "monetag", "Christmas 2026", "page builder"],
-  authors: [{ name: "Global Creator Pages" }],
+  authors: [{ name: "PageNova" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
-    title: "Global Creator Pages",
-    description: "A global creator-publishing and traffic-monetization platform.",
-    siteName: "Global Creator Pages",
+    title: "PageNova",
+    description: "A global creator platform. Build, share, and monetize.",
+    siteName: "PageNova",
     type: "website",
   },
 };

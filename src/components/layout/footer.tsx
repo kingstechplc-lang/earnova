@@ -13,10 +13,10 @@ export default function Footer() {
               <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-evergreen to-evergreen-dark text-cream">
                 <Sparkles className="h-3.5 w-3.5" />
               </span>
-              <span className="font-bold">Global Creator Pages</span>
+              <span className="font-bold">PageNova</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              A global creator-publishing and traffic-monetization platform. Christmas 2026 is our
+              PageNova — a global creator platform. Christmas 2026 is our
               flagship launch campaign — but the platform supports creators worldwide, every day of the year.
             </p>
           </div>
@@ -47,7 +47,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-border/60 flex flex-col sm:flex-row justify-between gap-3 text-xs text-muted-foreground">
-          <p>© 2026 Global Creator Pages · Christmas 2026 campaign active</p>
+          <p>© 2026 PageNova · Christmas 2026 campaign active</p>
           <p className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-evergreen animate-pulse" />
             All systems operational

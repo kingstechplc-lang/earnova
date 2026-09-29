@@ -77,7 +77,7 @@ export default function SignupView({
                 <Sparkles className="h-4 w-4 relative z-10" />
                 <span className="absolute inset-0 bg-gradient-to-tr from-transparent via-gold/30 to-transparent animate-pulse" />
               </span>
-              <span className="font-bold">Global Creator Pages</span>
+              <span className="font-bold">PageNova</span>
             </motion.div>
             <CardTitle className="font-serif text-2xl">Create your account</CardTitle>
             <CardDescription>Free to start. No payment information required.</CardDescription>

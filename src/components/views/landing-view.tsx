@@ -92,7 +92,7 @@ export default function LandingView({
                 transition={{ duration: 0.6, delay: 0.3 }}
                 className="text-base md:text-xl text-muted-foreground max-w-xl mb-8 leading-relaxed"
               >
-                A global creator-publishing platform. Build a Special Page for Christmas 2026,
+                A global creator platform. Build your page, share it, and optionally monetize.
                 publish content, share the URL, and optionally connect your own Adsterra or
                 Monetag account to monetize your legitimate traffic.
               </motion.p>
@@ -448,7 +448,7 @@ export default function LandingView({
             transition={{ duration: 0.6 }}
             className="font-serif text-3xl md:text-5xl font-bold tracking-tight text-cream mb-4"
           >
-            Build your Special Page today.
+            Build your page. Shine bright.
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -457,7 +457,7 @@ export default function LandingView({
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-cream/80 text-lg mb-8 max-w-xl mx-auto"
           >
-            Christmas 2026 is live. The platform is global. Your audience is waiting.
+            Christmas 2026 is live. Your audience is waiting. Shine bright.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}

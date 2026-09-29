@@ -22,7 +22,7 @@ for page in PdfReader(BODY).pages:
     writer.add_page(force_a4(page))
 
 writer.add_metadata({
-    '/Title':   'Global Earning Pages — Refined Architecture v2.0',
+    '/Title':   'PageNova — Refined Architecture v2.0',
     '/Author':  'Z.ai',
     '/Creator': 'Z.ai',
     '/Subject': 'Technical architecture refinement addressing six open issues in the platform pivot',

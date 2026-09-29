@@ -136,7 +136,7 @@ async function main() {
     create: {
       slug: 'christmas-2026',
       title: 'Christmas 2026',
-      description: 'The flagship launch campaign for Global Earning Pages. Users from any country can create a Christmas Special Page, publish content, and optionally monetize via their own Adsterra or Monetag account.',
+      description: 'The flagship launch campaign for PageNova. Users from any country can create a Christmas Special Page, publish content, and optionally monetize via their own Adsterra or Monetag account.',
       startsAt: new Date('2026-09-01'),
       endsAt: new Date('2027-01-10'),
       isActive: true,
