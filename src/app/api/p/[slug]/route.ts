@@ -58,7 +58,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
           adNetworkCode: platInt.adNetwork.code,
           integrationType: platInt.integrationType,
           scriptReference: platInt.scriptReference,
-          // Ad-tag metadata for the client-side AdSlot to inject
+          formatOptions: platInt.formatOptions ? JSON.parse(platInt.formatOptions) : null,
           adTagHtml: adTag.html,
           adTagDescription: adTag.description,
           adTagType: adTag.type,
@@ -81,6 +81,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
         })
         return {
           ...p,
+          formatOptions: integration.formatOptions ? JSON.parse(integration.formatOptions) : null,
           adTagHtml: adTag.html,
           adTagDescription: adTag.description,
           adTagType: adTag.type,
@@ -110,6 +111,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       userAdsEnabled: policy.userAdsEnabled,
       globalKillSwitch: policy.globalKillSwitch,
       maxAdUnitsPerPage: policy.maxAdUnitsPerPage,
+      adSlotResponsive: policy.adSlotResponsive,
     },
   })
 }

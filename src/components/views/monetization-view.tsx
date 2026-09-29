@@ -62,16 +62,18 @@ export default function MonetizationView({
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [userAdFormatSelection, setUserAdFormatSelection] = useState(true)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setLoading(true)
       setLoadError(null)
-      const [dRes, iRes, nRes] = await Promise.all([
+      const [dRes, iRes, nRes, pRes] = await Promise.all([
         safeFetch<Disclaimer>('/api/monetization/disclaimer'),
         safeFetch<{ integrations?: Integration[] }>('/api/monetization/integrations'),
         safeFetch<{ networks?: AdNetwork[] }>('/api/networks'),
+        safeFetch<{ policy?: { userAdFormatSelection?: boolean } }>('/api/admin/policy'),
       ])
       if (cancelled) return
       const firstError = dRes.error || iRes.error || nRes.error
@@ -79,6 +81,7 @@ export default function MonetizationView({
       if (dRes.data) setDisclaimer(dRes.data)
       setIntegrations(iRes.data?.integrations || [])
       setNetworks(nRes.data?.networks || [])
+      setUserAdFormatSelection(pRes.data?.policy?.userAdFormatSelection ?? true)
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -270,6 +273,7 @@ export default function MonetizationView({
       {showCreate && networks.length > 0 && (
         <CreateIntegrationDialog
           networks={networks}
+          userAdFormatSelection={userAdFormatSelection}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); reload() }}
         />
@@ -346,9 +350,10 @@ function DisableButton({ integrationId, onDone }: { integrationId: string; onDon
 }
 
 function CreateIntegrationDialog({
-  networks, onClose, onCreated,
+  networks, userAdFormatSelection, onClose, onCreated,
 }: {
   networks: AdNetwork[]
+  userAdFormatSelection: boolean
   onClose: () => void
   onCreated: () => void
 }) {
@@ -364,6 +369,16 @@ function CreateIntegrationDialog({
   const [loading, setLoading] = useState(false)
 
   const selectedNetwork = networks.find(n => n.id === networkId)
+
+  // When user format selection is disabled, auto-assign default format
+  useEffect(() => {
+    if (!userAdFormatSelection && selectedNetwork) {
+      const t = window.setTimeout(() => {
+        setIntegrationType(selectedNetwork.integrationTypes[0] || 'BANNER')
+      }, 0)
+      return () => window.clearTimeout(t)
+    }
+  }, [userAdFormatSelection, selectedNetwork])
 
   async function submit() {
     setError('')
@@ -420,15 +435,26 @@ function CreateIntegrationDialog({
             </Select>
           </div>
 
-          {selectedNetwork && (
+          {selectedNetwork && userAdFormatSelection && (
             <div>
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Integration type</Label>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Ad format type</Label>
               <Select value={integrationType} onValueChange={setIntegrationType}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Choose type" /></SelectTrigger>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Choose ad format" /></SelectTrigger>
                 <SelectContent>
                   {selectedNetwork.integrationTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Choose the ad format type. Different formats display differently (banners, native, push, etc.).
+              </p>
+            </div>
+          )}
+          {selectedNetwork && !userAdFormatSelection && (
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/60">
+              <p className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Ad format: {integrationType || 'BANNER'}</strong> — the admin has
+                disabled user ad format selection. Your integration will use this default format.
+              </p>
             </div>
           )}
 

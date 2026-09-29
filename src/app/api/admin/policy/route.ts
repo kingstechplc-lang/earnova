@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest) {
   const {
     maxAdUnitsPerPage, maxPlatformAdsPerPage, maxUserAdsPerPage,
     minContentBetweenAdsPx, platformAdsEnabled, userAdsEnabled,
-    newIntegrationsManual, globalKillSwitch,
+    newIntegrationsManual, globalKillSwitch, userAdFormatSelection, adSlotResponsive,
   } = body as {
     maxAdUnitsPerPage?: number
     maxPlatformAdsPerPage?: number
@@ -32,6 +32,8 @@ export async function PATCH(req: NextRequest) {
     userAdsEnabled?: boolean
     newIntegrationsManual?: boolean
     globalKillSwitch?: boolean
+    userAdFormatSelection?: boolean
+    adSlotResponsive?: boolean
   }
 
   let policy = await db.adPlacementPolicy.findFirst({ where: { name: 'global' } })
@@ -60,6 +62,8 @@ export async function PATCH(req: NextRequest) {
   if (userAdsEnabled !== undefined) data.userAdsEnabled = userAdsEnabled
   if (newIntegrationsManual !== undefined) data.newIntegrationsManual = newIntegrationsManual
   if (globalKillSwitch !== undefined) data.globalKillSwitch = globalKillSwitch
+  if (userAdFormatSelection !== undefined) data.userAdFormatSelection = userAdFormatSelection
+  if (adSlotResponsive !== undefined) data.adSlotResponsive = adSlotResponsive
 
   const updated = await db.adPlacementPolicy.update({ where: { id: policy.id }, data })
   return NextResponse.json({ policy: updated })

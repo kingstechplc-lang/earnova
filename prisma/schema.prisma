@@ -112,6 +112,8 @@ model AdPlacementPolicy {
   userAdsEnabled           Boolean  @default(true)
   newIntegrationsManual    Boolean  @default(true)
   globalKillSwitch         Boolean  @default(false)
+  userAdFormatSelection    Boolean  @default(true)
+  adSlotResponsive         Boolean  @default(true)
   updatedAt                DateTime @updatedAt
 }
 

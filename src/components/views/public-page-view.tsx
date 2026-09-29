@@ -231,7 +231,7 @@ export default function PublicPageView({
             transition={{ duration: 0.5, delay: 0.3 }}
             className="mb-6"
           >
-            <AdSlot placement={placementBySlot('HEADER')!} />
+            <AdSlot placement={placementBySlot('HEADER')!} responsive={data?.policy?.adSlotResponsive ?? true} />
           </motion.div>
         )}
 
@@ -252,12 +252,12 @@ export default function PublicPageView({
                 transition={{ delay: 0.2 }}
                 className="my-8"
               >
-                <AdSlot placement={placementBySlot('AFTER_FIRST_BLOCK')!} />
+                <AdSlot placement={placementBySlot('AFTER_FIRST_BLOCK')!} responsive={data?.policy?.adSlotResponsive ?? true} />
               </motion.div>
             )}
             {idx === 2 && page.blocks.length > 5 && placementBySlot('MID_CONTENT') && (
               <div className="my-8">
-                <AdSlot placement={placementBySlot('MID_CONTENT')!} />
+                <AdSlot placement={placementBySlot('MID_CONTENT')!} responsive={data?.policy?.adSlotResponsive ?? true} />
               </div>
             )}
           </motion.div>
@@ -270,12 +270,12 @@ export default function PublicPageView({
             viewport={{ once: true }}
             className="my-8"
           >
-            <AdSlot placement={placementBySlot('BEFORE_FOOTER')!} />
+            <AdSlot placement={placementBySlot('BEFORE_FOOTER')!} responsive={data?.policy?.adSlotResponsive ?? true} />
           </motion.div>
         )}
         {placementBySlot('FOOTER') && (
           <div className="mt-8">
-            <AdSlot placement={placementBySlot('FOOTER')!} />
+            <AdSlot placement={placementBySlot('FOOTER')!} responsive={data?.policy?.adSlotResponsive ?? true} />
           </div>
         )}
 

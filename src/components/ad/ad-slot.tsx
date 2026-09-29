@@ -17,6 +17,12 @@ type Placement = {
   adTagType?: 'script' | 'link' | 'iframe'
   adTagScriptSrc?: string
   isLive?: boolean
+  // Format options for responsive sizing
+  formatOptions?: {
+    width?: number
+    height?: number
+    format?: string
+  } | null
 }
 
 const NETWORK_LABEL: Record<string, { label: string; color: string }> = {
@@ -27,7 +33,7 @@ const NETWORK_LABEL: Record<string, { label: string; color: string }> = {
 
 type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
-export function AdSlot({ placement }: { placement: Placement }) {
+export function AdSlot({ placement, responsive = true }: { placement: Placement; responsive?: boolean }) {
   const isPlatform = placement.source !== 'USER_INTEGRATION'
   const network = NETWORK_LABEL[placement.adNetworkCode] || { label: placement.adNetworkCode, color: 'text-muted-foreground' }
   const label = isPlatform ? `Platform ad · ${network.label}` : `Creator ad · ${network.label}`
@@ -38,6 +44,21 @@ export function AdSlot({ placement }: { placement: Placement }) {
 
   // Whether this ad has a real ad-network tag to inject
   const hasRealAd = placement.isLive && !!placement.adTagHtml
+
+  // Compute responsive dimensions from formatOptions
+  const fmt = placement.formatOptions
+  const isBanner = placement.integrationType === 'BANNER'
+  const hasDimensions = isBanner && fmt?.width && fmt?.height
+  const slotStyle: React.CSSProperties = responsive && hasDimensions
+    ? {
+        maxWidth: `${fmt!.width}px`,
+        minHeight: `${fmt!.height}px`,
+        margin: '0 auto',
+      }
+    : {}
+  const injectStyle: React.CSSProperties = responsive && hasDimensions
+    ? { width: `${fmt!.width}px`, height: `${fmt!.height}px`, maxWidth: '100%' }
+    : {}
 
   useEffect(() => {
     if (!hasRealAd || !placement.adTagHtml || !containerRef.current) return
@@ -121,7 +142,8 @@ export function AdSlot({ placement }: { placement: Placement }) {
       data-ad-network={placement.adNetworkCode}
       data-ad-integration-type={placement.integrationType || ''}
       data-ad-script-ref={placement.scriptReference || ''}
-      className={`group relative w-full min-h-[100px] md:min-h-[120px] rounded-2xl overflow-hidden ${isPlatform ? 'ad-slot-platform' : 'ad-slot-user'}`}
+      className={`group relative rounded-2xl overflow-hidden ${isPlatform ? 'ad-slot-platform' : 'ad-slot-user'} ${responsive && hasDimensions ? '' : 'w-full min-h-[100px] md:min-h-[120px]'}`}
+      style={slotStyle}
     >
       {/* Animated scan-line on hover */}
       <div className="absolute inset-0 overflow-hidden rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
@@ -152,6 +174,7 @@ export function AdSlot({ placement }: { placement: Placement }) {
           <div
             ref={containerRef}
             className="ad-injection-zone absolute inset-0 flex items-center justify-center"
+            style={injectStyle}
             data-ad-injected="true"
           />
         )}

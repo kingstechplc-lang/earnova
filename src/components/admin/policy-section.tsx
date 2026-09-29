@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { motion } from 'framer-motion'
 import { safeFetch } from '@/lib/safe-fetch'
 import { FadeIn } from '@/components/animated/motion'
-import { ShieldAlert, Eye, User, Clock, Sliders, Save, Zap } from 'lucide-react'
+import { ShieldAlert, Eye, User, Clock, Sliders, Save, Zap, LayoutGrid, Maximize } from 'lucide-react'
 
 type Policy = {
   id: string
@@ -21,6 +21,8 @@ type Policy = {
   userAdsEnabled: boolean
   newIntegrationsManual: boolean
   globalKillSwitch: boolean
+  userAdFormatSelection: boolean
+  adSlotResponsive: boolean
 }
 
 export function PolicySection({ initialPolicy }: { initialPolicy: Policy | null }) {
@@ -57,7 +59,7 @@ export function PolicySection({ initialPolicy }: { initialPolicy: Policy | null 
     }
   }
 
-  async function toggle(key: 'globalKillSwitch' | 'platformAdsEnabled' | 'userAdsEnabled' | 'newIntegrationsManual', value: boolean) {
+  async function toggle(key: 'globalKillSwitch' | 'platformAdsEnabled' | 'userAdsEnabled' | 'newIntegrationsManual' | 'userAdFormatSelection' | 'adSlotResponsive', value: boolean) {
     setPolicy(prev => prev ? { ...prev, [key]: value } : null)
     const res = await safeFetch('/api/admin/policy', {
       method: 'PATCH',
@@ -121,6 +123,24 @@ export function PolicySection({ initialPolicy }: { initialPolicy: Policy | null 
               description="New ad integrations stay in PENDING_REVIEW until an admin reviews them."
               checked={policy.newIntegrationsManual}
               onChange={v => toggle('newIntegrationsManual', v)}
+            />
+            <div className="border-t border-border/60" />
+            <SwitchRow
+              icon={<LayoutGrid className="h-4 w-4" />}
+              iconColor="text-evergreen"
+              label="User ad format selection"
+              description="When ON, users can choose ad format type (BANNER, NATIVE, IN_PAGE, etc.) when creating integrations. When OFF, users are assigned a default format."
+              checked={policy.userAdFormatSelection}
+              onChange={v => toggle('userAdFormatSelection', v)}
+            />
+            <div className="border-t border-border/60" />
+            <SwitchRow
+              icon={<Maximize className="h-4 w-4" />}
+              iconColor="text-gold-dark"
+              label="Responsive ad slots"
+              description="When ON, ad slots size to the configured banner dimensions (e.g. 300×250px). When OFF, slots are full-width."
+              checked={policy.adSlotResponsive}
+              onChange={v => toggle('adSlotResponsive', v)}
             />
           </CardContent>
         </Card>
