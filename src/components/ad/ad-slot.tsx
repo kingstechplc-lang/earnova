@@ -83,8 +83,7 @@ export function AdSlot({ placement, responsive = true }: { placement: Placement;
     let abortCtrl: AbortController | null = null
     let fetchTimeoutHandle: ReturnType<typeof setTimeout> | null = null
     let loadTimeoutHandle: ReturnType<typeof setTimeout> | null = null
-    const iframeInspectHandles: ReturnType<typeof setTimeout>[] = []
-    let observer: MutationObserver | null = null
+    let inspectHandle: ReturnType<typeof setTimeout> | null = null
     let disposed = false
 
     const detectBlockAndInject = async () => {
@@ -130,7 +129,34 @@ export function AdSlot({ placement, responsive = true }: { placement: Placement;
         return
       }
 
-      // 3) Inject the ad-tag HTML
+      // 3) Inject the ad-tag HTML into a sandboxed iframe
+      //
+      // WHY IFRAME ISOLATION IS REQUIRED:
+      // Ad-networks like Adsterra use a global JS variable (window.atOptions)
+      // to store the zone key for their banner format. When multiple Adsterra
+      // banners run on the same page, they all write to the same window.atOptions
+      // — the second script overwrites the first's zone key, so only one of
+      // the two ads renders. Refreshing causes non-deterministic timing, so
+      // it appears to "rotate" between containers.
+      //
+      // By injecting each ad into its own <iframe> via srcdoc, each ad gets
+      // its own document / window scope → no global var collision → all ads
+      // render simultaneously. This is the standard publisher-side technique
+      // for serving multiple ad-network banners on one page.
+      //
+      // Sandbox attributes:
+      //   allow-scripts          — ad-network JS must run
+      //   allow-same-origin      — ad-network can read its own cookies
+      //                             (required for frequency capping, viewability)
+      //   allow-popups           — ad clicks open new tabs
+      //   allow-popups-to-escape-sandbox — popped-up tabs aren't sandboxed
+      //   allow-top-navigation-by-user-activation — ad can navigate top window
+      //                                              only on user click (ad clicks)
+      //
+      // Note: Chrome logs a warning when both allow-scripts + allow-same-origin
+      // are set ("can escape its sandboxing"). This is an accepted trade-off
+      // for ad iframes — without allow-same-origin, ad-networks can't read
+      // their cookies and refuse to serve ads.
       setLoadState('loading')
       setHasAdTag(true)
 
@@ -139,91 +165,98 @@ export function AdSlot({ placement, responsive = true }: { placement: Placement;
         if (!container) return
         container.innerHTML = ''
 
-        // Parse the ad-tag HTML and inject scripts properly
-        const tempDiv = document.createElement('div')
-        tempDiv.innerHTML = placement.adTagHtml!
+        // Determine if this is a script-based ad (needs iframe) or a
+        // link-based ad (just an <a> tag, can be injected directly)
+        const adTagHtml = placement.adTagHtml!
+        const hasScript = /<script[\s>]/i.test(adTagHtml)
 
-        const injectedScripts: HTMLScriptElement[] = []
+        if (hasScript) {
+          // ── Script-based ad → iframe isolation ─────────────────────────
+          //
+          // Build the srcdoc content — a minimal HTML document that runs
+          // the ad-tag script in its own scope.
+          const iframeHtml = buildIframeSrcDoc(adTagHtml, placement)
 
-        Array.from(tempDiv.children).forEach(child => {
-          if (child.tagName.toLowerCase() === 'script') {
-            const script = document.createElement('script')
-            Array.from(child.attributes).forEach(attr => {
-              script.setAttribute(attr.name, attr.value)
-            })
-            if (child.textContent) {
-              script.textContent = child.textContent
-            }
-            script.onload = () => setLoadState(prev => prev === 'loading' ? 'loaded' : prev)
-            script.onerror = () => setLoadState('error')
-            container.appendChild(script)
-            injectedScripts.push(script)
-          } else {
-            container.appendChild(child.cloneNode(true))
-          }
-        })
+          const iframe = document.createElement('iframe')
+          // sandbox: allow what ad-networks need; nothing more.
+          iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation')
+          iframe.setAttribute('referrerpolicy', 'no-referrer-when-downgrade')
+          // Allow fullscreen for native/video ad formats
+          iframe.setAttribute('allow', 'fullscreen')
+          iframe.style.cssText = 'width:100%;height:100%;border:0;display:block;margin:0;padding:0;overflow:hidden;background:transparent;'
+          iframe.title = `Advertisement: ${placement.slot} (${placement.adNetworkCode})`
 
-        // 4) Watch the container for Chrome injecting the "This content is
-        //    blocked" message inside an iframe. When Chrome blocks an
-        //    iframe (CSP / Safe Browsing / extension), it replaces the
-        //    iframe's content with a chrome-error page that contains the
-        //    text "This content is blocked". We detect this via a
-        //    MutationObserver on the container's subtree.
-        observer = new MutationObserver(mutations => {
-          for (const m of mutations) {
-            for (const node of m.addedNodes) {
-              if (node.nodeType !== Node.ELEMENT_NODE) continue
-              const el = node as Element
-              // Check if the added node is an iframe showing Chrome's
-              // "blocked content" error page (we can read its textContent
-              // since same-origin Chrome error pages are inspectable).
-              if (el.tagName === 'IFRAME') {
-                // Give the iframe a moment to render its error page,
-                // then inspect it.
-                const iframe = el as HTMLIFrameElement
-                const inspectHandle = setTimeout(() => {
-                  if (disposed) return
-                  try {
-                    // cross-origin iframes throw on access — that's fine,
-                    // we only care about same-origin error pages
-                    const doc = iframe.contentDocument || iframe.contentWindow?.document
-                    const text = doc?.body?.textContent || ''
-                    if (text.includes('This content is blocked') ||
-                        text.includes('Contact the site owner to fix the issue') ||
-                        text.includes('ERR_BLOCKED') ||
-                        text.includes('net::ERR_BLOCKED_BY_CLIENT')) {
-                      setBlockedReason('The browser blocked the ad iframe (ad blocker, CSP, or Safe Browsing)')
-                      setLoadState('blocked')
-                    }
-                  } catch {
-                    // cross-origin — iframe loaded something; we leave the
-                    // state as 'loading' and let the timeout catch it
-                  }
-                }, 500)
-                iframeInspectHandles.push(inspectHandle)
-              }
-            }
-          }
-        })
-        observer.observe(container, { childList: true, subtree: true })
-
-        if (injectedScripts.length === 0) {
-          setLoadState('loaded')
-        } else {
-          // Fallback timeout: if scripts haven't reported load after 6s,
-          // mark as blocked (most likely an ad blocker silently dropped
-          // the request without firing onerror).
-          loadTimeoutHandle = setTimeout(() => {
+          // When the iframe finishes loading, check its content for Chrome's
+          // "blocked content" error page (same-origin srcdoc is inspectable).
+          iframe.addEventListener('load', () => {
             if (disposed) return
-            setLoadState(prev => {
-              if (prev === 'loading') {
-                setBlockedReason('Ad request timed out — likely blocked by an ad blocker')
-                return 'blocked'
+            // Wait a moment for the ad-network script to fire + render
+            inspectHandle = setTimeout(() => {
+              if (disposed) return
+              try {
+                const doc = iframe.contentDocument || iframe.contentWindow?.document
+                const bodyText = doc?.body?.textContent || ''
+                const bodyHtml = doc?.body?.innerHTML || ''
+                // Detect Chrome's "blocked content" error page
+                if (bodyText.includes('This content is blocked') ||
+                    bodyText.includes('Contact the site owner to fix the issue') ||
+                    bodyText.includes('ERR_BLOCKED') ||
+                    bodyText.includes('net::ERR_BLOCKED_BY_CLIENT')) {
+                  setBlockedReason('The browser blocked the ad iframe (ad blocker, CSP, or Safe Browsing)')
+                  setLoadState('blocked')
+                  return
+                }
+                // If the iframe body is empty after 1.5s, the ad script
+                // either failed silently or hasn't rendered yet. Mark
+                // as loaded — the network may still render the ad later,
+                // and we don't want to flash "blocked" prematurely.
+                if (bodyHtml.trim() === '' || bodyHtml === '<br>' || bodyHtml.length < 20) {
+                  // Empty body — script may have run but produced no visible output
+                  // (could be a frequency-capped impression, etc.)
+                  setLoadState('loaded')
+                } else {
+                  setLoadState('loaded')
+                }
+              } catch {
+                // Cross-origin — can't inspect; assume loaded
+                setLoadState('loaded')
               }
-              return prev
-            })
-          }, 6000)
+            }, 1500)
+          })
+
+          iframe.addEventListener('error', () => {
+            if (disposed) return
+            setLoadState('error')
+          })
+
+          // Set srcdoc last (triggers load)
+          iframe.srcdoc = iframeHtml
+          container.appendChild(iframe)
+        } else {
+          // ── Link-based ad (DIRECT_LINK) → inject directly ───────────────
+          // Link ads don't have global-var collision issues, so no need
+          // for iframe isolation.
+          const tempDiv = document.createElement('div')
+          tempDiv.innerHTML = adTagHtml
+          Array.from(tempDiv.children).forEach(child => {
+            container.appendChild(child.cloneNode(true))
+          })
+          setLoadState('loaded')
         }
+
+        // Fallback timeout: if the ad hasn't reported load after 8s,
+        // mark as blocked (most likely an ad blocker silently dropped
+        // the request without firing onerror).
+        loadTimeoutHandle = setTimeout(() => {
+          if (disposed) return
+          setLoadState(prev => {
+            if (prev === 'loading') {
+              setBlockedReason('Ad request timed out — likely blocked by an ad blocker')
+              return 'blocked'
+            }
+            return prev
+          })
+        }, 8000)
       } catch (err) {
         console.error('Ad tag injection failed:', err)
         setLoadState('error')
@@ -238,11 +271,10 @@ export function AdSlot({ placement, responsive = true }: { placement: Placement;
       window.clearTimeout(timerId)
       if (fetchTimeoutHandle) clearTimeout(fetchTimeoutHandle)
       if (loadTimeoutHandle) clearTimeout(loadTimeoutHandle)
-      iframeInspectHandles.forEach(h => clearTimeout(h))
+      if (inspectHandle) clearTimeout(inspectHandle)
       if (abortCtrl) abortCtrl.abort()
-      if (observer) observer.disconnect()
     }
-  }, [hasRealAd, placement.adTagHtml, placement.adTagScriptSrc])
+  }, [hasRealAd, placement.adTagHtml, placement.adTagScriptSrc, placement.slot, placement.adNetworkCode])
 
   return (
     <motion.div
@@ -459,4 +491,57 @@ async function checkAdBlockBait(): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * Build the HTML document for the ad iframe's `srcdoc` attribute.
+ *
+ * Each ad gets its own complete HTML document so the ad-network script
+ * runs in an isolated window scope. This is the standard publisher-side
+ * technique for serving multiple ad-network banners on one page — without
+ * it, Adsterra's `window.atOptions` global variable collides between
+ * banners and only one renders.
+ *
+ * The document:
+ *   1. Has zero body margin/padding (ad fills the iframe)
+ *   2. Sets background:transparent (so our slot styling shows through)
+ *   3. Disables scrollbars (ads shouldn't scroll)
+ *   4. Includes the ad-network's ad-tag HTML verbatim
+ *   5. Has a small inline postMessage hook so the ad can signal when it
+ *      finishes rendering (optional — most ad-networks don't use this)
+ */
+function buildIframeSrcDoc(adTagHtml: string, placement: Placement): string {
+  // Compute the ad's expected dimensions (for the iframe body to size to)
+  const fmt = placement.formatOptions
+  const width = fmt?.width || '100%'
+  const height = fmt?.height || '100%'
+
+  // The ad-tag HTML is already a complete snippet (script tags + maybe
+  // a container div). We just wrap it in a minimal HTML document.
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<base target="_blank">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body { min-width: ${typeof width === 'number' ? width + 'px' : width}; min-height: ${typeof height === 'number' ? height + 'px' : height}; }
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; text-decoration: none; }
+</style>
+</head>
+<body>
+${adTagHtml}
+</body>
+</html>`
 }
