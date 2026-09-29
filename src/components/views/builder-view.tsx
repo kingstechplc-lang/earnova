@@ -19,6 +19,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Plus, GripVertical, Trash2, ChevronLeft, Eye } from 'lucide-react'
 import { safeFetch } from '@/lib/safe-fetch'
 import { useConfetti } from '@/components/animated/confetti'
+import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import type { View, CurrentUser } from '@/app/page'
 
 type Block = {
@@ -175,11 +176,29 @@ export default function BuilderView({
     setSaving(false)
   }
 
-  if (loading) return <div className="container mx-auto px-4 py-8">Loading…</div>
-  if (!page) return <div className="container mx-auto px-4 py-8">Page not found.</div>
+  if (loading) return (
+    <div className="relative min-h-screen">
+      <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" aria-hidden />
+      <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
+      <div className="relative z-10 container mx-auto px-4 py-8">Loading…</div>
+    </div>
+  )
+  if (!page) return (
+    <div className="relative min-h-screen">
+      <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" aria-hidden />
+      <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
+      <div className="relative z-10 container mx-auto px-4 py-8">Page not found.</div>
+    </div>
+  )
 
   return (
-    <div className="view-fade container mx-auto px-4 py-6 max-w-4xl">
+    <div className="relative min-h-screen">
+      {/* Ambient background layer — same treatment as dashboard so the builder
+          feels continuous with the rest of the app rather than flat. */}
+      <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" aria-hidden />
+      <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
+
+      <div className="relative z-10 view-fade container mx-auto px-4 py-6 max-w-4xl">
       {ConfettiLayer}
       <div className="flex items-center gap-3 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
@@ -199,7 +218,7 @@ export default function BuilderView({
             window.location.hash = `/p/${page.slug}`
             navigate({ name: 'public', slug: page.slug })
           }}
-          className="border-evergreen/30 text-evergreen hover:bg-evergreen/5"
+          className="border-evergreen/30 text-evergreen hover:bg-evergreen/5 backdrop-blur-sm bg-card/50"
         >
           <Eye className="h-4 w-4 mr-1" /> Preview
         </Button>
@@ -209,7 +228,7 @@ export default function BuilderView({
           className={
             page.publishedAt
               ? 'bg-cranberry text-cream hover:bg-cranberry/80'
-              : 'bg-evergreen text-cream hover:bg-evergreen-dark shadow-festive'
+              : 'bg-evergreen text-cream hover:bg-evergreen-dark shadow-festive btn-glow overflow-hidden'
           }
         >
           {page.publishedAt ? 'Unpublish' : 'Publish'}
@@ -244,15 +263,15 @@ export default function BuilderView({
               {page.moderationState}
             </span>
             <div className="flex-1" />
-            <Button size="sm" variant="outline" onClick={saveMetadata} className="border-evergreen/30 text-evergreen hover:bg-evergreen/5">
+            <Button size="sm" variant="outline" onClick={saveMetadata} className="border-evergreen/30 text-evergreen hover:bg-evergreen/5 btn-glow overflow-hidden">
               Save settings
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Block palette */}
-      <Card className="mb-6 overflow-hidden border-gold/30">
+      {/* Block palette — glass treatment so it reads as a toolbar on the ambient surface */}
+      <Card className="mb-6 overflow-hidden border-gold/30 glass-strong">
         <div className="h-1 w-full bg-gradient-to-r from-gold to-gold-dark" />
         <CardHeader>
           <CardTitle className="font-serif text-lg flex items-center gap-2">
@@ -268,7 +287,7 @@ export default function BuilderView({
                 size="sm"
                 variant="outline"
                 onClick={() => addBlock(type)}
-                className="border-evergreen/20 hover:bg-evergreen/5 hover:border-evergreen/40"
+                className="border-evergreen/20 hover:bg-evergreen/5 hover:border-evergreen/40 bg-background/50 backdrop-blur-sm"
               >
                 <Plus className="h-3 w-3 mr-1 text-evergreen" /> {label}
               </Button>
@@ -277,8 +296,9 @@ export default function BuilderView({
         </CardContent>
       </Card>
 
-      {/* Blocks */}
-      <div className="space-y-3">
+      {/* Workspace — sortable block list sits on a subtle elevated surface
+          so the editor feels distinct from the surrounding ambient page. */}
+      <div className="space-y-3 rounded-2xl bg-card/50 backdrop-blur-sm border border-border/40 p-4 shadow-sm">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={page.blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
             {page.blocks.map(block => (
@@ -301,6 +321,7 @@ export default function BuilderView({
             </CardContent>
           </Card>
         )}
+      </div>
       </div>
     </div>
   )

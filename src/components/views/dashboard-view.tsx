@@ -11,6 +11,7 @@ import {
 import { motion } from 'framer-motion'
 import { CountUp } from '@/components/animated/count-up'
 import { StaggerContainer, StaggerItem, FadeIn } from '@/components/animated/motion'
+import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { safeFetch } from '@/lib/safe-fetch'
 import { TiltCard } from '@/components/animated/tilt-card'
 import {
@@ -97,14 +98,25 @@ export default function DashboardView({
   const approvedCount = pages.filter(p => p.moderationState === 'APPROVED').length
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <div className="relative min-h-screen">
+      {/* Ambient background layer — subtle mesh + drifting orbs so the
+          dashboard sits on a layered surface rather than flat bg-background. */}
+      <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" aria-hidden />
+      <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-25" />
+
+      <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
       {/* Email verification banner */}
       <EmailVerificationBanner />
       {/* Header */}
       <FadeIn>
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-          <div>
-            <Badge variant="outline" className="mb-2 border-gold/40 text-gold-dark bg-gold/5">
+        <div className="relative flex flex-wrap items-end justify-between gap-4 mb-8">
+          {/* Soft gradient wash behind the welcome heading — like a gentle spotlight. */}
+          <div
+            className="absolute -inset-x-3 -inset-y-4 rounded-3xl bg-gradient-to-br from-gold/8 via-evergreen/4 to-berry/5 pointer-events-none"
+            aria-hidden
+          />
+          <div className="relative">
+            <Badge variant="outline" className="mb-2 border-gold/40 text-gold-dark bg-gold/5 glass-strong">
               <Sparkles className="h-3 w-3 mr-1" /> Creator dashboard
             </Badge>
             <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight">
@@ -112,7 +124,7 @@ export default function DashboardView({
             </h1>
             <p className="text-muted-foreground mt-1">Manage your Special Pages and grow your audience.</p>
           </div>
-          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+          <motion.div className="relative" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
             <Button
               onClick={() => navigate({ name: 'monetization' })}
               className="bg-evergreen text-cream hover:bg-evergreen-dark shadow-festive btn-glow overflow-hidden"
@@ -331,7 +343,7 @@ export default function DashboardView({
         <StaggerContainer className="grid gap-3">
           {pages.map(p => (
             <StaggerItem key={p.id} y={15}>
-              <Card className="overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-0.5 hover:border-evergreen/30">
+              <Card className="overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-0.5 hover:border-evergreen/30 bg-card/80 backdrop-blur-sm">
                 <div className={`h-1 w-full ${
                   p.moderationState === 'APPROVED' ? 'bg-gradient-to-r from-evergreen to-evergreen-light' :
                   p.moderationState === 'PENDING' ? 'bg-gradient-to-r from-gold to-gold-dark' :
@@ -381,6 +393,7 @@ export default function DashboardView({
           ))}
         </StaggerContainer>
       )}
+      </div>
     </div>
   )
 }

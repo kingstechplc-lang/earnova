@@ -573,3 +573,55 @@ Stage Summary:
 - Accessibility: cream/70 → cream text on evergreen-dark/forest-ink surfaces keeps contrast readable; light-mode header still uses semantic foreground tokens for body text.
 - All design changes are dark-mode safe via `.dark` variants in globals.css.
 - Verification: `bun run lint` ✓ clean, `bunx tsc --noEmit` ✓ clean, `bun run build` ✓ 30/30 pages generated successfully.
+
+---
+Task ID: 13
+Agent: frontend-styling-expert
+Task: Apply ambient background layering + visual polish to dashboard/builder/monetization/public-page views
+
+Work Log:
+- src/components/views/dashboard-view.tsx (444 → 457 lines, ~13 lines added):
+  * Added `FloatingOrbs` import from `@/components/animated/floating-orbs`.
+  * Wrapped the entire return in `<div className="relative min-h-screen">` with an ambient layer: `<div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" aria-hidden />` + `<FloatingOrbs count={2} colors={['evergreen','gold']} className="opacity-25" />`.
+  * Made the inner content container `relative z-10` so it sits above the ambient layer.
+  * Header section: wrapped in a `relative` flex with an absolute decorative gradient wash (`bg-gradient-to-br from-gold/8 via-evergreen/4 to-berry/5` rounded-3xl) behind the welcome heading; promoted the left content column and the right Wallet button to `relative` so they layer above the wash.
+  * "Creator dashboard" Badge upgraded with `glass-strong` for a frosted-pill feel.
+  * Stat TiltCards and "Create a new Special Page" card left untouched (already polished).
+  * Pages-list grid items: each Card now carries `bg-card/80 backdrop-blur-sm` so they read as elevated tiles on the new ambient surface rather than blending into the mesh background.
+- src/components/views/builder-view.tsx (431 → 453 lines, ~22 lines added):
+  * Added `FloatingOrbs` import.
+  * Both the `loading` and `!page` early returns now render inside an ambient wrapper (`relative min-h-screen` + `mesh-bg opacity-40` + 2 orbs at `opacity-20`) so the brief loading / not-found states feel continuous with the styled builder instead of dropping onto flat bg-background.
+  * Main return wrapped in `<div className="relative min-h-screen">` + ambient layer + inner `<div className="relative z-10 view-fade container ...">`.
+  * "Page settings" card left alone (already had tri-color top bar + shadow-festive).
+  * "Add a content block" palette card: upgraded from `border-gold/30` only to `border-gold/30 glass-strong` so the toolbar reads as a frosted panel hovering over the workspace. Each block-type button now carries `bg-background/50 backdrop-blur-sm` for subtle depth on the new glass surface.
+  * Block-editor sortable list: wrapped in a new "workspace" surface — `<div className="space-y-3 rounded-2xl bg-card/50 backdrop-blur-sm border border-border/40 p-4 shadow-sm">` — so the editor feels like a distinct workspace plate above the ambient page (rather than loose cards on a flat page).
+  * "Save settings" button gained `btn-glow overflow-hidden`. The "Publish" button (evergreen variant only) gained `btn-glow overflow-hidden`; the destructive "Unpublish" variant intentionally does NOT get btn-glow (destructive actions shouldn't invite clicks).
+  * "Preview" outline button got `backdrop-blur-sm bg-card/50` so it sits on the glass layer too.
+- src/components/views/monetization-view.tsx (901 → 928 lines, ~27 lines added):
+  * `FloatingOrbs` was already imported (line 10) — reused for both the loading state and the main view.
+  * Loading early-return now wrapped in ambient (`mesh-bg opacity-40` + 2 orbs gold/berry at `opacity-20`) — themed with gold/berry orbs to signal the money view.
+  * Main return wrapped in `<div className="relative min-h-screen">` + ambient layer (mesh-bg + gold/berry orbs) + inner `<div className="relative z-10 view-fade container ...">`.
+  * Hero header card left alone (already has gradient + FloatingOrbs + gold radial glow).
+  * Compliance notice: converted from a generic `<Alert>` into a distinctive "money panel" — `<div className="mb-6 relative overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-gold/8 via-berry/6 to-cranberry/5 backdrop-blur-sm shadow-sm">` with a tri-color top accent line (`bg-gradient-to-r from-gold via-gold-dark to-cranberry`), a gold-tinted icon chip, and stronger visual weight (font-semibold title, leading-relaxed description). This signals "important money info" rather than a generic system alert. (The single `<AlertTitle>` usage elsewhere in the dialog is preserved; the Alert import is still needed.)
+  * Integration cards: each Card now has `glass-strong` for premium "connected account" feel, plus a network-specific accent wash — `<div className="absolute inset-0 pointer-events-none ${networkWash}" />` where `networkWash` is `from-gold/12 via-gold/4 to-transparent` (adsterra), `from-berry/12 via-berry/4 to-transparent` (monetag), or `from-evergreen/12 via-evergreen/4 to-transparent` (platform). The state-based top bar (approved=evergreen, pending=gold, revoked=cranberry) is preserved. The CardContent and top bar were promoted to `relative` so they sit above the wash layer.
+  * "Connect ad network" button: added `btn-glow overflow-hidden` for the inviting glow-on-hover effect.
+  * Educational section + CreateIntegrationDialog: left untouched (already polished).
+- src/components/views/public-page-view.tsx (443 → 462 lines, ~19 lines added):
+  * Parallax hero: completely untouched (already styled with gradient + mesh + orbs + sparkles).
+  * Added a "post-hero ambient layer" — `<div className="relative">` wrapping the compliance banner + article, with an absolute `<div className="absolute inset-0 mesh-bg opacity-20 pointer-events-none" aria-hidden />` and a single low-opacity FloatingOrb (`count={1} colors={['evergreen']} className="opacity-15"`). Very subtle so it doesn't compete with the hero. The compliance banner + article both got `relative z-10` so they sit above the ambient layer.
+  * Compliance banner Alert: upgraded from `border-gold/30 bg-gold/5 backdrop-blur-sm` to `border-gold/40 bg-gold/10 backdrop-blur-sm shadow-festive` and the description color from `text-foreground/80` to `text-foreground/85` — softer gold tint + soft shadow signals "important info" without being alarmist.
+  * All 5 AdSlot placements (HEADER, AFTER_FIRST_BLOCK, MID_CONTENT, BEFORE_FOOTER, FOOTER) now sit on a subtle elevated surface — each wrapper motion.div / div gained `bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm`. The AdSlot's own rounded-2xl + dashed border + gradient bg is preserved; the new wrapper creates a thin frosted "frame" around it so the ad doesn't blend into the page background.
+  * Share CTA card: left untouched (already has gradient + sparkles + btn-glow).
+- Verification:
+  * `bun run lint` — passes (0 errors, no output).
+  * `bunx tsc --noEmit` — passes (0 errors, no output).
+  * `bun run build` — ✓ Compiled successfully in 12.0s; ✓ Generating static pages (30/30) in 150.4ms.
+
+Stage Summary:
+- Dashboard, Builder, Monetization, and Public Page views now each have a dedicated ambient background layer (mesh-bg + low-opacity FloatingOrbs) sitting behind `relative z-10` content — visually consistent with the Task 12 sidebar/footer/header treatment that established dedicated background colors per surface.
+- Per-view ambient theming: dashboard uses evergreen+gold orbs (welcome feel), builder uses evergreen+gold orbs (workspace continuity), monetization uses gold+berry orbs (money theme), public-page uses a single evergreen orb at very low opacity (subtle, doesn't compete with the rich parallax hero).
+- Money section is now visually distinctive: the monetization compliance notice is a gold/berry/cranberry gradient panel with tri-color accent line (was a generic cranberry Alert); integration cards are `glass-strong` with network-specific accent washes (adsterra=gold, monetag=berry, platform=evergreen); the "Connect ad network" button has btn-glow.
+- Builder workspace is now layered: palette card is `glass-strong` (frosted toolbar), the sortable block list sits on a `bg-card/50 backdrop-blur-sm` "workspace plate" with subtle border + shadow.
+- Public page ad slots: each of the 5 placement wrappers (HEADER, AFTER_FIRST_BLOCK, MID_CONTENT, BEFORE_FOOTER, FOOTER) now carries `bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm`, lifting the ad off the page background.
+- All changes preserve existing functionality, responsive breakpoints, dark-mode tokens, and accessibility contrast ratios (semantic foreground tokens used everywhere; aria-hidden on decorative layers).
+- Stat cards, parallax hero, gradient buttons, and other already-polished components were intentionally left untouched.

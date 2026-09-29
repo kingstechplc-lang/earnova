@@ -204,16 +204,21 @@ export default function PublicPageView({
         </motion.div>
       </div>
 
+      {/* Post-hero ambient layer — very subtle, doesn't compete with the hero. */}
+      <div className="relative">
+        <div className="absolute inset-0 mesh-bg opacity-20 pointer-events-none" aria-hidden />
+        <FloatingOrbs count={1} colors={['evergreen']} className="opacity-15" />
+
       {/* Compliance banner */}
       {hasAds && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="container mx-auto px-4 pt-4 max-w-3xl"
+          className="relative z-10 container mx-auto px-4 pt-4 max-w-3xl"
         >
-          <Alert className="border-gold/30 bg-gold/5 backdrop-blur-sm">
+          <Alert className="border-gold/40 bg-gold/10 backdrop-blur-sm shadow-festive">
             <Info className="h-4 w-4 text-gold-dark" />
-            <AlertDescription className="text-xs text-foreground/80">
+            <AlertDescription className="text-xs text-foreground/85">
               This page may display ads from the page creator&apos;s ad-network account (Adsterra/Monetag)
               and from the platform&apos;s own ad-network account. The platform does not pay the page creator;
               earnings come from the ad networks directly.
@@ -223,13 +228,13 @@ export default function PublicPageView({
       )}
 
       {/* Content + ad placements */}
-      <article className="container mx-auto px-4 py-8 max-w-3xl">
+      <article className="relative z-10 container mx-auto px-4 py-8 max-w-3xl">
         {placementBySlot('HEADER') && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="mb-6"
+            className="mb-6 bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm"
           >
             <AdSlot placement={placementBySlot('HEADER')!} responsive={(data?.policy as any)?.adSlotResponsive ?? true} />
           </motion.div>
@@ -250,13 +255,13 @@ export default function PublicPageView({
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.2 }}
-                className="my-8"
+                className="my-8 bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm"
               >
                 <AdSlot placement={placementBySlot('AFTER_FIRST_BLOCK')!} responsive={(data?.policy as any)?.adSlotResponsive ?? true} />
               </motion.div>
             )}
             {idx === 2 && page.blocks.length > 5 && placementBySlot('MID_CONTENT') && (
-              <div className="my-8">
+              <div className="my-8 bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm">
                 <AdSlot placement={placementBySlot('MID_CONTENT')!} responsive={(data?.policy as any)?.adSlotResponsive ?? true} />
               </div>
             )}
@@ -268,13 +273,13 @@ export default function PublicPageView({
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="my-8"
+            className="my-8 bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm"
           >
             <AdSlot placement={placementBySlot('BEFORE_FOOTER')!} responsive={(data?.policy as any)?.adSlotResponsive ?? true} />
           </motion.div>
         )}
         {placementBySlot('FOOTER') && (
-          <div className="mt-8">
+          <div className="mt-8 bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm">
             <AdSlot placement={placementBySlot('FOOTER')!} responsive={(data?.policy as any)?.adSlotResponsive ?? true} />
           </div>
         )}
@@ -309,6 +314,7 @@ export default function PublicPageView({
           </Card>
         </motion.div>
       </article>
+      </div>
     </div>
   )
 }

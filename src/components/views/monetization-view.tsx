@@ -115,10 +115,21 @@ export default function MonetizationView({
     if (i.error) setLoadError(i.error)
   }
 
-  if (loading) return <div className="container mx-auto px-4 py-8">Loading…</div>
+  if (loading) return (
+    <div className="relative min-h-screen">
+      <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" aria-hidden />
+      <FloatingOrbs count={2} colors={['gold', 'berry']} className="opacity-20" />
+      <div className="relative z-10 container mx-auto px-4 py-8">Loading…</div>
+    </div>
+  )
 
   return (
-    <div className="view-fade container mx-auto px-4 py-6 max-w-4xl">
+    <div className="relative min-h-screen">
+      {/* Ambient background layer — gold/berry accents signal the “money” theme. */}
+      <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" aria-hidden />
+      <FloatingOrbs count={2} colors={['gold', 'berry']} className="opacity-20" />
+
+      <div className="relative z-10 view-fade container mx-auto px-4 py-6 max-w-4xl">
       <FadeIn>
         <div className="flex items-center gap-3 mb-6">
           <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
@@ -147,16 +158,24 @@ export default function MonetizationView({
         </div>
       </FadeIn>
 
-      {/* Compliance notice */}
-      <Alert className="mb-6 border-cranberry/30 bg-cranberry/5">
-        <AlertCircle className="h-4 w-4 text-cranberry" />
-        <AlertTitle className="text-cranberry">The platform does not pay you.</AlertTitle>
-        <AlertDescription>
-          Earnings from ads on your Special Pages come from your own Adsterra or Monetag publisher account.
-          The platform cannot guarantee any level of earnings, or any earnings at all.
-          You are solely responsible for your ad-network relationship and traffic quality.
-        </AlertDescription>
-      </Alert>
+      {/* Compliance notice — distinctive “money” panel with gold/berry accents
+          so it reads as important info rather than a generic alert. */}
+      <div className="mb-6 relative overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-gold/8 via-berry/6 to-cranberry/5 backdrop-blur-sm shadow-sm">
+        <div className="h-1 w-full bg-gradient-to-r from-gold via-gold-dark to-cranberry" />
+        <div className="flex items-start gap-3 p-4">
+          <div className="rounded-full bg-gold/20 p-2 flex-shrink-0">
+            <AlertCircle className="h-4 w-4 text-gold-dark" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-foreground mb-0.5">The platform does not pay you.</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Earnings from ads on your Special Pages come from your own Adsterra or Monetag publisher account.
+              The platform cannot guarantee any level of earnings, or any earnings at all.
+              You are solely responsible for your ad-network relationship and traffic quality.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Disclaimer gate */}
       {disclaimer && !disclaimer.acknowledged && (
@@ -186,7 +205,7 @@ export default function MonetizationView({
         <Button
           onClick={() => setShowCreate(true)}
           disabled={!disclaimer?.acknowledged}
-          className="bg-evergreen text-cream hover:bg-evergreen-dark"
+          className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden"
         >
           <Plus className="h-4 w-4 mr-1.5" /> Connect ad network
         </Button>
@@ -208,16 +227,24 @@ export default function MonetizationView({
         <StaggerContainer className="space-y-3">
           {integrations.map(int => {
             const cfg = STATE_CONFIG[int.lifecycleState] || { label: int.lifecycleState, cls: 'pill-draft', icon: null }
+            // Network-specific accent wash — gold for Adsterra, berry for Monetag,
+            // evergreen for the platform's own integration.
+            const networkWash =
+              int.adNetwork.code === 'adsterra' ? 'bg-gradient-to-br from-gold/12 via-gold/4 to-transparent' :
+              int.adNetwork.code === 'monetag'  ? 'bg-gradient-to-br from-berry/12 via-berry/4 to-transparent' :
+              int.adNetwork.code === 'platform' ? 'bg-gradient-to-br from-evergreen/12 via-evergreen/4 to-transparent' :
+              'bg-gradient-to-br from-muted/10 via-transparent to-transparent'
             return (
               <StaggerItem key={int.id}>
-              <Card className="overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-0.5">
-                <div className={`h-1 w-full ${
+              <Card className="relative overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-0.5 glass-strong">
+                <div className={`absolute inset-0 pointer-events-none ${networkWash}`} aria-hidden />
+                <div className={`relative h-1 w-full ${
                   int.lifecycleState === 'APPROVED' ? 'bg-gradient-to-r from-evergreen to-evergreen-light' :
                   int.lifecycleState === 'PENDING_REVIEW' ? 'bg-gradient-to-r from-gold to-gold-dark' :
                   int.lifecycleState === 'REVOKED' ? 'bg-gradient-to-r from-cranberry to-berry' :
                   'bg-gradient-to-r from-muted-foreground/30 to-muted-foreground/10'
                 }`} />
-                <CardContent className="py-4">
+                <CardContent className="relative py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
@@ -295,6 +322,7 @@ export default function MonetizationView({
           onCreated={() => { setShowCreate(false); reload() }}
         />
       )}
+      </div>
     </div>
   )
 }
