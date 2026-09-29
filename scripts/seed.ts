@@ -165,7 +165,7 @@ async function main() {
     create: {
       email: 'kingsley@example.com',
       name: 'Kingsley Owusu',
-      passwordHash: hashPassword('demo1234'),
+      passwordHash: await hashPassword('demo1234'),
       bio: 'Content creator based in Accra. Building my first Christmas page.',
       locale: 'en',
       role: 'USER',
@@ -177,8 +177,8 @@ async function main() {
     create: {
       email: 'admin@example.com',
       name: 'Platform Admin',
-      passwordHash: hashPassword('admin1234'),
-      role: 'ADMIN',
+      passwordHash: await hashPassword('admin1234'),
+      role: 'ADMIN', emailVerified: new Date(),
       locale: 'en',
     },
   })

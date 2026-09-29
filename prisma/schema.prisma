@@ -16,11 +16,18 @@ model User {
   id              String   @id @default(cuid())
   email           String   @unique
   name            String?
+  username        String?  @unique   // globally unique handle (e.g. "kingsley")
   passwordHash    String?
   image           String?
+  coverImage      String?
   role            UserRole @default(USER)
   bio             String?
+  country         String?
+  timezone        String   @default("UTC")
   locale          String   @default("en")
+  emailVerified   DateTime?
+  twoFactorSecret String?
+  twoFactorEnabled Boolean @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -30,8 +37,12 @@ model User {
   moderationActions ModerationEvent[]
   disclaimerAcks  EarningsDisclaimerAck[]
   sessions        Session[]
+  emailVerifications EmailVerificationToken[]
+  passwordResets  PasswordResetToken[]
+  auditLogs       AuditLog[]
 
   @@index([role])
+  @@index([emailVerified])
 }
 
 enum UserRole {
@@ -46,7 +57,112 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt    DateTime
   createdAt    DateTime @default(now())
+  // Security tracking
+  userAgent    String?
+  ipAddress    String?   // hashed or partial for privacy
+  lastActivity DateTime @default(now())
+  revokedAt    DateTime?  // null = active, non-null = revoked
+
   @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─── SECURITY: EMAIL VERIFICATION ────────────────────────────────────────────
+
+model EmailVerificationToken {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique   // secure random token
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// ─── SECURITY: PASSWORD RESET ───────────────────────────────────────────────
+
+model PasswordResetToken {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique   // secure random token
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// ─── SECURITY: AUDIT LOG ────────────────────────────────────────────────────
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorId      String?
+  actor         User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action       String   // e.g. "user.suspend", "ad.approve", "policy.change"
+  resource     String?  // e.g. "user:abc123", "page:def456"
+  previousState String?  // JSON snapshot of previous state
+  newState     String?   // JSON snapshot of new state
+  reason       String?
+  ipAddress    String?
+  userAgent    String?
+  requestId    String?
+  createdAt    DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ─── SECURITY: PERMISSIONS (RBAC) ────────────────────────────────────────────
+
+model Permission {
+  id           String   @id @default(cuid())
+  key          String   @unique   // e.g. "users.read", "ads.approve", "pages.moderate"
+  description  String?
+  createdAt    DateTime @default(now())
+
+  roles        RolePermission[]
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  permissionKey String
+  permission   Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+  role         UserRole
+  createdAt    DateTime @default(now())
+
+  @@unique([permissionKey, role])
+  @@index([role])
+}
+
+// ─── PLATFORM: FEATURE FLAGS ────────────────────────────────────────────────
+
+model FeatureFlag {
+  id           String   @id @default(cuid())
+  key          String   @unique   // e.g. "ENABLE_POSTS", "ENABLE_USER_ADS"
+  description  String?
+  enabled      Boolean  @default(true)
+  config       String?  // JSON: additional config
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+}
+
+// ─── PLATFORM: SYSTEM SETTINGS ──────────────────────────────────────────────
+
+model SystemSetting {
+  id           String   @id @default(cuid())
+  key          String   @unique   // e.g. "platform.name", "maintenance.mode"
+  value        String   // JSON or plain string
+  description  String?
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
 }
 
 // ─── AD NETWORKS & COMPATIBILITY (Chapter 2) ─────────────────────────────────
