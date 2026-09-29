@@ -251,7 +251,31 @@ function UserDetailDialog({
   onBan: () => void
   onUnban: () => void
 }) {
-  const hasBannedPages = user.pages.some(p => p.moderationState === 'BANNED')
+  const [changingRole, setChangingRole] = useState(false)
+  const [currentUser, setCurrentUser] = useState(user)
+
+  // Sync when user prop changes
+  useEffect(() => { setCurrentUser(user) }, [user])
+
+  async function changeRole(newRole: 'USER' | 'MODERATOR' | 'ADMIN') {
+    if (newRole === currentUser.role) return
+    setChangingRole(true)
+    const res = await safeFetch(`/api/admin/users/${currentUser.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: newRole }),
+    })
+    setChangingRole(false)
+    if (res.error) {
+      alert(res.error)
+      return
+    }
+    if (res.data?.user) {
+      setCurrentUser(prev => ({ ...prev, role: res.data!.user!.role }))
+    }
+  }
+
+  const hasBannedPages = currentUser.pages.some(p => p.moderationState === 'BANNED')
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col" showCloseButton>
@@ -259,26 +283,52 @@ function UserDetailDialog({
         <DialogHeader className="p-6 pb-3">
           <DialogTitle className="font-serif text-xl flex items-center gap-2">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-evergreen/10 text-evergreen font-bold">
-              {(user.name || user.email)[0]?.toUpperCase()}
+              {(currentUser.name || currentUser.email)[0]?.toUpperCase()}
             </span>
-            {user.name || user.email.split('@')[0]}
+            {currentUser.name || currentUser.email.split('@')[0]}
           </DialogTitle>
           <DialogDescription className="flex items-center gap-2">
-            <Mail className="h-3 w-3" /> {user.email} · joined {new Date(user.createdAt).toLocaleDateString()}
+            <Mail className="h-3 w-3" /> {currentUser.email} · joined {new Date(currentUser.createdAt).toLocaleDateString()}
           </DialogDescription>
         </DialogHeader>
         <div className="px-6 pb-2 overflow-y-auto flex-1 min-h-0 space-y-4">
+          {/* Role management */}
+          <div className="p-3 rounded-lg bg-muted/30">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Role</p>
+            <div className="flex gap-1.5">
+              {(['USER', 'MODERATOR', 'ADMIN'] as const).map(r => (
+                <button
+                  key={r}
+                  onClick={() => changeRole(r)}
+                  disabled={changingRole}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
+                    currentUser.role === r
+                      ? r === 'ADMIN' ? 'bg-berry text-cream shadow-festive'
+                        : r === 'MODERATOR' ? 'bg-gold text-cream shadow-gold'
+                        : 'bg-evergreen text-cream shadow-festive'
+                      : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1.5">
+              ADMIN: full access · MODERATOR: read + approve/reject · USER: standard creator
+            </p>
+          </div>
+
           {/* Pages */}
           <div>
             <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
               <FileText className="h-4 w-4 text-evergreen" />
-              Pages ({user.pages.length})
+              Pages ({currentUser.pages.length})
             </h4>
-            {user.pages.length === 0 ? (
+            {currentUser.pages.length === 0 ? (
               <p className="text-xs text-muted-foreground">No pages yet.</p>
             ) : (
               <div className="space-y-1.5">
-                {user.pages.map(p => (
+                {currentUser.pages.map(p => (
                   <div key={p.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/30 text-xs">
                     <div className="min-w-0">
                       <span className="font-medium truncate">{p.title}</span>
@@ -301,13 +351,13 @@ function UserDetailDialog({
           <div>
             <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
               <Plug className="h-4 w-4 text-gold-dark" />
-              Ad integrations ({user.adIntegrations.length})
+              Ad integrations ({currentUser.adIntegrations.length})
             </h4>
-            {user.adIntegrations.length === 0 ? (
+            {currentUser.adIntegrations.length === 0 ? (
               <p className="text-xs text-muted-foreground">No integrations.</p>
             ) : (
               <div className="space-y-1.5">
-                {user.adIntegrations.map(int => (
+                {currentUser.adIntegrations.map(int => (
                   <div key={int.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/30 text-xs">
                     <div className="min-w-0">
                       <span className="font-medium">{int.adNetwork.displayName}</span>
@@ -332,7 +382,7 @@ function UserDetailDialog({
               <ShieldCheck className="h-4 w-4 mr-1" /> Restore user
             </Button>
           ) : (
-            user.role === 'USER' && (
+            currentUser.role === 'USER' && (
               <Button variant="outline" size="sm" onClick={onBan} className="border-cranberry/30 text-cranberry hover:bg-cranberry/5">
                 <Ban className="h-4 w-4 mr-1" /> Ban user
               </Button>
