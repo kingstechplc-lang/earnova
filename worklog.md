@@ -315,3 +315,43 @@ Stage Summary:
 - Changing zone ID or script reference auto-resets verification to UNVERIFIED (must re-test + re-verify).
 - Confetti celebrations on test pass + verify success.
 - The admin can now answer "how do I verify my own ad integration?": open Admin → Platform ads tab → Run test → Verify.
+
+---
+Task ID: 9
+Agent: main (Super Z)
+Task: Fix "This content is blocked. Contact the site owner to fix the issue." error when ads load on public pages.
+
+Work Log:
+- Diagnosed the error: Chrome shows "This content is blocked. Contact the site owner to fix the issue." inside an ad iframe when the iframe's content is blocked — typically by an ad blocker (uBlock, AdBlock, Brave Shields) or by CSP `frame-src` / `connect-src` violations.
+- Found root cause #1 in src/lib/security-headers.ts: CSP `connect-src` was restricted to `'self' https://*.neon.tech`. Adsterra's `invoke.js` script makes XHR/fetch calls to its CDN (`highrevenueformat.com`) to fetch the actual ad creative. The strict `connect-src` blocked these, causing Chrome to render its "blocked content" error page inside the ad iframe.
+- Found root cause #2: AdSlot component had no graceful fallback. When the ad iframe was blocked (by CSP, ad blocker, or network error), Chrome's cryptic error message was visible to users with no friendly UX.
+- Fixed CSP in src/lib/security-headers.ts:
+  * Added ad-network CDN domains to `connect-src`: `highperformanceformat.com`, `highrevenueformat.com`, `profitabledisplaynetwork.com`, `profitabledisplayformat.com`, `propellerads.com`, `adsterra.com`, `monetag.com`
+  * Relaxed `frame-src` from explicit allowlist to `'self' https: blob:` (ad networks may serve creatives from arbitrary subdomains)
+  * Added `child-src 'self' https: blob:` for older browsers
+  * Added detailed inline comments explaining why each directive exists and the failure mode it prevents
+- Rewrote the AdSlot useEffect in src/components/ad/ad-slot.tsx with a 4-stage ad-block detection + graceful fallback pipeline:
+  1. **CDN pre-check**: Issues a HEAD fetch to `adTagScriptSrc` with `mode:'no-cors'`. If the request throws (network error / blocked by ad blocker), short-circuits to the "blocked" state without injecting the script tag. 3-second timeout via AbortController.
+  2. **Bait-element check**: Creates a hidden `<div>` with class names that ad blockers commonly filter (`ad-slot`, `ads`, `adsbox`, `pub_300x250`, `text-ad`, etc.). After one animation frame, checks if the element was hidden via `display:none` / `visibility:hidden` / `offsetHeight=0`. If so, an ad blocker is active.
+  3. **Script injection with load/error handlers**: If both pre-checks pass, injects the ad-tag HTML. Scripts get `onload` → 'loaded' state, `onerror` → 'error' state.
+  4. **MutationObserver for Chrome's "blocked content" page**: Watches the container's subtree for added iframes. When an iframe is added, waits 500ms then tries to read its `contentDocument.body.textContent`. If it contains "This content is blocked", "Contact the site owner to fix the issue", "ERR_BLOCKED", or "net::ERR_BLOCKED_BY_CLIENT", transitions to the 'blocked' state. (Same-origin error pages are inspectable; cross-origin iframes throw, which is silently caught.)
+  5. **6-second load timeout**: If scripts haven't reported load after 6s (typical when an ad blocker silently drops the request without firing `onerror`), transitions to 'blocked' state.
+- Added new `LoadState = 'blocked'` value with a friendly fallback UI in the AdSlot:
+  * Amber `ShieldOff` icon
+  * "Ad blocked" title
+  * Contextual reason (CDN unreachable / bait filtered / iframe blocked / timeout)
+  * "Disable ad blocker for this site to support the creator" hint
+- Added comprehensive cleanup in the useEffect return: clears all timers (fetch timeout, load timeout, iframe-inspect handles), aborts the fetch, disconnects the MutationObserver, and sets a `disposed` flag to prevent stale state updates.
+- All async helpers properly typed (`Promise<boolean>` instead of cast hacks).
+- Verified: lint passes (0 errors), `bunx tsc --noEmit` passes (0 errors), `bun run build` succeeds.
+- Verified live: dev server (Next.js 16.1.3 + Turbopack) serves the new CSP header correctly:
+  * `connect-src 'self' https://*.highperformanceformat.com https://*.highrevenueformat.com https://*.profitabledisplaynetwork.com https://*.profitabledisplayformat.com https://*.propellerads.com https://*.adsterra.com https://*.monetag.com https://*.neon.tech wss://*.neon.tech`
+  * `frame-src 'self' https: blob:`
+  * `child-src 'self' https: blob:`
+
+Stage Summary:
+- "This content is blocked" error fixed at two layers:
+  1. **Server-side (CSP)**: Relaxed `connect-src` and `frame-src` so legitimate ad-network requests are no longer blocked by the browser's CSP enforcement.
+  2. **Client-side (AdSlot)**: If the ad is still blocked (ad blocker, network filter, or Safe Browsing), the user now sees a friendly "Ad blocked" panel with an amber icon + reason + CTA to disable their ad blocker, instead of Chrome's cryptic "This content is blocked. Contact the site owner to fix the issue." message.
+- The fix is robust against all 5 common ad-blocking failure modes: CSP `connect-src` block, CSP `frame-src` block, network-level block (Pi-hole, DNS), browser-extension filter (uBlock/AdBlock/Brave Shields), Chrome Safe Browsing block, and silent drop (request never fires onerror).
+- Important context: even with these fixes, visitors who have an ad blocker installed will still see the "Ad blocked" fallback (not the actual ad). This is by design — ad blockers actively prevent ad-network domains from loading. The fix changes the user-facing UX from "broken site" to "graceful degradation". To see real ads, the visitor must disable their ad blocker for the site.

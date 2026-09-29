@@ -1,7 +1,7 @@
 'use client'
 import { motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
-import { Lock, Layers, Sparkles, User, Eye, AlertCircle, Loader2 } from 'lucide-react'
+import { Lock, Layers, Sparkles, User, Eye, AlertCircle, Loader2, ShieldOff } from 'lucide-react'
 
 type Placement = {
   id: string
@@ -31,7 +31,7 @@ const NETWORK_LABEL: Record<string, { label: string; color: string }> = {
   platform: { label: 'Platform', color: 'text-evergreen' },
 }
 
-type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
+type LoadState = 'idle' | 'loading' | 'loaded' | 'error' | 'blocked'
 
 export function AdSlot({ placement, responsive = true }: { placement: Placement; responsive?: boolean }) {
   const isPlatform = placement.source !== 'USER_INTEGRATION'
@@ -41,6 +41,7 @@ export function AdSlot({ placement, responsive = true }: { placement: Placement;
   const containerRef = useRef<HTMLDivElement>(null)
   const [loadState, setLoadState] = useState<LoadState>('idle')
   const [hasAdTag, setHasAdTag] = useState(false)
+  const [blockedReason, setBlockedReason] = useState<string>('')
 
   // Whether this ad has a real ad-network tag to inject
   const hasRealAd = placement.isLive && !!placement.adTagHtml
@@ -72,64 +73,176 @@ export function AdSlot({ placement, responsive = true }: { placement: Placement;
       return
     }
 
-    // Defer the ad injection to avoid cascading renders in dev StrictMode
-    const timerId = window.setTimeout(() => {
-      // Inject the ad-network script tag into the container
+    // ---- Ad-blocker pre-check ----------------------------------------------
+    // Ad blockers usually block requests to known ad-network CDN hostnames.
+    // We do a quick beacon test: try to fetch a 1x1 pixel from the ad-network
+    // CDN. If the request fails (network error / blocked), we know an ad
+    // blocker is active and we can short-circuit to a friendly fallback
+    // instead of letting Chrome show "This content is blocked".
+    const scriptSrc = placement.adTagScriptSrc
+    let abortCtrl: AbortController | null = null
+    let fetchTimeoutHandle: ReturnType<typeof setTimeout> | null = null
+    let loadTimeoutHandle: ReturnType<typeof setTimeout> | null = null
+    const iframeInspectHandles: ReturnType<typeof setTimeout>[] = []
+    let observer: MutationObserver | null = null
+    let disposed = false
+
+    const detectBlockAndInject = async () => {
+      // 1) Pre-check: is the ad-network CDN reachable?
+      let cdnBlocked = false
+      if (scriptSrc) {
+        try {
+          abortCtrl = new AbortController()
+          fetchTimeoutHandle = setTimeout(() => abortCtrl!.abort(), 3000)
+          // Use mode:'no-cors' so the request goes through even without CORS
+          // headers — we only care whether it succeeded or was blocked.
+          await fetch(scriptSrc, {
+            method: 'HEAD',
+            mode: 'no-cors',
+            signal: abortCtrl.signal,
+            // cache:'no-store' forces a real network roundtrip
+            cache: 'no-store',
+          })
+          // In no-cors mode, an opaque response (type:'opaque') means success.
+          // A thrown error means the request was blocked.
+        } catch (err) {
+          cdnBlocked = true
+          console.warn(`[AdSlot] Ad-network CDN unreachable for ${scriptSrc}:`, err)
+        } finally {
+          if (fetchTimeoutHandle) clearTimeout(fetchTimeoutHandle)
+        }
+      }
+
+      // 2) Also check for known ad-blocker "bait" element pattern
+      //    Ad blockers remove/hide elements with class names like 'ad-slot',
+      //    'adsbygoogle', etc. We can detect this by creating a bait element
+      //    and seeing if it gets hidden.
+      const baitBlocked = await checkAdBlockBait()
+
+      if (disposed) return
+
+      if (cdnBlocked || baitBlocked) {
+        setBlockedReason(cdnBlocked
+          ? 'The ad network CDN was blocked (likely by an ad blocker or network filter)'
+          : 'An ad blocker appears to be filtering ad content'
+        )
+        setLoadState('blocked')
+        return
+      }
+
+      // 3) Inject the ad-tag HTML
       setLoadState('loading')
       setHasAdTag(true)
 
       try {
-        // Clear any existing content
         const container = containerRef.current
         if (!container) return
         container.innerHTML = ''
 
         // Parse the ad-tag HTML and inject scripts properly
-        // (setting innerHTML doesn't execute <script> tags — we need to create them manually)
         const tempDiv = document.createElement('div')
         tempDiv.innerHTML = placement.adTagHtml!
 
-        // Inject non-script elements (links, divs, etc.)
+        const injectedScripts: HTMLScriptElement[] = []
+
         Array.from(tempDiv.children).forEach(child => {
           if (child.tagName.toLowerCase() === 'script') {
-            // Create a new script element (setting innerHTML doesn't execute scripts)
             const script = document.createElement('script')
-            // Copy attributes
             Array.from(child.attributes).forEach(attr => {
               script.setAttribute(attr.name, attr.value)
             })
-            // If the script has inline content (like atOptions config), set it
             if (child.textContent) {
               script.textContent = child.textContent
             }
-            // Set up load/error handlers
-            script.onload = () => setLoadState('loaded')
+            script.onload = () => setLoadState(prev => prev === 'loading' ? 'loaded' : prev)
             script.onerror = () => setLoadState('error')
             container.appendChild(script)
+            injectedScripts.push(script)
           } else {
-            // Non-script elements can be appended directly
             container.appendChild(child.cloneNode(true))
           }
         })
 
-        // If there were scripts, wait for them; otherwise mark as loaded
-        const scripts = container.querySelectorAll('script')
-        if (scripts.length === 0) {
+        // 4) Watch the container for Chrome injecting the "This content is
+        //    blocked" message inside an iframe. When Chrome blocks an
+        //    iframe (CSP / Safe Browsing / extension), it replaces the
+        //    iframe's content with a chrome-error page that contains the
+        //    text "This content is blocked". We detect this via a
+        //    MutationObserver on the container's subtree.
+        observer = new MutationObserver(mutations => {
+          for (const m of mutations) {
+            for (const node of m.addedNodes) {
+              if (node.nodeType !== Node.ELEMENT_NODE) continue
+              const el = node as Element
+              // Check if the added node is an iframe showing Chrome's
+              // "blocked content" error page (we can read its textContent
+              // since same-origin Chrome error pages are inspectable).
+              if (el.tagName === 'IFRAME') {
+                // Give the iframe a moment to render its error page,
+                // then inspect it.
+                const iframe = el as HTMLIFrameElement
+                const inspectHandle = setTimeout(() => {
+                  if (disposed) return
+                  try {
+                    // cross-origin iframes throw on access — that's fine,
+                    // we only care about same-origin error pages
+                    const doc = iframe.contentDocument || iframe.contentWindow?.document
+                    const text = doc?.body?.textContent || ''
+                    if (text.includes('This content is blocked') ||
+                        text.includes('Contact the site owner to fix the issue') ||
+                        text.includes('ERR_BLOCKED') ||
+                        text.includes('net::ERR_BLOCKED_BY_CLIENT')) {
+                      setBlockedReason('The browser blocked the ad iframe (ad blocker, CSP, or Safe Browsing)')
+                      setLoadState('blocked')
+                    }
+                  } catch {
+                    // cross-origin — iframe loaded something; we leave the
+                    // state as 'loading' and let the timeout catch it
+                  }
+                }, 500)
+                iframeInspectHandles.push(inspectHandle)
+              }
+            }
+          }
+        })
+        observer.observe(container, { childList: true, subtree: true })
+
+        if (injectedScripts.length === 0) {
           setLoadState('loaded')
         } else {
-          // Set a timeout — if scripts don't load in 5s, show error
-          setTimeout(() => {
-            setLoadState(prev => prev === 'loading' ? 'loaded' : prev)
-          }, 5000)
+          // Fallback timeout: if scripts haven't reported load after 6s,
+          // mark as blocked (most likely an ad blocker silently dropped
+          // the request without firing onerror).
+          loadTimeoutHandle = setTimeout(() => {
+            if (disposed) return
+            setLoadState(prev => {
+              if (prev === 'loading') {
+                setBlockedReason('Ad request timed out — likely blocked by an ad blocker')
+                return 'blocked'
+              }
+              return prev
+            })
+          }, 6000)
         }
       } catch (err) {
         console.error('Ad tag injection failed:', err)
         setLoadState('error')
       }
-    }, 0)
+    }
 
-    return () => window.clearTimeout(timerId)
-  }, [hasRealAd, placement.adTagHtml])
+    // Defer to avoid cascading renders in dev StrictMode
+    const timerId = window.setTimeout(detectBlockAndInject, 0)
+
+    return () => {
+      disposed = true
+      window.clearTimeout(timerId)
+      if (fetchTimeoutHandle) clearTimeout(fetchTimeoutHandle)
+      if (loadTimeoutHandle) clearTimeout(loadTimeoutHandle)
+      iframeInspectHandles.forEach(h => clearTimeout(h))
+      if (abortCtrl) abortCtrl.abort()
+      if (observer) observer.disconnect()
+    }
+  }, [hasRealAd, placement.adTagHtml, placement.adTagScriptSrc])
 
   return (
     <motion.div
@@ -184,6 +297,26 @@ export function AdSlot({ placement, responsive = true }: { placement: Placement;
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
+        )}
+
+        {/* Blocked state — friendly fallback instead of Chrome's "This content is blocked" */}
+        {loadState === 'blocked' && hasRealAd && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/95 backdrop-blur-sm px-4 text-center"
+          >
+            <ShieldOff className="h-5 w-5 text-amber-500" />
+            <div className="text-xs font-semibold text-foreground/90">
+              Ad blocked
+            </div>
+            <div className="text-[10px] text-muted-foreground/80 leading-relaxed max-w-[220px]">
+              {blockedReason || 'Your browser or an ad blocker prevented this ad from loading.'}
+            </div>
+            <div className="text-[9px] text-muted-foreground/50 mt-1">
+              Disable ad blocker for this site to support the creator
+            </div>
+          </motion.div>
         )}
 
         {/* Error state */}
@@ -285,4 +418,45 @@ function checkConsent(): boolean {
   // In production, remove this and require explicit consent
   localStorage.setItem('gep_ad_consent', 'granted')
   return true
+}
+
+/**
+ * Detect ad blockers by injecting a "bait" element with class names that
+ * ad blockers commonly filter (e.g., 'ad-slot', 'ads', 'adsbox'). If the
+ * element is hidden via display:none / visibility:hidden / offsetHeight=0
+ * after a brief delay, an ad blocker is active.
+ *
+ * Returns true if an ad blocker appears to be filtering our content.
+ */
+async function checkAdBlockBait(): Promise<boolean> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false
+
+  try {
+    const bait = document.createElement('div')
+    bait.className = 'ad-slot ads adsbox ad-placement pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text_ads_2 ads-ad'
+    bait.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;'
+    bait.innerHTML = '&nbsp;'
+    document.body.appendChild(bait)
+
+    // Give the browser one animation frame to apply any styles that an
+    // ad-blocker extension may have injected via CSS rules.
+    const isHidden = await new Promise<boolean>(resolve => {
+      requestAnimationFrame(() => {
+        const styles = window.getComputedStyle(bait)
+        const hidden =
+          bait.offsetParent === null ||
+          bait.offsetHeight === 0 ||
+          bait.offsetWidth === 0 ||
+          styles.display === 'none' ||
+          styles.visibility === 'hidden' ||
+          styles.opacity === '0'
+        resolve(hidden)
+      })
+    })
+
+    document.body.removeChild(bait)
+    return isHidden
+  } catch {
+    return false
+  }
 }
