@@ -66,24 +66,25 @@ export function renderAdTag(config: AdTagConfig): RenderedAdTag {
     }
   }
 
-  // Normalize CDN URL (remove protocol prefix if present)
+  // Normalize CDN URL — always use https:// for ad network scripts
   const cdn = cdnUrl.replace(/^https?:\/\//, '').replace(/^\/+/, '').replace(/\/+$/, '')
+  const cdnWithProtocol = `https://${cdn}`
   // The zone identifier (prefer zoneKey, fall back to zoneId)
   const zone = zoneKey || zoneId || ''
 
   // Build the script src URL based on network + integration type
   switch (networkCode) {
     case 'adsterra':
-      return renderAdsterraTag(integrationType, cdn, zone, zoneId, formatOptions)
+      return renderAdsterraTag(integrationType, cdnWithProtocol, zone, zoneId, formatOptions)
     case 'monetag':
-      return renderMonetagTag(integrationType, cdn, zone, zoneId, formatOptions)
+      return renderMonetagTag(integrationType, cdnWithProtocol, zone, zoneId, formatOptions)
     default:
       // Generic script-based tag for unknown networks
       return {
-        html: `<script async data-cfasync="false" src="//${cdn}/${zone}/invoke.js"></script>`,
-        description: `Generic ad tag: //${cdn}/${zone}/invoke.js`,
+        html: `<script async data-cfasync="false" src="${cdnWithProtocol}/${zone}/invoke.js"></script>`,
+        description: `Generic ad tag: ${cdnWithProtocol}/${zone}/invoke.js`,
         type: 'script',
-        scriptSrc: `//${cdn}/${zone}/invoke.js`,
+        scriptSrc: `${cdnWithProtocol}/${zone}/invoke.js`,
         isLive: true,
       }
   }
@@ -103,57 +104,57 @@ function renderAdsterraTag(
       const height = formatOptions?.height || 250
       const format = formatOptions?.format || 'iframe'
       return {
-        html: `<script type="text/javascript">atOptions = {'key':'${zone}','format':'${format}','height':${height},'width':${width},'params':{}};</script><script type="text/javascript" src="//${cdn}/${zone}/invoke.js"></script>`,
+        html: `<script type="text/javascript">atOptions = {'key':'${zone}','format':'${format}','height':${height},'width':${width},'params':{}};</script><script type="text/javascript" src="${cdn}/${zone}/invoke.js"></script>`,
         description: `Adsterra banner (${width}×${height} ${format}) — zone ${zone} on ${cdn}`,
         type: 'script',
-        scriptSrc: `//${cdn}/${zone}/invoke.js`,
+        scriptSrc: `${cdn}/${zone}/invoke.js`,
         isLive: true,
       }
     }
     case 'NATIVE': {
       return {
-        html: `<script async="async" data-cfasync="false" src="//${cdn}/${zone}/invoke.js"></script>`,
+        html: `<script async="async" data-cfasync="false" src="${cdn}/${zone}/invoke.js"></script>`,
         description: `Adsterra native banner — zone ${zone} on ${cdn}`,
         type: 'script',
-        scriptSrc: `//${cdn}/${zone}/invoke.js`,
+        scriptSrc: `${cdn}/${zone}/invoke.js`,
         isLive: true,
       }
     }
     case 'PUSH': {
       return {
-        html: `<script async src="//${cdn}/${zone}/social-bar.js"></script>`,
+        html: `<script async src="${cdn}/${zone}/social-bar.js"></script>`,
         description: `Adsterra social bar / push — zone ${zone} on ${cdn}`,
         type: 'script',
-        scriptSrc: `//${cdn}/${zone}/social-bar.js`,
+        scriptSrc: `${cdn}/${zone}/social-bar.js`,
         isLive: true,
       }
     }
     case 'DIRECT_LINK': {
       const b = zoneId || zone
       return {
-        html: `<a href="//${cdn}/${zone}/go.php?b=${b}" target="_blank" rel="noopener noreferrer sponsored" style="display:block;width:100%;min-height:90px"></a>`,
+        html: `<a href="${cdn}/${zone}/go.php?b=${b}" target="_blank" rel="noopener noreferrer sponsored" style="display:block;width:100%;min-height:90px"></a>`,
         description: `Adsterra direct link — zone ${zone} on ${cdn}`,
         type: 'link',
-        scriptSrc: `//${cdn}/${zone}/go.php?b=${b}`,
+        scriptSrc: `${cdn}/${zone}/go.php?b=${b}`,
         isLive: true,
       }
     }
     case 'VIGNETTE':
     case 'IN_PAGE': {
       return {
-        html: `<script type="text/javascript" src="//${cdn}/${zone}/${integrationType === 'VIGNETTE' ? 'vignette' : 'in-page'}.js"></script>`,
+        html: `<script type="text/javascript" src="${cdn}/${zone}/${integrationType === 'VIGNETTE' ? 'vignette' : 'in-page'}.js"></script>`,
         description: `Adsterra ${integrationType.toLowerCase()} — zone ${zone} on ${cdn}`,
         type: 'script',
-        scriptSrc: `//${cdn}/${zone}/invoke.js`,
+        scriptSrc: `${cdn}/${zone}/invoke.js`,
         isLive: true,
       }
     }
     default: {
       return {
-        html: `<script async data-cfasync="false" src="//${cdn}/${zone}/invoke.js"></script>`,
+        html: `<script async data-cfasync="false" src="${cdn}/${zone}/invoke.js"></script>`,
         description: `Adsterra ${integrationType.toLowerCase()} — zone ${zone} on ${cdn}`,
         type: 'script',
-        scriptSrc: `//${cdn}/${zone}/invoke.js`,
+        scriptSrc: `${cdn}/${zone}/invoke.js`,
         isLive: true,
       }
     }
@@ -176,28 +177,28 @@ function renderMonetagTag(
     case 'NATIVE':
     case 'BANNER': {
       return {
-        html: `<script src="//${cdn}/${zone}/invoke.js" async="async" data-cfasync="false"></script>`,
+        html: `<script src="${cdn}/${zone}/invoke.js" async="async" data-cfasync="false"></script>`,
         description: `Monetag ${integrationType.toLowerCase().replace('_', ' ')} — zone ${zone} on ${cdn}`,
         type: 'script',
-        scriptSrc: `//${cdn}/${zone}/invoke.js`,
+        scriptSrc: `${cdn}/${zone}/invoke.js`,
         isLive: true,
       }
     }
     case 'DIRECT_LINK': {
       return {
-        html: `<a href="//${cdn}/${zone}/" target="_blank" rel="noopener noreferrer sponsored" style="display:block;width:100%;min-height:90px"></a>`,
+        html: `<a href="${cdn}/${zone}/" target="_blank" rel="noopener noreferrer sponsored" style="display:block;width:100%;min-height:90px"></a>`,
         description: `Monetag direct link — zone ${zone} on ${cdn}`,
         type: 'link',
-        scriptSrc: `//${cdn}/${zone}/`,
+        scriptSrc: `${cdn}/${zone}/`,
         isLive: true,
       }
     }
     default: {
       return {
-        html: `<script src="//${cdn}/${zone}/invoke.js" async="async" data-cfasync="false"></script>`,
+        html: `<script src="${cdn}/${zone}/invoke.js" async="async" data-cfasync="false"></script>`,
         description: `Monetag ${integrationType.toLowerCase()} — zone ${zone} on ${cdn}`,
         type: 'script',
-        scriptSrc: `//${cdn}/${zone}/invoke.js`,
+        scriptSrc: `${cdn}/${zone}/invoke.js`,
         isLive: true,
       }
     }
