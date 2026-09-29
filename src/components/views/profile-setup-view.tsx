@@ -6,12 +6,14 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { motion, AnimatePresence } from 'framer-motion'
 import { safeFetch } from '@/lib/safe-fetch'
 import { useConfetti } from '@/components/animated/confetti'
+import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import {
-  Sparkles, Check, X, Search, User, Globe, Link2, Eye,
-  Loader2, AtSign, MapPin, Clock, Globe2,
+  Sparkles, Check, X, User, Link2, Eye,
+  Loader2, AtSign, MapPin, Globe2, AlertCircle, RefreshCw,
 } from 'lucide-react'
 import type { View, CurrentUser } from '@/app/page'
 
@@ -135,29 +137,72 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
   }
 
   if (loading) {
-    return <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <div className="h-64 rounded-xl shimmer-bg" />
-    </div>
+    return (
+      <div className="relative min-h-screen">
+        <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" aria-hidden />
+        <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
+        <div className="relative z-10 container mx-auto px-4 py-8 max-w-2xl flex items-center justify-center min-h-[60vh]">
+          <div className="glass-card rounded-2xl p-8 text-center w-full max-w-md">
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-evergreen to-evergreen-dark text-cream shadow-festive mb-4">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <p className="font-serif text-lg font-bold mb-1">Loading your profile</p>
+            <p className="text-sm text-muted-foreground mb-4">Hang tight while we fetch your details…</p>
+            <div className="h-1.5 w-32 mx-auto rounded-full overflow-hidden bg-muted/40">
+              <div className="h-full w-1/2 shimmer-bg rounded-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (!profile) {
-    return <div className="container mx-auto px-4 py-8">Failed to load profile.</div>
+    return (
+      <div className="relative min-h-screen">
+        <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" aria-hidden />
+        <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
+        <div className="relative z-10 container mx-auto px-4 py-8 max-w-2xl">
+          <Alert className="border-cranberry/40 bg-cranberry/5 backdrop-blur-sm shadow-festive">
+            <AlertCircle className="h-4 w-4 text-cranberry" />
+            <AlertDescription>
+              <p className="font-semibold text-foreground mb-1">Failed to load profile</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                We couldn&apos;t fetch your profile details. Please try again.
+              </p>
+              <Button size="sm" variant="outline" onClick={() => location.reload()} className="border-cranberry/30 text-cranberry hover:bg-cranberry/5">
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      {ConfettiLayer}
+    <div className="relative min-h-screen">
+      {/* Ambient background layer — subtle mesh + drifting orbs so the
+          profile setup view sits on a layered surface rather than flat bg-background. */}
+      <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" aria-hidden />
+      <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="font-serif text-3xl font-bold mb-1 flex items-center gap-2">
-          <Sparkles className="h-7 w-7 text-evergreen" />
-          Set up your profile
-        </h1>
-        <p className="text-muted-foreground mb-8">Claim your username and customize how you appear to the world.</p>
-      </motion.div>
+      <div className="relative z-10 view-fade container mx-auto px-4 py-8 max-w-2xl">
+        {ConfettiLayer}
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative mb-8">
+          <div className="absolute -inset-x-3 -inset-y-4 rounded-3xl bg-gradient-to-br from-evergreen/8 via-gold/4 to-berry/5 pointer-events-none" aria-hidden />
+          <div className="relative">
+            <h1 className="font-serif text-3xl font-bold mb-1 flex items-center gap-2">
+              <Sparkles className="h-7 w-7 text-evergreen" />
+              Set up your profile
+            </h1>
+            <p className="text-muted-foreground">Claim your username and customize how you appear to the world.</p>
+          </div>
+        </motion.div>
 
       {/* Username claiming */}
-      <Card className={`mb-6 overflow-hidden ${profile.username ? 'border-evergreen/30' : 'border-gold/40'}`}>
+      <Card className={`mb-6 overflow-hidden glass-strong shadow-festive ${profile.username ? 'border-evergreen/30' : 'border-gold/40'}`}>
         <div className={`h-1.5 w-full ${profile.username ? 'bg-gradient-to-r from-evergreen to-evergreen-light' : 'bg-gradient-to-r from-gold to-gold-dark'}`} />
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -178,23 +223,41 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
                 value={usernameInput}
                 onChange={e => setUsernameInput(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
                 placeholder="kingsley"
-                className="pl-7 font-mono"
+                className={`pl-7 font-mono transition-colors ${
+                  !profile.username && usernameAvailable === true ? 'border-evergreen/50 focus:ring-2 focus:ring-evergreen/20'
+                  : !profile.username && usernameAvailable === false ? 'border-cranberry/50 focus:ring-2 focus:ring-cranberry/20'
+                  : ''
+                }`}
                 disabled={!!profile.username}
                 maxLength={20}
               />
               {usernameChecking && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />}
               {!usernameChecking && usernameAvailable === true && !profile.username && (
-                <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-evergreen" />
+                <motion.span
+                  initial={{ scale: 0, rotate: -90 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 240, damping: 14 }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-evergreen/15"
+                >
+                  <Check className="h-3.5 w-3.5 text-evergreen" />
+                </motion.span>
               )}
               {!usernameChecking && usernameAvailable === false && !profile.username && (
-                <X className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-cranberry" />
+                <motion.span
+                  initial={{ scale: 0, rotate: 90 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: 'spring', stiffness: 240, damping: 14 }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-cranberry/15"
+                >
+                  <X className="h-3.5 w-3.5 text-cranberry" />
+                </motion.span>
               )}
             </div>
             {!profile.username && (
               <Button
                 onClick={claimUsername}
                 disabled={!usernameInput || usernameAvailable !== true || usernameChecking}
-                className="bg-evergreen text-cream hover:bg-evergreen-dark"
+                className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden"
               >
                 Claim
               </Button>
@@ -203,16 +266,19 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
 
           {/* Username status */}
           {usernameError && !profile.username && (
-            <p className="text-xs text-cranberry">{usernameError}</p>
+            <p className="text-xs text-cranberry flex items-center gap-1.5">
+              <AlertCircle className="h-3 w-3 flex-shrink-0" />
+              {usernameError}
+            </p>
           )}
           {usernameSuggestions.length > 0 && !profile.username && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs text-muted-foreground">Try:</span>
               {usernameSuggestions.map(s => (
                 <button
                   key={s}
                   onClick={() => setUsernameInput(s)}
-                  className="text-xs font-mono px-2 py-0.5 rounded bg-muted/60 hover:bg-evergreen/10 hover:text-evergreen transition-colors"
+                  className="text-xs font-mono px-2 py-1 rounded-lg bg-evergreen/5 text-evergreen border border-evergreen/20 hover:bg-evergreen/15 hover:border-evergreen/40 hover:-translate-y-0.5 transition-all"
                 >
                   @{s}
                 </button>
@@ -220,18 +286,18 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
             </div>
           )}
           {profile.username && (
-            <div className="flex items-center gap-2">
-              <Badge className="bg-evergreen/10 text-evergreen border-evergreen/30">
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-evergreen/5 border border-evergreen/20">
+              <Badge className="bg-evergreen/15 text-evergreen border-evergreen/30">
                 <Check className="h-3 w-3 mr-1" /> Claimed
               </Badge>
-              <span className="text-xs text-muted-foreground">earnova.com/@{profile.username}</span>
+              <span className="text-xs text-muted-foreground font-mono">earnova.com/@{profile.username}</span>
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Profile fields */}
-      <Card className="mb-6">
+      <Card className="mb-6 overflow-hidden glass-strong shadow-festive">
         <div className="h-1.5 w-full bg-gradient-to-r from-evergreen via-gold to-berry" />
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -301,11 +367,15 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
               className="mt-1"
             />
             {profile.interests.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
+              <div className="flex flex-wrap gap-2 mt-2">
                 {profile.interests.map(i => (
-                  <Badge key={i} variant="outline" className="bg-evergreen/5 text-evergreen border-evergreen/30 text-xs">
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-gradient-to-br from-evergreen/8 to-gold/5 text-evergreen border border-evergreen/30 hover:from-evergreen/15 hover:to-gold/10 hover:border-evergreen/50 hover:-translate-y-0.5 hover:shadow-sm transition-all"
+                  >
+                    <Sparkles className="h-3 w-3 opacity-70" />
                     {i}
-                  </Badge>
+                  </span>
                 ))}
               </div>
             )}
@@ -336,7 +406,8 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
       </Card>
 
       {/* Social links */}
-      <Card className="mb-6">
+      <Card className="mb-6 overflow-hidden glass-strong shadow-festive">
+        <div className="h-1.5 w-full bg-gradient-to-r from-gold via-evergreen to-berry" />
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Globe2 className="h-5 w-5 text-gold-dark" />
@@ -345,7 +416,13 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
         </CardHeader>
         <CardContent className="space-y-2">
           {profile.socialLinks.map((sl, i) => (
-            <div key={i} className="flex gap-2">
+            <div
+              key={i}
+              className="flex gap-2 items-center p-2 rounded-xl bg-gradient-to-r from-card/80 to-card/40 backdrop-blur-sm border border-border/50 hover:border-evergreen/30 transition-colors"
+            >
+              <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-evergreen/15 to-gold/10 text-evergreen font-bold text-xs uppercase">
+                {sl.platform ? sl.platform[0] : <Globe2 className="h-3.5 w-3.5" />}
+              </span>
               <Input
                 value={sl.platform}
                 onChange={e => {
@@ -354,7 +431,7 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
                   setProfile({ ...profile, socialLinks: links })
                 }}
                 placeholder="platform"
-                className="w-32 font-mono text-sm"
+                className="w-28 font-mono text-sm h-9 border-transparent bg-transparent focus-visible:border-border"
               />
               <Input
                 value={sl.url}
@@ -364,13 +441,13 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
                   setProfile({ ...profile, socialLinks: links })
                 }}
                 placeholder="https://..."
-                className="flex-1 font-mono text-sm"
+                className="flex-1 font-mono text-sm h-9 border-transparent bg-transparent focus-visible:border-border"
               />
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => setProfile({ ...profile, socialLinks: profile.socialLinks.filter((_, idx) => idx !== i) })}
-                className="text-muted-foreground hover:text-cranberry"
+                className="text-muted-foreground hover:text-cranberry hover:bg-cranberry/5 h-9 px-2"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -380,7 +457,7 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
             size="sm"
             variant="outline"
             onClick={() => setProfile({ ...profile, socialLinks: [...profile.socialLinks, { platform: '', url: '' }] })}
-            className="border-evergreen/30 text-evergreen hover:bg-evergreen/5"
+            className="border-evergreen/30 text-evergreen hover:bg-evergreen/5 btn-glow overflow-hidden"
           >
             + Add link
           </Button>
@@ -416,6 +493,7 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
             {saving ? 'Saving…' : 'Save profile'}
           </Button>
         </div>
+      </div>
       </div>
     </div>
   )

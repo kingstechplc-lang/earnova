@@ -4,11 +4,13 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { safeFetch } from '@/lib/safe-fetch'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
+import { CountUp } from '@/components/animated/count-up'
 import {
   Share2, ExternalLink, ChevronLeft, MapPin, Globe2, Clock, Sparkles,
-  FileText, Eye,
+  FileText, Eye, AlertCircle,
 } from 'lucide-react'
 import type { View } from '@/app/page'
 
@@ -59,20 +61,44 @@ export default function PublicProfileView({ username, navigate }: { username: st
     return () => { cancelled = true }
   }, [username])
 
-  if (loading) return <div className="container mx-auto px-4 py-20 text-center text-muted-foreground">Loading profile…</div>
+  if (loading) {
+    return (
+      <div className="relative min-h-screen">
+        <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" aria-hidden />
+        <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
+        <div className="relative z-10 container mx-auto px-4 py-20 max-w-md flex items-center justify-center">
+          <div className="glass-card rounded-2xl p-8 text-center w-full">
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-evergreen to-evergreen-dark text-cream shadow-festive mb-4">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <p className="font-serif text-lg font-bold mb-1">Loading profile…</p>
+            <p className="text-sm text-muted-foreground mb-4">Fetching the creator&apos;s details.</p>
+            <div className="h-1.5 w-32 mx-auto rounded-full overflow-hidden bg-muted/40">
+              <div className="h-full w-1/2 shimmer-bg rounded-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-12 max-w-md">
-        <Card>
-          <CardContent className="py-16 text-center">
-            <p className="text-xl font-bold mb-1 font-serif">{error}</p>
-            <p className="text-sm text-muted-foreground mb-6">This creator may not exist or their profile is private.</p>
-            <Button variant="outline" onClick={() => navigate({ name: 'landing' })}>
-              <ChevronLeft className="h-4 w-4 mr-1" /> Back to home
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="relative min-h-screen">
+        <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" aria-hidden />
+        <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
+        <div className="relative z-10 container mx-auto px-4 py-12 max-w-md">
+          <Alert className="border-cranberry/40 bg-cranberry/5 backdrop-blur-sm shadow-festive">
+            <AlertCircle className="h-4 w-4 text-cranberry" />
+            <AlertDescription>
+              <p className="font-serif text-lg font-bold mb-1 text-foreground">{error}</p>
+              <p className="text-sm text-muted-foreground mb-4">This creator may not exist or their profile is private.</p>
+              <Button variant="outline" size="sm" onClick={() => navigate({ name: 'landing' })} className="border-cranberry/30 text-cranberry hover:bg-cranberry/5 btn-glow overflow-hidden">
+                <ChevronLeft className="h-4 w-4 mr-1" /> Back to home
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
       </div>
     )
   }
@@ -135,7 +161,7 @@ export default function PublicProfileView({ username, navigate }: { username: st
                   <Clock className="h-3 w-3 mr-1" /> Joined {new Date(profile.joinedAt).toLocaleDateString()}
                 </Badge>
                 <Badge className="bg-cream/15 text-cream border-cream/20 backdrop-blur-sm">
-                  <FileText className="h-3 w-3 mr-1" /> {profile.stats.totalPages} pages
+                  <FileText className="h-3 w-3 mr-1" /> <CountUp value={profile.stats.totalPages} duration={1000} /> pages
                 </Badge>
               </div>
             </div>
@@ -149,7 +175,7 @@ export default function PublicProfileView({ username, navigate }: { username: st
                 navigator.clipboard.writeText(url)
                 alert('Profile link copied')
               }}
-              className="bg-cream/15 text-cream hover:bg-cream/25 border-cream/20 backdrop-blur-sm"
+              className="bg-cream/15 text-cream hover:bg-cream/25 border-cream/20 backdrop-blur-sm btn-glow overflow-hidden"
             >
               <Share2 className="h-4 w-4 mr-1.5" /> Share
             </Button>
@@ -158,103 +184,155 @@ export default function PublicProfileView({ username, navigate }: { username: st
       </div>
 
       {/* Body */}
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
-        {/* Interests */}
-        {profile.interests.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold mb-2">Interests</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {profile.interests.map(i => (
-                <Badge key={i} variant="outline" className="bg-evergreen/5 text-evergreen border-evergreen/30">
-                  {i}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
+      <div className="relative">
+        {/* Ambient body background — subtle so it doesn't compete with the rich hero above. */}
+        <div className="absolute inset-0 mesh-bg opacity-20 pointer-events-none" aria-hidden />
+        <FloatingOrbs count={1} colors={['evergreen']} className="opacity-15" />
 
-        {/* Social links */}
-        {profile.socialLinks.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold mb-2">Links</h3>
-            <div className="flex flex-wrap gap-2">
-              {profile.socialLinks.map((sl, i) => (
-                <a
-                  key={i}
-                  href={sl.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm hover:border-evergreen/40 hover:bg-evergreen/5 transition-all"
-                >
-                  <SocialIcon platform={sl.platform} />
-                  <span>{sl.label || sl.platform}</span>
-                  <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Pages */}
-        <div>
-          <h3 className="font-serif text-xl font-bold mb-3 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-evergreen" />
-            Pages ({profile.pages.length})
-          </h3>
-          {profile.pages.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-10 text-center text-muted-foreground">
-                <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40" />
-                <p className="text-sm">No published pages yet.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {profile.pages.map((page, i) => (
-                <motion.div
-                  key={page.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <Card className="overflow-hidden hover:shadow-elevated hover:-translate-y-0.5 transition-all cursor-pointer"
-                    onClick={() => {
-                      window.location.hash = `/p/${page.slug}`
-                      navigate({ name: 'public', slug: page.slug })
-                    }}
+        <div className="relative z-10 container mx-auto px-4 py-8 max-w-3xl">
+          {/* Interests */}
+          {profile.interests.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold mb-2">Interests</h3>
+              <div className="flex flex-wrap gap-2">
+                {profile.interests.map(i => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-gradient-to-br from-evergreen/8 to-gold/5 text-evergreen border border-evergreen/30 hover:from-evergreen/15 hover:to-gold/10 hover:border-evergreen/50 hover:-translate-y-0.5 hover:shadow-sm transition-all"
                   >
-                    <div className="h-0.5 w-full bg-gradient-to-r from-evergreen to-gold" />
-                    <CardContent className="py-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-semibold truncate">{page.title}</h4>
-                          <p className="text-xs text-muted-foreground font-mono truncate">/p/{page.slug}</p>
-                          {page.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{page.description}</p>
-                          )}
-                          <div className="flex items-center gap-2 mt-2">
-                            {page.campaign && (
-                              <Badge variant="outline" className="bg-gold/5 text-gold-dark border-gold/30 text-[10px]">
-                                {page.campaign.title}
-                              </Badge>
-                            )}
-                            <span className="text-[10px] text-muted-foreground">
-                              {page._count.blocks} blocks · {page.publishedAt ? new Date(page.publishedAt).toLocaleDateString() : ''}
-                            </span>
-                          </div>
-                        </div>
-                        <Eye className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
+                    <Sparkles className="h-3 w-3 opacity-70" />
+                    {i}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Social links */}
+          {profile.socialLinks.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold mb-2">Links</h3>
+              <div className="flex flex-wrap gap-2">
+                {profile.socialLinks.map((sl, i) => (
+                  <a
+                    key={i}
+                    href={sl.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 backdrop-blur-sm px-4 py-2 text-sm hover:border-evergreen/40 hover:bg-evergreen/5 hover:-translate-y-0.5 hover:shadow-sm transition-all"
+                  >
+                    <SocialIcon platform={sl.platform} />
+                    <span>{sl.label || sl.platform}</span>
+                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pages */}
+          <div>
+            <h3 className="font-serif text-xl font-bold mb-3 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-evergreen" />
+              Pages
+              <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-evergreen/15 to-gold/10 text-evergreen border border-evergreen/30">
+                <CountUp value={profile.pages.length} duration={800} />
+              </span>
+            </h3>
+            {profile.pages.length === 0 ? (
+              <Card className="border-dashed border-evergreen/30 bg-card/60 backdrop-blur-sm">
+                <CardContent className="py-12 text-center">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 200 }}
+                    className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-evergreen/10 to-gold/8 text-evergreen/60 mb-3"
+                  >
+                    <FileText className="h-7 w-7" />
+                  </motion.div>
+                  <p className="font-medium text-foreground mb-1">No published pages yet</p>
+                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                    This creator hasn&apos;t published any Special Pages. Check back soon!
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-3">
+                {profile.pages.map((page, i) => (
+                  <motion.div
+                    key={page.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                  >
+                    <Card
+                      className="relative overflow-hidden hover:shadow-elevated hover:-translate-y-0.5 hover:border-evergreen/40 transition-all cursor-pointer glass-card"
+                      onClick={() => {
+                        window.location.hash = `/p/${page.slug}`
+                        navigate({ name: 'public', slug: page.slug })
+                      }}
+                    >
+                      <div className="h-0.5 w-full bg-gradient-to-r from-evergreen to-gold" />
+                      <CardContent className="py-4">
+                        <div className="flex items-start gap-3">
+                          {/* Page-type icon tile */}
+                          <div className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-evergreen/10 to-gold/8 text-xl" aria-hidden>
+                            {pageTypeEmoji(page.pageType)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-semibold truncate">{page.title}</h4>
+                            <p className="text-xs text-muted-foreground font-mono truncate">/p/{page.slug}</p>
+                            {page.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{page.description}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              {page.campaign && (
+                                <Badge variant="outline" className="bg-gold/8 text-gold-dark border-gold/30 text-[10px]">
+                                  <Sparkles className="h-2.5 w-2.5 mr-1" /> {page.campaign.title}
+                                </Badge>
+                              )}
+                              <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <FileText className="h-2.5 w-2.5" /> {page._count.blocks} blocks
+                              </span>
+                              {page.publishedAt && (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <Clock className="h-2.5 w-2.5" /> {new Date(page.publishedAt).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-evergreen/5 text-evergreen">
+                            <Eye className="h-3.5 w-3.5" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
+}
+
+/** Returns an emoji for a given page type. */
+function pageTypeEmoji(pageType: string): string {
+  const map: Record<string, string> = {
+    PERSONAL: '👤',
+    CELEBRATION: '🎄',
+    LINK_HUB: '🔗',
+    CREATOR: '✨',
+    BLOGGER: '✍️',
+    PHOTOGRAPHY: '📸',
+    MUSIC: '🎵',
+    GAMING: '🎮',
+    BUSINESS: '💼',
+    EVENT: '🎉',
+  }
+  return map[pageType] || '📄'
 }
 
 function SocialIcon({ platform }: { platform: string }) {

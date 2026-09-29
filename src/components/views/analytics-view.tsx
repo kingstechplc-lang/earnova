@@ -10,6 +10,7 @@ import {
 import { CountUp } from '@/components/animated/count-up'
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
+import { TiltCard } from '@/components/animated/tilt-card'
 import { safeFetch } from '@/lib/safe-fetch'
 import type { View, CurrentUser } from '@/app/page'
 
@@ -63,25 +64,35 @@ export default function AnalyticsView({
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid gap-4 md:grid-cols-4">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-32 rounded-xl shimmer-bg" />
-          ))}
+      <div className="relative min-h-screen">
+        <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" aria-hidden />
+        <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
+        <div className="relative z-10 container mx-auto px-4 py-8 max-w-5xl">
+          <div className="grid gap-4 md:grid-cols-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-32 rounded-xl shimmer-bg" />
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-5xl">
-      <FadeIn>
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
-            <ChevronLeft className="h-4 w-4" /> Back
-          </Button>
-        </div>
-      </FadeIn>
+    <div className="relative min-h-screen">
+      {/* Ambient background layer — subtle mesh + drifting orbs so the
+          analytics view sits on a layered surface rather than flat bg-background. */}
+      <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" aria-hidden />
+      <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
+
+      <div className="relative z-10 view-fade container mx-auto px-4 py-6 max-w-5xl">
+        <FadeIn>
+          <div className="flex items-center gap-3 mb-6">
+            <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
+              <ChevronLeft className="h-4 w-4" /> Back
+            </Button>
+          </div>
+        </FadeIn>
 
       {/* Hero header */}
       <FadeIn delay={0.05}>
@@ -159,7 +170,7 @@ export default function AnalyticsView({
 
       {/* Trust Score */}
       <FadeIn delay={0.25}>
-        <Card className="mt-6 overflow-hidden shadow-festive">
+        <Card className="mt-6 overflow-hidden shadow-festive glass-strong">
           <div className="h-1.5 w-full bg-gradient-to-r from-evergreen via-gold to-berry" />
           <CardHeader>
             <div className="flex items-center justify-between flex-wrap gap-3">
@@ -177,7 +188,7 @@ export default function AnalyticsView({
                 variant="outline"
                 onClick={recomputeScore}
                 disabled={recomputing}
-                className="border-evergreen/30 text-evergreen hover:bg-evergreen/5"
+                className="border-evergreen/30 text-evergreen hover:bg-evergreen/5 btn-glow overflow-hidden"
               >
                 <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${recomputing ? 'animate-spin' : ''}`} />
                 {recomputing ? 'Computing…' : 'Recompute'}
@@ -263,6 +274,7 @@ export default function AnalyticsView({
           </CardContent>
         </Card>
       </FadeIn>
+      </div>
     </div>
   )
 }
@@ -271,29 +283,47 @@ function StatCard({ icon, value, label, accent, delay }: {
   icon: React.ReactNode; value: number; label: string; accent: 'evergreen' | 'gold' | 'berry'; delay: number
 }) {
   const accents = {
-    evergreen: { bg: 'bg-evergreen/10', text: 'text-evergreen', bar: 'bg-gradient-to-r from-evergreen to-evergreen-light' },
-    gold: { bg: 'bg-gold/15', text: 'text-gold-dark', bar: 'bg-gradient-to-r from-gold to-gold-dark' },
-    berry: { bg: 'bg-berry/10', text: 'text-berry', bar: 'bg-gradient-to-r from-berry to-berry/70' },
+    evergreen: {
+      bg: 'bg-evergreen/10', text: 'text-evergreen', bar: 'bg-gradient-to-r from-evergreen to-evergreen-light',
+      wash: 'bg-gradient-to-br from-evergreen/8 via-evergreen/3 to-transparent',
+      orb: 'bg-evergreen/15', ring: 'border-evergreen/30',
+    },
+    gold: {
+      bg: 'bg-gold/15', text: 'text-gold-dark', bar: 'bg-gradient-to-r from-gold-light via-gold to-gold-dark',
+      wash: 'bg-gradient-to-br from-gold/12 via-gold/4 to-transparent',
+      orb: 'bg-gold/20', ring: 'border-gold/30',
+    },
+    berry: {
+      bg: 'bg-berry/10', text: 'text-berry', bar: 'bg-gradient-to-r from-berry to-berry/70',
+      wash: 'bg-gradient-to-br from-berry/10 via-berry/3 to-transparent',
+      orb: 'bg-berry/20', ring: 'border-berry/30',
+    },
   }
   const a = accents[accent]
   return (
-    <Card className="overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-0.5">
-      <div className={`h-1 w-full ${a.bar}`} />
-      <CardContent className="py-5">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay, type: 'spring', stiffness: 200 }}
-          className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${a.bg} ${a.text} mb-3`}
-        >
-          {icon}
-        </motion.div>
-        <p className="text-3xl font-bold font-serif">
-          <CountUp value={value} duration={1500} />
-        </p>
-        <p className="text-xs text-muted-foreground uppercase tracking-wide mt-1">{label}</p>
-      </CardContent>
-    </Card>
+    <TiltCard intensity={5}>
+      <Card className={`relative overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-1 ${a.ring}`}>
+        {/* Gradient background wash */}
+        <div className={`absolute inset-0 ${a.wash}`} aria-hidden />
+        {/* Floating accent orb */}
+        <div className={`absolute -top-6 -right-6 h-20 w-20 rounded-full ${a.orb} blur-2xl animate-pulse`} aria-hidden />
+        <div className={`h-1 w-full ${a.bar}`} />
+        <CardContent className="relative py-5">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay, type: 'spring', stiffness: 200 }}
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-xl ${a.bg} ${a.text} mb-3`}
+          >
+            {icon}
+          </motion.div>
+          <p className="text-3xl font-bold font-serif">
+            <CountUp value={value} duration={1500} />
+          </p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide mt-1">{label}</p>
+        </CardContent>
+      </Card>
+    </TiltCard>
   )
 }
 
@@ -321,12 +351,24 @@ function BreakdownCard({
     berry: 'bg-gradient-to-r from-berry to-berry/70',
   }
 
+  const accentRing: Record<string, string> = {
+    evergreen: 'border-evergreen/25',
+    gold: 'border-gold/25',
+    berry: 'border-berry/25',
+  }
+
+  const accentIconText: Record<string, string> = {
+    evergreen: 'text-evergreen',
+    gold: 'text-gold-dark',
+    berry: 'text-berry',
+  }
+
   return (
-    <Card className="overflow-hidden">
+    <Card className={`relative overflow-hidden bg-card/80 backdrop-blur-sm ${accentRing[accent]}`}>
       <div className={`h-1 w-full ${barColors[accent]}`} />
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <span className={accent === 'evergreen' ? 'text-evergreen' : accent === 'gold' ? 'text-gold-dark' : 'text-berry'}>
+          <span className={accentIconText[accent]}>
             {icon}
           </span>
           {title}
@@ -349,13 +391,13 @@ function BreakdownCard({
                     labelMap[k] || k
                   )}
                 </span>
-                <div className="flex-1 bg-muted/30 rounded-full h-2.5 overflow-hidden">
+                <div className="flex-1 bg-muted/30 rounded-full h-2.5 overflow-hidden ring-1 ring-border/30">
                   <motion.div
                     initial={{ width: 0 }}
                     whileInView={{ width: `${(v / total) * 100}%` }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.8, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                    className={`h-full ${barColors[accent]} rounded-full`}
+                    className={`h-full ${barColors[accent]} rounded-full shadow-sm`}
                   />
                 </div>
                 <span className="text-xs text-muted-foreground w-10 text-right font-mono">{v}%</span>
@@ -410,11 +452,24 @@ function ScoreCircle({ label, value, big }: { label: string; value: number; big?
 }
 
 function ScoreBar({ label, value, good, delay }: { label: string; value: number; good: boolean; delay: number }) {
-  const color = good
-    ? value >= 70 ? 'bg-emerald-500' : value >= 40 ? 'bg-amber-500' : 'bg-red-500'
-    : value <= 30 ? 'bg-emerald-500' : value <= 60 ? 'bg-amber-500' : 'bg-red-500'
+  // Brand-aligned gradients — evergreen (good), gold (warn), cranberry→berry (bad).
+  // For "good" metrics: high score = evergreen. For "risk" metrics: low value = evergreen.
+  const grad = good
+    ? value >= 70 ? 'bg-gradient-to-r from-evergreen to-evergreen-light'
+      : value >= 40 ? 'bg-gradient-to-r from-gold to-gold-dark'
+        : 'bg-gradient-to-r from-cranberry to-berry'
+    : value <= 30 ? 'bg-gradient-to-r from-evergreen to-evergreen-light'
+      : value <= 60 ? 'bg-gradient-to-r from-gold to-gold-dark'
+        : 'bg-gradient-to-r from-cranberry to-berry'
+  const glow = good
+    ? value >= 70 ? 'shadow-[0_0_12px_rgba(70,135,92,0.45)]'
+      : value >= 40 ? 'shadow-[0_0_12px_rgba(212,164,55,0.45)]'
+        : 'shadow-[0_0_12px_rgba(146,69,62,0.45)]'
+    : value <= 30 ? 'shadow-[0_0_12px_rgba(70,135,92,0.45)]'
+      : value <= 60 ? 'shadow-[0_0_12px_rgba(212,164,55,0.45)]'
+        : 'shadow-[0_0_12px_rgba(146,69,62,0.45)]'
   return (
-    <div className="p-3 bg-muted/20 rounded-lg">
+    <div className="p-3 bg-muted/20 rounded-lg ring-1 ring-border/30">
       <div className="flex justify-between text-xs mb-2">
         <span className="text-muted-foreground">{label}</span>
         <span className="font-mono font-bold">{value}</span>
@@ -424,7 +479,7 @@ function ScoreBar({ label, value, good, delay }: { label: string; value: number;
           initial={{ width: 0 }}
           animate={{ width: `${value}%` }}
           transition={{ duration: 1, delay, ease: [0.22, 1, 0.36, 1] }}
-          className={`h-full ${color} rounded-full`}
+          className={`h-full ${grad} ${glow} rounded-full`}
         />
       </div>
     </div>
