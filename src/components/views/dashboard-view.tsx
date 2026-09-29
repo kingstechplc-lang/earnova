@@ -14,7 +14,7 @@ import { StaggerContainer, StaggerItem, FadeIn } from '@/components/animated/mot
 import { safeFetch } from '@/lib/safe-fetch'
 import { TiltCard } from '@/components/animated/tilt-card'
 import {
-  Plus, Eye, Edit3, BarChart3, Wallet, FileText, Sparkles, TrendingUp, Globe2, Heart,
+  Plus, Eye, Edit3, BarChart3, Wallet, FileText, Sparkles, TrendingUp, Mail, X,
 } from 'lucide-react'
 import type { View, CurrentUser } from '@/app/page'
 
@@ -98,6 +98,8 @@ export default function DashboardView({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {/* Email verification banner */}
+      <EmailVerificationBanner />
       {/* Header */}
       <FadeIn>
         <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
@@ -380,6 +382,51 @@ export default function DashboardView({
         </StaggerContainer>
       )}
     </div>
+  )
+}
+
+function EmailVerificationBanner() {
+  const [show, setShow] = useState(true)
+  const [sent, setSent] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  if (!show) return null
+
+  return (
+    <FadeIn>
+      <div className="mb-6 p-3 rounded-xl border border-gold/40 bg-gradient-to-r from-gold/10 to-transparent flex items-center gap-3">
+        <div className="rounded-full bg-gold/20 p-2 flex-shrink-0">
+          <Mail className="h-4 w-4 text-gold-dark" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">Verify your email to unlock all features</p>
+          <p className="text-xs text-muted-foreground">Unverified accounts cannot create ad integrations.</p>
+        </div>
+        {sent ? (
+          <Badge className="bg-evergreen/15 text-evergreen border-evergreen/30 text-xs flex-shrink-0">
+            <Sparkles className="h-3 w-3 mr-1" /> Link sent
+          </Badge>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true)
+              const res = await safeFetch('/api/auth/resend-verification', { method: 'POST' })
+              setLoading(false)
+              if (!res.error) setSent(true)
+            }}
+            className="border-gold/40 text-gold-dark hover:bg-gold/10 flex-shrink-0"
+          >
+            {loading ? 'Sending…' : 'Send link'}
+          </Button>
+        )}
+        <button onClick={() => setShow(false)} className="p-1 text-muted-foreground hover:text-foreground flex-shrink-0">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </FadeIn>
   )
 }
 
