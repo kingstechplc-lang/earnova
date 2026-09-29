@@ -272,6 +272,52 @@ model AdPlacementPolicy {
   updatedAt                DateTime @updatedAt
 }
 
+// ─── AD SLOT CONFIGURATION (admin-configurable per-slot policy) ──────────────
+//
+// One row per (slot, source) pair. Lets the admin decide:
+//   * Whether a particular slot (HEADER, FOOTER, etc.) is enabled for platform
+//     ads, user ads, or both.
+//   * Which integration types (BANNER, IN_PAGE, NATIVE, etc.) are allowed in
+//     that slot — enforced at placement time.
+//   * Which specific VERIFIED PlatformAdNetworkIntegration is assigned to that
+//     slot (replaces the old `platformIntegrations[0]` round-robin matcher,
+//     which caused duplicate Adsterra atOptions collisions when multiple slots
+//     shared the same integration).
+//   * The default priority (lower = appears higher on page).
+//   * Visibility rules — when to render the slot at all:
+//       'ALWAYS'                   → render even if no ad available (placeholder)
+//       'ONLY_WHEN_AD_AVAILABLE'    → hide the slot if no ad is live (default)
+//       'NEVER'                     → slot is disabled entirely
+//
+// The placement engine + /api/p/[slug] route read this table to decide which
+// slots render and which integration is used. The admin UI in
+// src/components/admin/slot-config-section.tsx lets admins edit it.
+model AdSlotConfig {
+  id                       String         @id @default(cuid())
+  slot                     PlacementSlot
+  source                   PlacementSource
+  enabled                  Boolean        @default(true)
+  // Comma-separated list of IntegrationType allowed in this slot, e.g.
+  // "BANNER,NATIVE" — empty string means "any integration type allowed".
+  allowedIntegrationTypes  String         @default("")
+  // If set, this specific platform integration is used for the slot.
+  // If null, the engine round-robins among VERIFIED platform integrations
+  // that match `allowedIntegrationTypes` (with collision avoidance).
+  assignedIntegrationId     String?
+  // Default priority used when seeding placements for new pages.
+  defaultPriority          Int            @default(50)
+  // Visibility rule for this slot.
+  //   ALWAYS                   → always render slot (even without ad)
+  //   ONLY_WHEN_AD_AVAILABLE   → render slot only when a live ad exists
+  //   NEVER                    → slot disabled
+  visibility               String         @default("ONLY_WHEN_AD_AVAILABLE")
+  updatedAt                DateTime       @updatedAt
+
+  @@unique([slot, source])
+  @@index([slot])
+  @@index([source])
+}
+
 // ─── CONSENT (Chapter 3) ─────────────────────────────────────────────────────
 
 model ConsentRecord {

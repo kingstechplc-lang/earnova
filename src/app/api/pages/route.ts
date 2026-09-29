@@ -55,13 +55,51 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  // Auto-add platform ad placements (Layer 2) on every new page
-  await db.adPlacement.createMany({
-    data: [
-      { pageId: page.id, source: 'PLATFORM_NETWORK', slot: 'HEADER', priority: 10, enabled: true },
-      { pageId: page.id, source: 'PLATFORM_NETWORK', slot: 'BEFORE_FOOTER', priority: 90, enabled: true },
-    ],
-  })
+  // Auto-add platform + user ad placements based on AdSlotConfig defaults.
+  //
+  // The admin's AdSlotConfig table controls which (slot, source) pairs are
+  // enabled by default on every new page. The placement engine + /api/p/[slug]
+  // route will further filter these at render time based on:
+  //   - whether a VERIFIED platform integration exists for that slot
+  //   - whether the page owner has an APPROVED user integration for that slot
+  //   - the visibility rule (ALWAYS / ONLY_WHEN_AD_AVAILABLE / NEVER)
+  //
+  // We seed one AdPlacement row per enabled (slot, source) pair from
+  // AdSlotConfig. This means the admin can change default slots without
+  // editing this code.
+  const { getEnabledSlotsForSource } = await import('@/lib/slot-config')
+  const platformSlots = await getEnabledSlotsForSource('PLATFORM_NETWORK')
+  const userSlots = await getEnabledSlotsForSource('USER_INTEGRATION')
+
+  const placementsData: Array<{
+    pageId: string
+    source: 'PLATFORM_NETWORK' | 'USER_INTEGRATION'
+    slot: any
+    priority: number
+    enabled: boolean
+  }> = [
+    ...platformSlots.map(s => ({
+      pageId: page.id,
+      source: 'PLATFORM_NETWORK' as const,
+      slot: s.slot,
+      priority: s.priority,
+      enabled: true,
+    })),
+    // User placements are seeded but won't render until the owner attaches
+    // an APPROVED integration to the page. The placement-engine filters
+    // out placements with no APPROVED integration (line 96).
+    ...userSlots.map(s => ({
+      pageId: page.id,
+      source: 'USER_INTEGRATION' as const,
+      slot: s.slot,
+      priority: s.priority,
+      enabled: true,
+    })),
+  ]
+
+  if (placementsData.length > 0) {
+    await db.adPlacement.createMany({ data: placementsData })
+  }
 
   return NextResponse.json({ page })
 }

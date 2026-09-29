@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ChevronLeft, ShieldAlert, ShieldCheck, Zap, Activity, Megaphone, Network, Sliders, Users, FileText, Clock,
+  ChevronLeft, ShieldAlert, ShieldCheck, Zap, Activity, Megaphone, Network, Sliders, Users, FileText, Clock, LayoutGrid,
 } from 'lucide-react'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { FadeIn } from '@/components/animated/motion'
@@ -16,6 +16,7 @@ import { CampaignsSection } from '@/components/admin/campaigns-section'
 import { NetworksSection } from '@/components/admin/networks-section'
 import { CompatibilitySection } from '@/components/admin/compatibility-section'
 import { PolicySection } from '@/components/admin/policy-section'
+import { SlotConfigSection } from '@/components/admin/slot-config-section'
 import { UsersSection } from '@/components/admin/users-section'
 import { PagesSection } from '@/components/admin/pages-section'
 import { PlatformIntegrationsSection } from '@/components/admin/platform-integrations-section'
@@ -23,7 +24,7 @@ import { ReviewsSection } from '@/components/admin/reviews-section'
 import { IntegrationsSection } from '@/components/admin/integrations-section'
 import type { View, CurrentUser } from '@/app/page'
 
-type Tab = 'overview' | 'campaigns' | 'platform-ads' | 'networks' | 'compatibility' | 'policy' | 'users' | 'pages' | 'reviews' | 'integrations'
+type Tab = 'overview' | 'campaigns' | 'platform-ads' | 'networks' | 'compatibility' | 'slot-config' | 'policy' | 'users' | 'pages' | 'reviews' | 'integrations'
 
 const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; adminOnly?: boolean }> = [
   { id: 'overview', label: 'Overview', icon: <Activity className="h-4 w-4" /> },
@@ -32,6 +33,7 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; adminOnly?: b
   { id: 'integrations', label: 'Integrations', icon: <Clock className="h-4 w-4" />, adminOnly: true },
   { id: 'networks', label: 'Ad networks', icon: <Network className="h-4 w-4" />, adminOnly: true },
   { id: 'compatibility', label: 'Compatibility', icon: <Sliders className="h-4 w-4" />, adminOnly: true },
+  { id: 'slot-config', label: 'Slot config', icon: <LayoutGrid className="h-4 w-4" />, adminOnly: true },
   { id: 'policy', label: 'Policy', icon: <Sliders className="h-4 w-4" />, adminOnly: true },
   { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" />, adminOnly: true },
   { id: 'pages', label: 'Pages', icon: <FileText className="h-4 w-4" /> },
@@ -183,6 +185,7 @@ export default function AdminView({
               {tab === 'integrations' && user.role === 'ADMIN' && <IntegrationsSection />}
               {tab === 'networks' && user.role === 'ADMIN' && <NetworksSection />}
               {tab === 'compatibility' && user.role === 'ADMIN' && <CompatibilitySection />}
+              {tab === 'slot-config' && user.role === 'ADMIN' && <SlotConfigSection />}
               {tab === 'policy' && user.role === 'ADMIN' && <PolicySection initialPolicy={policy} />}
               {tab === 'users' && user.role === 'ADMIN' && <UsersSection />}
               {tab === 'pages' && <PagesSection />}

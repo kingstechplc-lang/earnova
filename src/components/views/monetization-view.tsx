@@ -5,12 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { motion } from 'framer-motion'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
 import { safeFetch } from '@/lib/safe-fetch'
 import { GradientDialogHeader } from '@/components/animated/gradient-dialog-header'
 import { useConfetti } from '@/components/animated/confetti'
+import { useToast } from '@/hooks/use-toast'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -20,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import {
   ShieldCheck, ExternalLink, Plus, ChevronLeft, AlertCircle, Wallet, Sparkles,
-  Send, Pause, Lock, Info, TrendingUp, Globe2,
+  Send, Pause, Lock, Info, TrendingUp, Globe2, Paperclip, MapPin, FileText, Layers,
 } from 'lucide-react'
 import type { View, CurrentUser } from '@/app/page'
 
@@ -29,12 +31,21 @@ type AdNetwork = {
   integrationTypes: string[]; requiresSiteVerification: boolean; policyDocUrl: string | null
 }
 
+type Placement = {
+  id: string
+  pageId: string
+  slot: string
+  enabled: boolean
+  page: { slug: string; title: string }
+}
+
 type Integration = {
   id: string; integrationType: string; siteIdentifier: string | null
   zoneIdentifier: string | null; scriptReference: string | null
   lifecycleState: string; rejectionReason: string | null
   approvedAt: string | null; createdAt: string
   adNetwork: AdNetwork
+  placements?: Placement[]
 }
 
 type Disclaimer = {
@@ -232,7 +243,10 @@ export default function MonetizationView({
                         <SubmitButton integrationId={int.id} onDone={reload} />
                       )}
                       {int.lifecycleState === 'APPROVED' && (
-                        <DisableButton integrationId={int.id} onDone={reload} />
+                        <>
+                          <DisableButton integrationId={int.id} onDone={reload} />
+                          <AttachButton integration={int} onDone={reload} />
+                        </>
                       )}
                       {int.adNetwork.policyDocUrl && (
                         <Button variant="ghost" size="sm" asChild>
@@ -243,6 +257,9 @@ export default function MonetizationView({
                       )}
                     </div>
                   </div>
+                  {int.placements && int.placements.length > 0 && (
+                    <AttachedPagesPills placements={int.placements} />
+                  )}
                 </CardContent>
               </Card>
               </StaggerItem>
@@ -346,6 +363,323 @@ function DisableButton({ integrationId, onDone }: { integrationId: string; onDon
       <Pause className="h-3 w-3 mr-1" />
       {loading ? 'Disabling…' : 'Disable'}
     </Button>
+  )
+}
+
+// All 6 placement slots supported by the platform. We show all of them in the
+// dialog — the placement engine filters out disabled ones at render time, so
+// we don't need to fetch the admin-only AdSlotConfig here.
+const SLOT_INFO: Array<{ slot: string; label: string; description: string }> = [
+  { slot: 'HEADER',            label: 'Header',            description: 'Top of page, above first content block' },
+  { slot: 'AFTER_FIRST_BLOCK',  label: 'After first block', description: 'Right after the first content block' },
+  { slot: 'MID_CONTENT',        label: 'Mid content',       description: 'Midway through the content (only on pages with 5+ blocks)' },
+  { slot: 'BEFORE_FOOTER',     label: 'Before footer',     description: 'Just before the page footer' },
+  { slot: 'FOOTER',            label: 'Footer',            description: 'At the very bottom of the page' },
+  { slot: 'SIDEBAR',           label: 'Sidebar',           description: 'Sidebar (hidden on mobile)' },
+]
+
+type PageLite = {
+  id: string
+  slug: string
+  title: string
+  pageType: string
+  _count: { blocks: number }
+}
+
+function AttachedPagesPills({ placements }: { placements: Placement[] }) {
+  // Only show placements that are actually enabled; disabled placements
+  // (e.g. admin flipped the slot off after the user attached) are noise here.
+  const enabled = placements.filter(p => p.enabled)
+  if (enabled.length === 0) return null
+
+  // Group placements by page so we render one pill per page with all its slots.
+  const byPage = new Map<string, { slug: string; title: string; slots: string[] }>()
+  for (const p of enabled) {
+    if (!byPage.has(p.pageId)) {
+      byPage.set(p.pageId, { slug: p.page.slug, title: p.page.title, slots: [] })
+    }
+    byPage.get(p.pageId)!.slots.push(p.slot)
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="mt-3 pt-3 border-t border-border/60"
+    >
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1">
+        <MapPin className="h-3 w-3" /> Attached to {byPage.size} page{byPage.size === 1 ? '' : 's'}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {Array.from(byPage.entries()).map(([pageId, info]) => (
+          <span
+            key={pageId}
+            className="inline-flex items-center gap-1.5 rounded-md bg-evergreen/10 border border-evergreen/25 px-2 py-1 text-xs"
+            title={`/${info.slug}`}
+          >
+            <FileText className="h-3 w-3 text-evergreen flex-shrink-0" />
+            <span className="font-medium truncate max-w-[160px]">{info.title}</span>
+            <span className="text-muted-foreground/70">·</span>
+            <span className="text-muted-foreground font-mono text-[10px]">{info.slots.join(', ')}</span>
+          </span>
+        ))}
+      </div>
+    </motion.div>
+  )
+}
+
+function AttachButton({ integration, onDone }: { integration: Integration; onDone: () => void }) {
+  const [open, setOpen] = useState(false)
+  const { fire: fireConfetti, ConfettiLayer } = useConfetti()
+  const { toast } = useToast()
+  return (
+    <>
+      {ConfettiLayer}
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Paperclip className="h-3 w-3 mr-1" /> Attach to page
+      </Button>
+      {open && (
+        <AttachToPageDialog
+          integration={integration}
+          onClose={() => setOpen(false)}
+          onDone={onDone}
+          fireConfetti={fireConfetti}
+          toast={toast}
+        />
+      )}
+    </>
+  )
+}
+
+function AttachToPageDialog({
+  integration, onClose, onDone, fireConfetti, toast,
+}: {
+  integration: Integration
+  onClose: () => void
+  onDone: () => void
+  fireConfetti: (opts?: { count?: number; spread?: number; y?: number; x?: number }) => void
+  toast: ReturnType<typeof useToast>['toast']
+}) {
+  const [pages, setPages] = useState<PageLite[]>([])
+  const [loadingPages, setLoadingPages] = useState(true)
+  const [pageId, setPageId] = useState<string>('')
+  const [slots, setSlots] = useState<Set<string>>(new Set(['AFTER_FIRST_BLOCK']))
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch the user's pages when the dialog opens. We don't pre-fetch at
+  // MonetizationView mount because most users won't open this dialog, and
+  // we want the list to be fresh when they do.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoadingPages(true)
+      setError(null)
+      const res = await safeFetch<{ pages?: PageLite[] }>('/api/pages')
+      if (cancelled) return
+      if (res.error) {
+        setError(res.error)
+        setPages([])
+      } else {
+        setPages(res.data?.pages || [])
+      }
+      setLoadingPages(false)
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  function pickPage(id: string) {
+    setPageId(id)
+    // If the user already has placements for this page, pre-check those slots
+    // so the dialog reflects the current state — they can toggle more or fewer.
+    const existing = integration.placements?.filter(p => p.pageId === id && p.enabled) || []
+    if (existing.length > 0) {
+      setSlots(new Set(existing.map(p => p.slot)))
+    } else {
+      setSlots(new Set(['AFTER_FIRST_BLOCK']))
+    }
+  }
+
+  function toggleSlot(slot: string) {
+    setSlots(prev => {
+      const next = new Set(prev)
+      if (next.has(slot)) next.delete(slot)
+      else next.add(slot)
+      return next
+    })
+  }
+
+  async function submit() {
+    setError(null)
+    if (!pageId) {
+      setError('Please choose a page first.')
+      return
+    }
+    if (slots.size === 0) {
+      setError('Please select at least one ad slot.')
+      return
+    }
+    setSubmitting(true)
+    const res = await safeFetch(`/api/monetization/integrations/${integration.id}/attach`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pageId, slots: Array.from(slots) }),
+    })
+    setSubmitting(false)
+    if (res.error) {
+      setError(res.error)
+      return
+    }
+    const pageCount = slots.size
+    toast({
+      title: 'Attached to page ✓',
+      description: `Your ad integration is now placed in ${pageCount} slot${pageCount === 1 ? '' : 's'} on the selected page.`,
+    })
+    // Celebratory confetti burst — 80 particles as per the task spec.
+    fireConfetti({ count: 80, spread: 60, y: 0.4 })
+    onDone()
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent
+        className="max-w-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col"
+        showCloseButton={false}
+      >
+        <GradientDialogHeader
+          variant="evergreen"
+          icon={Paperclip}
+          title="Attach to a page"
+          description="Pick a Special Page you own and choose which ad slots this integration should appear in. Re-attaching replaces any previous placements for that page."
+          onClose={onClose}
+        />
+
+        <div className="p-6 space-y-5 overflow-y-auto flex-1 min-h-0">
+          {/* ── Page selection ─────────────────────────────────────── */}
+          <div>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <MapPin className="h-3 w-3" /> Choose a page
+            </Label>
+            <div className="mt-2 space-y-2 max-h-[260px] overflow-y-auto pr-1">
+              {loadingPages ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-14 rounded-lg shimmer-bg" />
+                  ))}
+                </div>
+              ) : pages.length === 0 ? (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>No pages yet</AlertTitle>
+                  <AlertDescription>
+                    You don&apos;t own any Special Pages yet. Create one from the
+                    dashboard first, then come back here to attach this integration.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                pages.map(p => {
+                  const selected = pageId === p.id
+                  const blockCount = p._count?.blocks ?? 0
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => pickPage(p.id)}
+                      className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                        selected
+                          ? 'border-evergreen bg-evergreen/5 shadow-elevated'
+                          : 'border-border hover:border-evergreen/40 hover:bg-evergreen/5'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`mt-0.5 h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                            selected ? 'border-evergreen' : 'border-muted-foreground/30'
+                          }`}
+                          aria-hidden
+                        >
+                          {selected && <div className="h-2 w-2 rounded-full bg-evergreen" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{p.title}</p>
+                          <p className="text-xs text-muted-foreground font-mono truncate">/{p.slug}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {blockCount} block{blockCount === 1 ? '' : 's'} · {p.pageType}
+                            {blockCount < 5 && (
+                              <span className="ml-1 text-gold-dark">(MID_CONTENT needs 5+ blocks)</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </div>
+
+          {/* ── Slot selection ────────────────────────────────────── */}
+          <div>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <Layers className="h-3 w-3" /> Ad slots
+            </Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Pick which slots your integration should appear in. Slots that the
+              admin has disabled won&apos;t render even if selected — the placement
+              engine filters them at render time.
+            </p>
+            <div className="mt-2 space-y-2">
+              {SLOT_INFO.map(s => {
+                const checked = slots.has(s.slot)
+                return (
+                  <label
+                    key={s.slot}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      checked
+                        ? 'border-evergreen bg-evergreen/5'
+                        : 'border-border hover:border-evergreen/40 hover:bg-evergreen/5'
+                    }`}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggleSlot(s.slot)}
+                      className="mt-0.5"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm">{s.label}</p>
+                      <p className="text-xs text-muted-foreground">{s.description}</p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-mono flex-shrink-0">
+                      {s.slot}
+                    </Badge>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button
+              onClick={submit}
+              disabled={submitting || loadingPages || !pageId || slots.size === 0 || pages.length === 0}
+              className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden"
+            >
+              <Paperclip className="h-3 w-3 mr-1" />
+              {submitting ? 'Attaching…' : 'Attach to page'}
+            </Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

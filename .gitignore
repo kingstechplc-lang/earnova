@@ -7,3 +7,5 @@ node_modules/
 dev.log
 next-env.d.ts
 scripts/
+tool-results/
+tsconfig.tsbuildinfo

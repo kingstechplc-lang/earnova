@@ -8,9 +8,19 @@ import { getCurrentUser } from '@/lib/auth'
 export async function GET() {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Include placements with the page relation so the client can render
+  // "Attached to: <page-title> (<slot>, <slot>)" pills without a second fetch.
+  // We select only slug + title (not the full page row) to keep the payload small
+  // and to avoid leaking unrelated page fields (description, moderation state, etc.).
   const integrations = await db.adIntegration.findMany({
     where: { userId: user.id, lifecycleState: { not: 'DELETED' } },
-    include: { adNetwork: true, placements: true },
+    include: {
+      adNetwork: true,
+      placements: {
+        include: { page: { select: { slug: true, title: true } } },
+        orderBy: { slot: 'asc' },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   })
   return NextResponse.json({ integrations })

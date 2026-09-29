@@ -410,3 +410,89 @@ Stage Summary:
 - This is the same approach used by major ad-supported sites (NYT, Bloomberg, etc.).
 - Critical fix for dev workflow: when editing `src/lib/security-headers.ts`, you MUST `rm -rf .next` and restart the dev server — Next.js 16 + Turbopack caches the headers() function output and doesn't hot-reload security-headers.ts changes.
 - After this fix, the user should hard-refresh their browser (Ctrl+Shift+R) to clear the browser's cached CSP and get the new one.
+
+---
+Task ID: 11-b
+Agent: subagent (slot-config UI builder)
+Task: Build admin SlotConfigSection UI for per-slot ad configuration
+
+Work Log:
+- Read context: policy-section.tsx (SwitchRow + NumberField patterns + "✓ Saved" flash), compatibility-section.tsx (matrix card layout + shadcn Select usage), platform-integrations-section.tsx (integration shape + VERIFIED filter), src/lib/slot-config.ts (SlotConfigRow type, Visibility, getSlotConfigs cache helper), src/lib/safe-fetch.ts (SafeFetchResult<T> union return shape), src/app/api/admin/slot-config/route.ts + [id]/route.ts (POST bulk + PATCH single signatures), src/app/api/admin/platform-integrations/route.ts (integration list shape with adNetwork/integrationType/zoneKey/verificationState), prisma/schema.prisma lines 295-312 + 461-512 (AdSlotConfig model + IntegrationType/PlacementSlot/PlacementSource enums).
+- Built new file: src/components/admin/slot-config-section.tsx (~571 lines, 'use client').
+  * Component exports `SlotConfigSection`.
+  * Loads slot configs via GET /api/admin/slot-config + verified platform integrations via GET /api/admin/platform-integrations (filtered to verificationState === 'VERIFIED') in parallel via Promise.all on mount.
+  * Renders a header Card explaining what AdSlotConfig does + the two key bullets from the spec ("Disabled slots won't render at all…" and "visibility=ONLY_WHEN_AD_AVAILABLE will hide automatically when no ad is available.").
+  * Renders 6 FadeIn blocks (one per slot, staggered by 0.04s each), each containing a md:grid-cols-2 layout with up to 2 cards (PLATFORM_NETWORK + USER_INTEGRATION).
+  * Each SlotCard has: top color bar (evergreen gradient for PLATFORM_NETWORK, berry→cranberry for USER_INTEGRATION), icon (PanelTop/PanelBottom/PanelRight/AlignCenter/BetweenHorizontalStart/BetweenHorizontalEnd) + slot label + source badge (Zap icon for platform, User icon for user), CardDescription with slot-specific blurb.
+  * Card body controls:
+    - Enabled Switch (instant PATCH via PATCH /api/admin/slot-config/[id], optimistic update with revert-on-error).
+    - Visibility Select with all 3 options (ALWAYS / ONLY_WHEN_AD_AVAILABLE / NEVER); each SelectItem shows label + "— description" so the user sees what each value does on hover/selection.
+    - Allowed integration types: 8 toggleable chips (SCRIPT, DIRECT_LINK, NATIVE, BANNER, IN_PAGE, VIGNETTE, PUSH, MULTITAG). Active chips get evergreen ring + background; inactive chips are muted.
+    - Assigned platform integration: Select dropdown (only rendered for source=PLATFORM_NETWORK cards). Options: "Auto (round-robin)" (sentinel value `__AUTO__` → maps to null in payload) + each verified integration labeled with `adNetwork.displayName · integrationType · zoneKey`. Shows a fallback "No verified integrations" hint when the list is empty.
+    - Default priority: number input (1-200) with min/max enforcement.
+  * Sticky save bar at the bottom (sticky bottom-4) with "You have unsaved changes" hint when dirty, "✓ Saved" flash indicator (1.5s), and "Save slot config" button.
+  * Dirty tracking via JSON snapshot of the editable fields EXCLUDING `enabled` (since enabled is instantly PATCHed). The save button is disabled when not dirty.
+  * Save button POSTs the full config array via POST /api/admin/slot-config with all 12 rows; on success, refreshes local state from the server response and updates the dirty snapshot.
+  * Error display via Alert variant="destructive" at the top.
+  * Loading state: 4 shimmer-bg placeholders.
+- Wired into src/components/views/admin-view.tsx:
+  * Added `LayoutGrid` to lucide-react imports.
+  * Imported `SlotConfigSection` from `@/components/admin/slot-config-section`.
+  * Extended `Tab` type union to include `'slot-config'`.
+  * Inserted `{ id: 'slot-config', label: 'Slot config', icon: <LayoutGrid className="h-4 w-4" />, adminOnly: true }` between 'compatibility' and 'policy' in TABS array.
+  * Added render line `{tab === 'slot-config' && user.role === 'ADMIN' && <SlotConfigSection />}` between the compatibility and policy render lines.
+- Encountered + fixed a transient bug: the MultiEdit tool left a stray `}}` (double brace) on the policy render line that broke JSX parsing. Fixed via a single-string Edit. Root cause was the old_str/new_str pattern matching a partial-line boundary that left an unbalanced brace.
+- Verified: `bun run lint` passes with 0 errors. `bunx tsc --noEmit` reports 0 errors in the two files I touched (the only remaining TS errors are pre-existing in src/app/api/p/[slug]/route.ts from a prior task — out of scope for this sub-agent and I did NOT modify any backend code per the constraints).
+
+Stage Summary:
+- New component src/components/admin/slot-config-section.tsx (~571 LoC) — admin UI for per-slot ad configuration.
+- Renders all 12 (slot × source) cards organized as 6 rows of 2 cards each, with evergreen top-bar for PLATFORM_NETWORK cards and berry→cranberry top-bar for USER_INTEGRATION cards.
+- Per-card controls: instant-PATCH enabled Switch, visibility Select dropdown with descriptive option labels, multi-select chips for the 8 IntegrationType values, assigned-platform-integration dropdown (PLATFORM_NETWORK only) listing verified integrations with `displayName · integrationType · zoneKey` format, default-priority number input (1-200).
+- Sticky bottom save bar with "✓ Saved" flash + dirty indicator + disabled state when nothing has changed.
+- All API calls go through `safeFetch` from `@/lib/safe-fetch`. No backend modifications. Wired into admin-view.tsx as a new admin-only tab "Slot config" (inserted between 'compatibility' and 'policy', using LayoutGrid icon).
+- Lint: pass (0 errors). Type check: pass for both edited files.
+
+---
+Task ID: 11-c
+Agent: subagent (attach-to-page UI builder)
+Task: Build "Attach to page" button + dialog in monetization-view
+
+Work Log:
+- Read context: worklog (task 11-b built SlotConfigSection UI), src/components/views/monetization-view.tsx (full 567-line file with existing Submit/Disable buttons + CreateIntegrationDialog), src/app/api/monetization/integrations/route.ts (GET handler already included placements but WITHOUT page relation), src/app/api/monetization/integrations/[id]/attach/route.ts (POST accepts {pageId, slots: string[]}, deletes existing placements for that page+integration then creates new ones), src/app/api/pages/route.ts (GET returns {pages: [{id, slug, title, pageType, _count: {blocks}}]}), src/components/admin/platform-integrations-section.tsx (GradientDialogHeader + useConfetti usage patterns), src/components/animated/confetti.tsx (useConfetti returns {fire, ConfettiLayer}, fire accepts {count, spread, x, y}), src/lib/safe-fetch.ts (SafeFetchResult<T> union with data|error|status), src/components/ui/dialog.tsx (DialogContent supports showCloseButton prop), src/components/ui/checkbox.tsx (shadcn Checkbox), src/hooks/use-toast.ts (shadcn useToast returning {toast, dismiss}), prisma/schema.prisma (AdPlacement has pageId/slot/enabled + page relation to SpecialPage; PlacementSlot enum has 6 values: HEADER, AFTER_FIRST_BLOCK, MID_CONTENT, BEFORE_FOOTER, FOOTER, SIDEBAR).
+- Modified backend: src/app/api/monetization/integrations/route.ts GET handler.
+  * Updated Prisma include from `placements: true` to:
+    `placements: { include: { page: { select: { slug: true, title: true } } }, orderBy: { slot: 'asc' } }`
+  * Rationale: client needs page title/slug to render "Attached to: <title> (<slots>)" pills without a second network round-trip. select-only-slug+title keeps the payload small and avoids leaking page fields the user shouldn't see (description, moderationState, etc.).
+  * Added explanatory inline comment.
+- Updated src/components/views/monetization-view.tsx (567 → 900 lines, ~333 lines added/modified):
+  * Added imports: Checkbox from '@/components/ui/checkbox', useToast from '@/hooks/use-toast', icons Paperclip/MapPin/FileText/Layers from lucide-react.
+  * Extended Integration type: added `placements?: Placement[]` field, added new Placement type with `{ id, pageId, slot, enabled, page: { slug, title } }`.
+  * In integration card rendering (APPROVED branch): added `<AttachButton integration={int} onDone={reload} />` alongside the existing `<DisableButton>`, wrapped both in a fragment.
+  * Added `<AttachedPagesPills placements={int.placements} />` below the card's main flex row, rendered conditionally when placements array has any items.
+  * Added SLOT_INFO constant: array of {slot, label, description} for all 6 PlacementSlot values with user-friendly descriptions exactly as specified in the task brief.
+  * Added PageLite type: `{id, slug, title, pageType, _count: {blocks}}` matching the GET /api/pages response shape.
+  * Added AttachedPagesPills component: filters placements to enabled only, groups by pageId into a Map, renders one pill per page with FileText icon + title + "·" + comma-separated slot names. Uses framer-motion for fade-in. Returns null when no enabled placements exist.
+  * Added AttachButton component: holds the dialog open state, owns the useConfetti instance + useToast instance. Renders outline button with Paperclip icon "Attach to page". Renders ConfettiLayer + conditionally the AttachToPageDialog.
+  * Added AttachToPageDialog component (~230 lines):
+    - Fetches GET /api/pages on dialog open via useEffect + safeFetch; cleans up with cancelled flag.
+    - Page selection: render-loading state with shimmer placeholders, empty state with Info Alert pointing the user back to the dashboard, page list with clickable cards (radio-style: green border + filled radio dot when selected). Each card shows title, /slug, block count, pageType, and a "MID_CONTENT needs 5+ blocks" warning if applicable.
+    - On page pick: pre-checks any slots the user already has placements for on that page (so re-opening the dialog reflects current state); falls back to {AFTER_FIRST_BLOCK} default for new pages.
+    - Slot selection: 6 cards with Checkbox, label, description, and a mono-spaced Badge showing the enum value. Checked state highlights with evergreen border + bg.
+    - Submit: POST /api/monetization/integrations/[id]/attach with {pageId, slots: Array.from(set)}. On success: shows toast "Attached to page ✓ — Your ad integration is now placed in N slots on the selected page." and fires 80-particle confetti (count:80, spread:60, y:0.4 per task spec). On error: shows Alert variant="destructive" with server's error message.
+    - Footer: Cancel + Attach to page buttons. Attach button disabled when submitting/loading/no page/no slots/no pages.
+    - Uses GradientDialogHeader variant="evergreen" with Paperclip icon, matching the existing CreateIntegrationDialog visual style.
+    - Dialog max-w-2xl (wider than CreateIntegrationDialog's max-w-lg) to accommodate the page list + 6 slot cards comfortably.
+  * Toast function type: `ReturnType<typeof useToast>['toast']` (avoids a hand-rolled signature that broke tsc due to Radix's narrower ReactNode subtype for ToastProps.title).
+- Verification:
+  * `bun run lint` — passes (0 errors, no output).
+  * `bunx tsc --noEmit` — passes (0 errors, no output).
+  * No backend route signature changes — only the GET /api/monetization/integrations include clause. POST/attach route already accepted {pageId, slots: string[]}.
+
+Stage Summary:
+- Creators with APPROVED ad-network integrations can now attach them to their own Special Pages and choose which ad slots they should appear in — all from the Monetization view without leaving the page.
+- "Attach to page" button visible only on APPROVED integration cards, next to the existing Disable button.
+- New dialog (max-w-2xl) fetches the user's pages on open, lets them pick one (radio-card style), then pick from all 6 placement slots (HEADER, AFTER_FIRST_BLOCK, MID_CONTENT, BEFORE_FOOTER, FOOTER, SIDEBAR) via checkboxes with descriptions. Re-attaching to an already-attached page pre-checks the current slots so the user can incrementally edit.
+- Single backend change: GET /api/monetization/integrations now includes placements.page.{slug,title} — eliminates an extra fetch and keeps the card's "Attached to:" pills always in sync with server state on every reload.
+- Attached-pages pills render below each integration card: green-bordered pills with FileText icon + page title + comma-separated slot list (e.g., "kingsley-christmas · HEADER, FOOTER"). Pill count header: "Attached to N pages".
+- On successful attach: green confetti burst (80 particles) + success toast via shadcn useToast. On failure: destructive Alert with server's error message inside the dialog.
+- Lint: pass (0 errors). TypeScript: pass (0 errors). No backend route changes — only the Prisma include clause.

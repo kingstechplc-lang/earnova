@@ -2,6 +2,7 @@
 // Given a Special Page's intended placements, returns the subset that may render together.
 import { db } from '@/lib/db'
 import type { AdPlacement, AdIntegration, AdNetwork, SpecialPage } from '@prisma/client'
+import { getSlotConfigs, isIntegrationTypeAllowed, type SlotConfigRow } from '@/lib/slot-config'
 
 type PlacementWithRelations = AdPlacement & {
   integration: (AdIntegration & { adNetwork: AdNetwork }) | null
@@ -87,13 +88,25 @@ export async function computeRenderedPlacements(
   // 0. Global kill switch
   if (policy.globalKillSwitch) return []
 
-  // 1. Filter by global toggles
+  // 1. Filter by global toggles + per-slot config
+  // Pre-load all slot configs into a Map for O(1) lookup in the filter
+  const allSlotConfigs = await getSlotConfigs()
+  const slotCfgMap = new Map<string, SlotConfigRow>()
+  for (const cfg of allSlotConfigs) {
+    slotCfgMap.set(`${cfg.slot}|${cfg.source}`, cfg)
+  }
+
   let candidates = placements.filter(p => {
     if (!p.enabled) return false
     if (p.source === 'USER_INTEGRATION' && !policy.userAdsEnabled) return false
     if ((p.source === 'PLATFORM_DIRECT' || p.source === 'PLATFORM_NETWORK') && !policy.platformAdsEnabled) return false
     // User-integration placements require the integration to be APPROVED
     if (p.source === 'USER_INTEGRATION' && (!p.integration || p.integration.lifecycleState !== 'APPROVED')) return false
+    // AdSlotConfig: skip if (slot, source) is disabled or visibility is NEVER
+    const slotCfg = slotCfgMap.get(`${p.slot}|${p.source}`)
+    if (slotCfg && (!slotCfg.enabled || slotCfg.visibility === 'NEVER')) return false
+    // AdSlotConfig: skip if integrationType is not in the allowed list for this slot
+    if (slotCfg && !isIntegrationTypeAllowed(slotCfg, p.integration?.integrationType)) return false
     return true
   })
 
