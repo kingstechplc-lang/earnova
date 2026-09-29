@@ -356,6 +356,10 @@ function CreateIntegrationDialog({
   const [integrationType, setIntegrationType] = useState('')
   const [siteIdentifier, setSiteIdentifier] = useState('')
   const [zoneIdentifier, setZoneIdentifier] = useState('')
+  const [zoneKey, setZoneKey] = useState('')
+  const [cdnUrl, setCdnUrl] = useState('')
+  const [bannerWidth, setBannerWidth] = useState('300')
+  const [bannerHeight, setBannerHeight] = useState('250')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -364,6 +368,11 @@ function CreateIntegrationDialog({
   async function submit() {
     setError('')
     setLoading(true)
+    const formatOptions = integrationType === 'BANNER' ? {
+      width: parseInt(bannerWidth) || 300,
+      height: parseInt(bannerHeight) || 250,
+      format: 'iframe',
+    } : null
     const res = await safeFetch('/api/monetization/integrations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -372,6 +381,9 @@ function CreateIntegrationDialog({
         integrationType,
         siteIdentifier,
         zoneIdentifier,
+        zoneKey: zoneKey || undefined,
+        cdnUrl: cdnUrl || undefined,
+        formatOptions,
       }),
     })
     setLoading(false)
@@ -442,7 +454,65 @@ function CreateIntegrationDialog({
               className="mt-1 font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              The zone ID or tag key from your ad-network dashboard.
+              The zone ID from your ad-network dashboard.
+            </p>
+          </div>
+
+          <div>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Zone key (alphanumeric)</Label>
+            <Input
+              placeholder="e.g. abc123def456 (Adsterra) or 1234567 (Monetag)"
+              value={zoneKey}
+              onChange={e => setZoneKey(e.target.value)}
+              className="mt-1 font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              The ad-network-specific key used in the script src URL. Found in your ad-network dashboard ad code snippet.
+            </p>
+          </div>
+
+          <div>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">CDN URL (tag delivery domain)</Label>
+            <Input
+              placeholder="e.g. www.highperformanceformat.com (Adsterra) or pl12345.profitabledisplaynetwork.com (Monetag)"
+              value={cdnUrl}
+              onChange={e => setCdnUrl(e.target.value)}
+              className="mt-1 font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              The CDN domain your ad network serves tags from. Found in the ad code snippet from your publisher dashboard.
+            </p>
+          </div>
+
+          {integrationType === 'BANNER' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Banner width (px)</Label>
+                <Input
+                  type="number"
+                  value={bannerWidth}
+                  onChange={e => setBannerWidth(e.target.value)}
+                  className="mt-1 font-mono text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Banner height (px)</Label>
+                <Input
+                  type="number"
+                  value={bannerHeight}
+                  onChange={e => setBannerHeight(e.target.value)}
+                  className="mt-1 font-mono text-sm"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="p-3 rounded-lg bg-gold/5 border border-gold/20">
+            <p className="text-xs text-muted-foreground">
+              <strong className="text-foreground">Need help?</strong> Copy the ad code snippet from your ad-network
+              publisher dashboard. The zone key and CDN URL are in the <code className="font-mono">src</code> attribute
+              of the <code className="font-mono">&lt;script&gt;</code> tag. For Adsterra banners, the zone key is in
+              the <code className="font-mono">atOptions</code> config object.
             </p>
           </div>
 

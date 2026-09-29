@@ -34,8 +34,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { adNetworkId, integrationType, siteIdentifier, zoneIdentifier, scriptReference } = body as {
-    adNetworkId: string; integrationType: string; siteIdentifier?: string; zoneIdentifier?: string; scriptReference?: string
+  const { adNetworkId, integrationType, siteIdentifier, zoneIdentifier, zoneKey, cdnUrl, formatOptions, scriptReference } = body as {
+    adNetworkId: string; integrationType: string; siteIdentifier?: string; zoneIdentifier?: string
+    zoneKey?: string; cdnUrl?: string; formatOptions?: { width?: number; height?: number; format?: string }
+    scriptReference?: string
   }
   if (!adNetworkId || !integrationType) {
     return NextResponse.json({ error: 'adNetworkId and integrationType required' }, { status: 400 })
@@ -46,10 +48,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Ad network not available' }, { status: 400 })
   }
 
-  // CRITICAL: never store raw user-supplied JavaScript. We accept only a "scriptReference"
-  // which is a sanitized identifier (e.g. a zone ID). The actual ad code is emitted by the
-  // server-side renderer using platform-controlled templates keyed off the integration type.
-  // This is per Chapter 7 of the spec — controlled Ad Integration System, no arbitrary JS.
+  // CRITICAL: never store raw user-supplied JavaScript. We accept only sanitized identifiers
+  // (zoneKey, cdnUrl, formatOptions). The actual ad code is emitted by the server-side AdRenderer
+  // using platform-controlled templates. This is per Chapter 7 of the spec.
   const integration = await db.adIntegration.create({
     data: {
       userId: user.id,
@@ -57,6 +58,9 @@ export async function POST(req: NextRequest) {
       integrationType: integrationType as any,
       siteIdentifier: siteIdentifier?.trim() || null,
       zoneIdentifier: zoneIdentifier?.trim() || null,
+      zoneKey: zoneKey?.trim() || null,
+      cdnUrl: cdnUrl?.trim() || null,
+      formatOptions: formatOptions ? JSON.stringify(formatOptions) : null,
       scriptReference: scriptReference?.trim() || null,
       lifecycleState: 'DRAFT',
     },

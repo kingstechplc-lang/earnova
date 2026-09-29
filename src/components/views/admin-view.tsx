@@ -20,14 +20,16 @@ import { UsersSection } from '@/components/admin/users-section'
 import { PagesSection } from '@/components/admin/pages-section'
 import { PlatformIntegrationsSection } from '@/components/admin/platform-integrations-section'
 import { ReviewsSection } from '@/components/admin/reviews-section'
+import { IntegrationsSection } from '@/components/admin/integrations-section'
 import type { View, CurrentUser } from '@/app/page'
 
-type Tab = 'overview' | 'campaigns' | 'platform-ads' | 'networks' | 'compatibility' | 'policy' | 'users' | 'pages' | 'reviews'
+type Tab = 'overview' | 'campaigns' | 'platform-ads' | 'networks' | 'compatibility' | 'policy' | 'users' | 'pages' | 'reviews' | 'integrations'
 
 const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; adminOnly?: boolean }> = [
   { id: 'overview', label: 'Overview', icon: <Activity className="h-4 w-4" /> },
   { id: 'campaigns', label: 'Campaigns', icon: <Megaphone className="h-4 w-4" /> },
   { id: 'platform-ads', label: 'Platform ads', icon: <Zap className="h-4 w-4" />, adminOnly: true },
+  { id: 'integrations', label: 'Integrations', icon: <Clock className="h-4 w-4" />, adminOnly: true },
   { id: 'networks', label: 'Ad networks', icon: <Network className="h-4 w-4" />, adminOnly: true },
   { id: 'compatibility', label: 'Compatibility', icon: <Sliders className="h-4 w-4" />, adminOnly: true },
   { id: 'policy', label: 'Policy', icon: <Sliders className="h-4 w-4" />, adminOnly: true },
@@ -178,6 +180,7 @@ export default function AdminView({
               {tab === 'overview' && stats && <AdminOverview stats={stats} events={events} />}
               {tab === 'campaigns' && <CampaignsSection />}
               {tab === 'platform-ads' && user.role === 'ADMIN' && <PlatformIntegrationsSection />}
+              {tab === 'integrations' && user.role === 'ADMIN' && <IntegrationsSection />}
               {tab === 'networks' && user.role === 'ADMIN' && <NetworksSection />}
               {tab === 'compatibility' && user.role === 'ADMIN' && <CompatibilitySection />}
               {tab === 'policy' && user.role === 'ADMIN' && <PolicySection initialPolicy={policy} />}
