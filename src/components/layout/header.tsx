@@ -53,7 +53,7 @@ export default function Header({
             <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-gold ring-2 ring-background animate-pulse-glow" />
           </span>
           <span className="flex flex-col leading-tight text-left">
-            <span className="text-sm font-bold tracking-tight text-foreground">PageNova</span>
+            <span className="text-sm font-bold tracking-tight text-foreground">Earnova</span>
             <span className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] flex items-center gap-1">
               <span className="h-1 w-1 rounded-full bg-evergreen animate-pulse" />
               Christmas 2026 · Live

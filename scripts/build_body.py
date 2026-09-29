@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-PageNova — Refined Architecture Specification
+Earnova — Refined Architecture Specification
 Body PDF generator (ReportLab). Cover is generated separately via Playwright
 and merged via pypdf.
 """
@@ -244,7 +244,7 @@ story.append(PageBreak())
 story.append(add_heading('Chapter 1 &nbsp;·&nbsp; Executive Summary', H1, level=0))
 
 story.append(Paragraph(
-    'This document refines the PageNova architecture by resolving six open '
+    'This document refines the Earnova architecture by resolving six open '
     'issues raised during the original concept review. Each issue is addressed with a '
     'concrete architectural decision, the data model changes required to support it, '
     'and the operational controls that must accompany it. The objective is to convert '
@@ -277,7 +277,7 @@ story.append(Paragraph(
 
 story.append(add_heading('1.1 &nbsp;What changes from the original concept', H2, level=1))
 story.append(Paragraph(
-    'The original concept proposed a "PAGENOVA" platform with an "Earn '
+    'The original concept proposed a "EARNOVA" platform with an "Earn '
     'Money" dashboard button, an ad-placement engine that allowed user ads and platform '
     'ads to coexist on the same page without constraint, a Trust Score field with no '
     'defined inputs, and no specified offboarding flow. Each of these is addressed in '
@@ -813,7 +813,7 @@ story.append(PageBreak())
 story.append(add_heading('Chapter 6 &nbsp;·&nbsp; Earnings-Claim Compliance Language', H1, level=0))
 
 story.append(Paragraph(
-    'The original concept used "PAGENOVA" as the product name and '
+    'The original concept used "EARNOVA" as the product name and '
     '"Earn Money" as the dashboard button label. Both create implied-earnings '
     'exposure under the U.S. Federal Trade Commission\'s endorsement rules '
     '(16 CFR Part 255) and analogous regimes in other jurisdictions. The FTC '
@@ -838,8 +838,8 @@ story.append(add_heading('6.1 &nbsp;Recommended language changes', H2, level=1))
 story.extend(make_table(
     [
         ['Original concept', 'Recommendation', 'Rationale'],
-        ['"PAGENOVA"',
-         '"PageNova" or "Creator Hub"',
+        ['"EARNOVA"',
+         '"Earnova" or "Creator Hub"',
          'Removes the earnings promise from the product name'],
         ['"Earn Money" button',
          '"Monetization" or "Ad Networks"',
@@ -1242,7 +1242,7 @@ def page_decorator(canvas, doc):
     canvas.setFont('FreeSerif', 8.5)
     canvas.setFillColor(TEXT_MUTED)
     canvas.drawString(LEFT_M, BOT_M / 2,
-                       'PageNova — Refined Architecture v2.0')
+                       'Earnova — Refined Architecture v2.0')
     canvas.drawRightString(PAGE_W - RIGHT_M, BOT_M / 2,
                             'Page %d' % doc.page)
     # Thin footer rule
@@ -1256,7 +1256,7 @@ doc = TocDocTemplate(
     pagesize=A4,
     leftMargin=LEFT_M, rightMargin=RIGHT_M,
     topMargin=TOP_M, bottomMargin=BOT_M,
-    title='PageNova — Refined Architecture v2.0',
+    title='Earnova — Refined Architecture v2.0',
     author='Z.ai',
     subject='Technical architecture refinement addressing 6 open issues',
 )

@@ -64,7 +64,7 @@ export default function LoginView({
                 <Sparkles className="h-4 w-4 relative z-10" />
                 <span className="absolute inset-0 bg-gradient-to-tr from-transparent via-gold/30 to-transparent animate-pulse" />
               </span>
-              <span className="font-bold">PageNova</span>
+              <span className="font-bold">Earnova</span>
             </motion.div>
             <CardTitle className="font-serif text-2xl">Welcome back</CardTitle>
             <CardDescription>Log in to manage your Special Pages.</CardDescription>
