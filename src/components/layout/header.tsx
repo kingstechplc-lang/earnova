@@ -1,10 +1,18 @@
 'use client'
 import { Button } from '@/components/ui/button'
 import { Sparkles, LayoutDashboard, Wallet, Shield, LogOut, Menu, X } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { View, CurrentUser } from '@/app/page'
 
+/*
+ * Header visual treatment
+ * ------------------------
+ * The public-pages header uses a warm cream glass (light mode) / evergreen
+ * glass (dark mode) with a slightly thicker gold accent line at the top.
+ * A small scroll listener toggles the .is-scrolled modifier to intensify
+ * the background and add a soft shadow after the user scrolls 8px down.
+ */
 export default function Header({
   user, view, navigate, onLogout,
 }: {
@@ -14,6 +22,15 @@ export default function Header({
   onLogout: () => void
 }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const navItem = (label: string, icon: React.ReactNode, target: View, current: boolean) => (
     <button
@@ -35,9 +52,9 @@ export default function Header({
   )
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70">
-      {/* Animated gold accent line */}
-      <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-gold/60 to-transparent" />
+    <header className={`sticky top-0 z-40 w-full border-b border-border/60 header-glass ${scrolled ? 'is-scrolled' : ''}`}>
+      {/* Slightly thicker, more vivid gold accent line */}
+      <div className="header-accent-line" />
 
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
@@ -47,15 +64,15 @@ export default function Header({
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
-          <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-evergreen to-evergreen-dark text-cream shadow-festive overflow-hidden">
+          <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-evergreen to-evergreen-dark text-cream shadow-festive overflow-hidden ring-1 ring-gold/30">
             <Sparkles className="h-4 w-4 relative z-10" />
             <span className="absolute inset-0 bg-gradient-to-tr from-transparent via-gold/30 to-transparent animate-pulse" />
-            <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-gold ring-2 ring-background animate-pulse-glow" />
+            <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-gold ring-2 ring-background live-pulse" />
           </span>
           <span className="flex flex-col leading-tight text-left">
             <span className="text-sm font-bold tracking-tight text-foreground">Earnova</span>
             <span className="text-[10px] text-muted-foreground uppercase tracking-[0.15em] flex items-center gap-1">
-              <span className="h-1 w-1 rounded-full bg-evergreen animate-pulse" />
+              <span className="h-1 w-1 rounded-full bg-evergreen live-pulse" />
               Christmas 2026 · Live
             </span>
           </span>
@@ -133,7 +150,7 @@ export default function Header({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25 }}
-            className="md:hidden overflow-hidden border-t border-border bg-background/95 backdrop-blur-xl"
+            className="md:hidden overflow-hidden border-t border-border bg-cream/95 dark:bg-evergreen-dark/95 backdrop-blur-xl"
           >
             <div className="container mx-auto px-4 py-3 flex flex-col gap-1">
               {user ? (

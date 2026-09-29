@@ -549,3 +549,27 @@ Stage Summary:
 - Admin "Slot config" tab gives full per-slot control: enable/disable, allowed integration types, assigned platform integration, default priority, visibility rule.
 - "Attach to page" UI in monetization-view lets creators attach their APPROVED integration to specific pages + slots.
 - All changes pushed to GitHub (commit 358e2e5).
+
+---
+Task ID: 12
+Agent: frontend-styling-expert
+Task: Redesign sidebar/footer/header with dedicated background colors + visual polish
+
+Work Log:
+- globals.css: Added new utility classes in `@layer components`:
+  - `.sidebar-bg` — vertical evergreen-dark→evergreen gradient + faint inline-SVG pine-needle texture, with `.dark` variant tuned for the dark-mode evergreen tokens.
+  - `.footer-bg` — forest-ink background with subtle gold (top-left) and berry (bottom-right) radial glows + a `::before` pine-needle scatter overlay; `.dark` variant included.
+  - `.footer-accent-line` — 3px tri-color gradient (evergreen → evergreen-light → gold → gold-dark → berry) with a soft gold box-shadow.
+  - `.header-glass` — warm cream glass (light mode) / evergreen glass (dark mode) with `inset 0 1px 0 gold` highlight and `.is-scrolled` modifier that intensifies the background and adds a soft shadow.
+  - `.header-accent-line` — 1.5px vivid gold gradient (was 1px translucent gold via-gold/60 line).
+  - `.mesh-bg-dark`, `.pine-texture`, `.gold-glow`, `.nav-pill-active`, `.dot-glow-evergreen`, `.live-pulse` + `@keyframes live-pulse-soft` supporting utilities.
+- sidebar.tsx: Replaced flat `bg-background/95 backdrop-blur-xl` on desktop and `bg-background` on mobile drawer with `.sidebar-bg`. Logo panel: gold ring on logo, `text-cream` brand text, `text-gold-light/70` tagline, and a thin gold accent line beneath the header. Active nav item: `.nav-pill-active` glass pill + gold left-border accent + `text-gold` active icon (inactive icons `text-cream/60`). User info card and Log out button restyled to read on dark evergreen (`text-cream`, `text-cream/50` for email, gold-tinted outline button). Mobile top bar + drawer match the desktop treatment.
+- footer.tsx: Replaced `bg-gradient-to-b from-background to-muted/40` with `.footer-bg`. Top accent line replaced with `.footer-accent-line`. Wrapped brand mark in `.gold-glow` for the soft radial halo behind the logo. Brand + section headings now `text-gold-light`, body copy `text-cream/70`, sub-footer `text-cream/60`, divider `border-cream/10`. Active campaign dot (Christmas 2026) uses `.dot-glow-evergreen`; system-status dot keeps its `.dot-glow-evergreen` halo and the existing `animate-pulse`.
+- header.tsx: Replaced `bg-background/80 backdrop-blur-xl` with `.header-glass` and added a `useEffect` scroll listener that toggles `.is-scrolled` after 8px of scroll (intensifies background + adds soft shadow). Top accent line swapped to `.header-accent-line` (1.5px, more vivid). Logo badge gets `ring-1 ring-gold/30`. The previously-referenced `animate-pulse-glow` class (which had no CSS definition) is replaced by a real `.live-pulse` utility on both the gold indicator dot and the evergreen "Live" dot — driving the new `live-pulse-soft` keyframe. Mobile menu now uses `bg-cream/95 dark:bg-evergreen-dark/95` so it stays consistent with the header glass.
+
+Stage Summary:
+- Sidebar, footer, header, and main content area each now have a DEDICATED background treatment — sidebar = deep evergreen forest panel with pine texture, footer = darkest forest-ink with tri-color accent line and gold halo, header = warm cream glass with gold scroll-activated intensification, main = the existing light content area.
+- Layered depth: gold radial glows, glass pills, glowing status dots, and gold accent lines create visual hierarchy without flashy animation.
+- Accessibility: cream/70 → cream text on evergreen-dark/forest-ink surfaces keeps contrast readable; light-mode header still uses semantic foreground tokens for body text.
+- All design changes are dark-mode safe via `.dark` variants in globals.css.
+- Verification: `bun run lint` ✓ clean, `bunx tsc --noEmit` ✓ clean, `bun run build` ✓ 30/30 pages generated successfully.
