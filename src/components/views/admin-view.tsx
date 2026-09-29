@@ -88,7 +88,12 @@ export default function AdminView({
   const visibleTabs = TABS.filter(t => !t.adminOnly || user.role === 'ADMIN')
 
   return (
-    <div className="view-fade container mx-auto px-4 py-6 max-w-5xl">
+    <div className="relative min-h-screen">
+      {/* Ambient background layer — consistent with dashboard/builder/monetization/views (Tasks 13/14) */}
+      <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" aria-hidden />
+      <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-20" />
+
+      <div className="relative z-10 view-fade container mx-auto px-4 py-6 max-w-5xl">
       {ConfettiLayer}
       <FadeIn>
         <div className="flex items-center gap-3 mb-6">
@@ -194,6 +199,7 @@ export default function AdminView({
           )}
         </motion.div>
       </AnimatePresence>
+      </div>
     </div>
   )
 }
