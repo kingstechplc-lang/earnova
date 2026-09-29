@@ -87,7 +87,7 @@ export function AdSlot({ placement, responsive = true }: { placement: Placement;
         // Parse the ad-tag HTML and inject scripts properly
         // (setting innerHTML doesn't execute <script> tags — we need to create them manually)
         const tempDiv = document.createElement('div')
-        tempDiv.innerHTML = placement.adTagHtml
+        tempDiv.innerHTML = placement.adTagHtml!
 
         // Inject non-script elements (links, divs, etc.)
         Array.from(tempDiv.children).forEach(child => {

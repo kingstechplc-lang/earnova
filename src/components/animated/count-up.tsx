@@ -22,7 +22,7 @@ export function CountUp({
 }) {
   const [display, setDisplay] = useState(0)
   const previousValue = useRef(0)
-  const rafId = useRef<number>()
+  const rafId = useRef<number>(0)
 
   useEffect(() => {
     const startValue = previousValue.current

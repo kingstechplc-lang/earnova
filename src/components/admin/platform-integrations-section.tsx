@@ -685,7 +685,7 @@ function ReasonDialog({
   title: string
   description: string
   variant: 'evergreen' | 'cranberry' | 'gold'
-  icon: React.ComponentType<{ className?: string }>
+  icon: React.ComponentType<{ className?: string }> | any
   confirmLabel: string
   onClose: () => void
   onSubmit: (text: string) => Promise<boolean>

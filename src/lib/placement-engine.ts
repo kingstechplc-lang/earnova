@@ -25,6 +25,8 @@ export type PlacementPolicySnapshot = {
   platformAdsEnabled: boolean
   userAdsEnabled: boolean
   globalKillSwitch: boolean
+  userAdFormatSelection: boolean
+  adSlotResponsive: boolean
 }
 
 export async function getActivePolicy(): Promise<PlacementPolicySnapshot> {
@@ -40,6 +42,8 @@ export async function getActivePolicy(): Promise<PlacementPolicySnapshot> {
     platformAdsEnabled: policy.platformAdsEnabled,
     userAdsEnabled: policy.userAdsEnabled,
     globalKillSwitch: policy.globalKillSwitch,
+    userAdFormatSelection: policy.userAdFormatSelection,
+    adSlotResponsive: policy.adSlotResponsive,
   }
 }
 

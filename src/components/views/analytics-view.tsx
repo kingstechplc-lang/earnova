@@ -289,7 +289,7 @@ function StatCard({ icon, value, label, accent, delay }: {
           {icon}
         </motion.div>
         <p className="text-3xl font-bold font-serif">
-          <CountUp value={value} duration={1500} delay={delay * 1000} />
+          <CountUp value={value} duration={1500} />
         </p>
         <p className="text-xs text-muted-foreground uppercase tracking-wide mt-1">{label}</p>
       </CardContent>

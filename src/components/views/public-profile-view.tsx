@@ -37,7 +37,7 @@ type CreatorProfile = {
   stats: { totalPages: number }
 }
 
-export function PublicProfileView({ username, navigate }: { username: string; navigate: (v: View) => void }) {
+export default function PublicProfileView({ username, navigate }: { username: string; navigate: (v: View) => void }) {
   const [profile, setProfile] = useState<CreatorProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

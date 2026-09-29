@@ -34,7 +34,7 @@ type ProfileData = {
   socialLinks: SocialLink[]
 }
 
-export function ProfileSetupView({ user, navigate }: { user: CurrentUser; navigate: (v: View) => void }) {
+export default function ProfileSetupView({ user, navigate }: { user: CurrentUser; navigate: (v: View) => void }) {
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -78,7 +78,7 @@ export function ProfileSetupView({ user, navigate }: { user: CurrentUser; naviga
       )
       setUsernameChecking(false)
       if (res.data) {
-        setUsernameAvailable(res.data.available)
+        setUsernameAvailable(res.data.available ?? false)
         if (!res.data.available && res.data.reason) {
           setUsernameError(res.data.reason)
           setUsernameSuggestions(res.data.suggestions || [])

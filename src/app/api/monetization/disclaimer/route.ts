@@ -14,7 +14,7 @@ By activating an ad integration, you acknowledge that you are solely responsible
 
 export async function GET() {
   const user = await getCurrentUser()
-  let ack = null
+  let ack: { id: string; userId: string; disclaimerVersion: string; acknowledgedAt: Date } | null = null
   if (user) {
     ack = await db.earningsDisclaimerAck.findFirst({
       where: { userId: user.id },
