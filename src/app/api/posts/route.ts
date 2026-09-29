@@ -147,5 +147,39 @@ export async function POST(req: NextRequest) {
     },
   })
 
+  // Auto-add platform + user ad placements based on AdSlotConfig defaults.
+  // Same logic as /api/pages POST — posts get the same ad slot treatment
+  // as Special Pages so creators can monetize their posts.
+  const { getEnabledSlotsForSource } = await import('@/lib/slot-config')
+  const platformSlots = await getEnabledSlotsForSource('PLATFORM_NETWORK')
+  const userSlots = await getEnabledSlotsForSource('USER_INTEGRATION')
+
+  const placementsData: Array<{
+    postId: string
+    source: 'PLATFORM_NETWORK' | 'USER_INTEGRATION'
+    slot: any
+    priority: number
+    enabled: boolean
+  }> = [
+    ...platformSlots.map(s => ({
+      postId: post.id,
+      source: 'PLATFORM_NETWORK' as const,
+      slot: s.slot,
+      priority: s.priority,
+      enabled: true,
+    })),
+    ...userSlots.map(s => ({
+      postId: post.id,
+      source: 'USER_INTEGRATION' as const,
+      slot: s.slot,
+      priority: s.priority,
+      enabled: true,
+    })),
+  ]
+
+  if (placementsData.length > 0) {
+    await db.adPlacement.createMany({ data: placementsData })
+  }
+
   return NextResponse.json({ post: { ...post, content } })
 }

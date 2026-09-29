@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -839,4 +840,132 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ─── Rich Text Editor + Public Post Content ──────────────────────────────
+   TipTap editor styles + rendered-content styles for public posts.
+   Uses @tailwindcss/typography for the prose base, with brand-aligned
+   customizations (evergreen headings, gold links, berry blockquotes).
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* TipTap editor instance — editable */
+.rich-text-editor .ProseMirror {
+  min-height: 300px;
+  outline: none;
+}
+
+.rich-text-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+.rich-text-editor .ProseMirror ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+}
+.rich-text-editor .ProseMirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.rich-text-editor .ProseMirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* Public post rendered content — read-only */
+.prose-content {
+  font-family: var(--font-sans);
+  line-height: 1.75;
+}
+.prose-content h1,
+.prose-content h2,
+.prose-content h3 {
+  font-family: var(--font-serif);
+  color: var(--evergreen-dark);
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+.prose-content h1 { font-size: 2em; }
+.prose-content h2 { font-size: 1.5em; }
+.prose-content h3 { font-size: 1.25em; }
+.prose-content p {
+  margin-bottom: 1em;
+}
+.prose-content a {
+  color: var(--evergreen);
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-underline-offset: 2px;
+  font-weight: 500;
+}
+.prose-content a:hover {
+  color: var(--evergreen-dark);
+}
+.prose-content blockquote {
+  border-left: 4px solid var(--berry);
+  padding-left: 1rem;
+  margin: 1.5em 0;
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+.prose-content code {
+  background: var(--muted);
+  color: var(--berry);
+  padding: 0.125em 0.375em;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  font-family: var(--font-mono);
+}
+.prose-content pre {
+  background: var(--forest-ink);
+  color: var(--cream);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1.5em 0;
+}
+.prose-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.prose-content ul,
+.prose-content ol {
+  padding-left: 1.5em;
+  margin-bottom: 1em;
+}
+.prose-content ul { list-style: disc; }
+.prose-content ol { list-style: decimal; }
+.prose-content ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+}
+.prose-content ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.25em;
+}
+.prose-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  margin: 1.5em auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.prose-content hr {
+  border: none;
+  border-top: 2px solid var(--border);
+  margin: 2em 0;
+}
+.prose-content mark {
+  background: color-mix(in oklch, var(--gold) 30%, transparent);
+  padding: 0.125em 0.25em;
+  border-radius: 0.25rem;
 }

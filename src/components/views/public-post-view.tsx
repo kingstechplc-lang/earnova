@@ -11,6 +11,8 @@ import { CountUp } from '@/components/animated/count-up'
 import { FadeIn } from '@/components/animated/motion'
 import { safeFetch } from '@/lib/safe-fetch'
 import { toast } from '@/hooks/use-toast'
+import { renderPostContent } from '@/lib/render-post-content'
+import { AdSlot } from '@/components/ad/ad-slot'
 import {
   Share2, ChevronLeft, AlertCircle, Eye, Heart, MessageCircle,
   Sparkles, Layers, Clock, Link as LinkIcon,
@@ -23,7 +25,10 @@ type PublicPost = {
   slug: string
   title: string
   excerpt: string | null
-  content: any[] | null
+  // Content is stored as a JSON string in the DB. The API parses it before
+  // returning, so the client receives either an old simple-block array or a
+  // new ProseMirror doc object (or null for empty posts).
+  content: any
   type: string
   visibility: string
   coverImage: string | null
@@ -49,6 +54,37 @@ type PublicPost = {
   campaign: { id: string; slug: string; title: string } | null
 }
 
+type Placement = {
+  id: string
+  slot: string
+  source: string
+  adNetworkCode: string
+  integrationType: string | null
+  scriptReference: string | null
+  priority: number
+  // Ad-tag metadata (enriched server-side by the API)
+  adTagHtml?: string
+  adTagDescription?: string
+  adTagType?: 'script' | 'link' | 'iframe'
+  adTagScriptSrc?: string
+  isLive?: boolean
+  formatOptions?: { width?: number; height?: number; format?: string } | null
+}
+
+type Policy = {
+  platformAdsEnabled: boolean
+  userAdsEnabled: boolean
+  globalKillSwitch: boolean
+  maxAdUnitsPerPage: number
+  adSlotResponsive?: boolean
+}
+
+type ApiResponse = {
+  post: PublicPost
+  placements: Placement[]
+  policy: Policy
+}
+
 const POST_TYPE_EMOJI: Record<string, string> = {
   TEXT: '📝', ARTICLE: '📰', IMAGE: '🖼️', GALLERY: '🎨', VIDEO: '🎬',
   LINK: '🔗', POLL: '📊', EVENT: '📅', ANNOUNCEMENT: '📢',
@@ -62,7 +98,7 @@ export default function PublicPostView({
   postId: string
   navigate: (v: View) => void
 }) {
-  const [post, setPost] = useState<PublicPost | null>(null)
+  const [data, setData] = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -71,12 +107,12 @@ export default function PublicPostView({
     ;(async () => {
       setLoading(true)
       setError('')
-      const res = await safeFetch<{ post?: PublicPost }>(`/api/post/${postId}`)
+      const res = await safeFetch<ApiResponse>(`/api/post/${postId}`)
       if (cancelled) return
       if (res.error) {
         setError(res.error)
       } else if (res.data?.post) {
-        setPost(res.data.post)
+        setData(res.data)
       } else {
         setError('Post not found.')
       }
@@ -123,7 +159,7 @@ export default function PublicPostView({
   }
 
   // ── Error state ────────────────────────────────────────────────────────
-  if (error || !post) {
+  if (error || !data) {
     return (
       <div className="relative min-h-screen">
         <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" aria-hidden />
@@ -153,6 +189,9 @@ export default function PublicPostView({
     )
   }
 
+  const { post, placements, policy } = data
+  const placementBySlot = (slot: string) => placements.find(p => p.slot === slot)
+
   const authorName = post.author.name || post.author.username || 'Anonymous'
   const authorInitial = authorName[0]?.toUpperCase() || '?'
   const publishedDate = post.publishedAt
@@ -166,7 +205,11 @@ export default function PublicPostView({
     .map(t => t.trim())
     .filter(Boolean)
 
-  const contentBlocks = Array.isArray(post.content) ? post.content : []
+  // Render the rich-text content via renderPostContent (handles ProseMirror
+  // JSON, old block arrays, and plain HTML — returns sanitized HTML).
+  // post.content from the API is the PARSED JSON object, so we stringify it
+  // before passing to renderPostContent (which expects a string).
+  const contentHtml = post.content ? renderPostContent(JSON.stringify(post.content)) : ''
 
   return (
     <div className="min-h-screen">
@@ -187,6 +230,18 @@ export default function PublicPostView({
               <ChevronLeft className="h-4 w-4 mr-1" /> Back to home
             </Button>
           </FadeIn>
+
+          {/* HEADER ad — above the article title */}
+          {placementBySlot('HEADER') && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="mb-6 bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm"
+            >
+              <AdSlot placement={placementBySlot('HEADER')!} responsive={policy?.adSlotResponsive ?? true} />
+            </motion.div>
+          )}
 
           {/* Cover image */}
           {post.coverImage && (
@@ -325,24 +380,33 @@ export default function PublicPostView({
             </motion.div>
           )}
 
-          {/* Content blocks */}
-          <div className="space-y-2">
-            {contentBlocks.length === 0 ? (
-              <p className="text-muted-foreground italic">This post has no content.</p>
-            ) : (
-              contentBlocks.map((block, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-50px' }}
-                  transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <ContentBlock block={block} />
-                </motion.div>
-              ))
-            )}
-          </div>
+          {/* AFTER_FIRST_BLOCK ad — placed right before the content (MVP:
+              rather than splitting the rendered HTML after the first paragraph,
+              we place it between the meta row and the article body). */}
+          {placementBySlot('AFTER_FIRST_BLOCK') && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              className="my-6 bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm"
+            >
+              <AdSlot placement={placementBySlot('AFTER_FIRST_BLOCK')!} responsive={policy?.adSlotResponsive ?? true} />
+            </motion.div>
+          )}
+
+          {/* Content body — rich-text HTML rendered via renderPostContent */}
+          {contentHtml ? (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="prose-content"
+              dangerouslySetInnerHTML={{ __html: contentHtml }}
+            />
+          ) : (
+            <p className="text-muted-foreground italic">This post has no content.</p>
+          )}
 
           {/* "View page this post belongs to" CTA */}
           {post.page && (
@@ -371,6 +435,18 @@ export default function PublicPostView({
                   <ChevronLeft className="h-4 w-4 rotate-180 text-evergreen" />
                 </CardContent>
               </Card>
+            </motion.div>
+          )}
+
+          {/* BEFORE_FOOTER ad — after the page CTA, before the share CTA */}
+          {placementBySlot('BEFORE_FOOTER') && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              className="my-6 bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm"
+            >
+              <AdSlot placement={placementBySlot('BEFORE_FOOTER')!} responsive={policy?.adSlotResponsive ?? true} />
             </motion.div>
           )}
 
@@ -407,48 +483,15 @@ export default function PublicPostView({
               </CardContent>
             </Card>
           </motion.div>
+
+          {/* FOOTER ad — after the share CTA */}
+          {placementBySlot('FOOTER') && (
+            <div className="mt-8 bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm">
+              <AdSlot placement={placementBySlot('FOOTER')!} responsive={policy?.adSlotResponsive ?? true} />
+            </div>
+          )}
         </article>
       </div>
     </div>
   )
-}
-
-// ── Content block renderer ────────────────────────────────────────────────
-function ContentBlock({ block }: { block: any }) {
-  const b = block || {}
-  switch (b.type) {
-    case 'heading': {
-      const level = b.level || 2
-      if (level === 1) {
-        return (
-          <h1 className="font-serif text-3xl md:text-4xl font-bold mt-10 mb-5 text-evergreen-dark">
-            {b.text}
-          </h1>
-        )
-      }
-      return (
-        <h2 className="font-serif text-2xl md:text-3xl font-bold mt-8 mb-4 text-evergreen-dark flex items-center gap-3">
-          <motion.span
-            initial={{ scale: 0 }}
-            whileInView={{ scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ type: 'spring', stiffness: 200 }}
-            className="h-2 w-2 rounded-full bg-gold anim-sparkle-pulse"
-          />
-          {b.text}
-        </h2>
-      )
-    }
-    case 'paragraph':
-      return (
-        <p className="text-base md:text-lg leading-relaxed mb-5 text-foreground/90">
-          {b.text}
-        </p>
-      )
-    default:
-      // Unknown block — render text if present, else nothing.
-      return b.text ? (
-        <p className="text-base md:text-lg leading-relaxed mb-5 text-foreground/90">{b.text}</p>
-      ) : null
-  }
 }

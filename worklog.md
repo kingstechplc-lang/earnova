@@ -758,3 +758,49 @@ Stage Summary:
 - PostEditorView is a full create/edit lifecycle: title + content + excerpt + cover + type + visibility + tags + collapsible SEO; sticky action bar with Save draft / Publish (100-particle confetti) / Schedule (datetime dialog) / Archive / Delete (AlertDialog confirm) / View public; MVP content editor uses a Textarea with Markdown-lite syntax (## for headings, blank lines between paragraphs) — content is converted to/from JSON block arrays via textToBlocks/blocksToText helpers.
 - PublicPostView renders a published post for visitors: branded glass-card loading state, cranberry Alert error state, ambient article container, gradient-text-evergreen title, author row with avatar + "View profile" link, engagement stat pills with CountUp, content blocks (paragraph + heading levels 1/2), optional "View page this post belongs to" card, and a Share CTA using Web Share API with clipboard fallback + toast notification.
 - All three views follow existing visual language (mesh-bg ambient + low-opacity FloatingOrbs, glass cards, gradient accents, brand palette, anim-pulse-glow / anim-sparkle-pulse / shimmer-bg / view-fade utilities) and use safeFetch for every API call — no raw fetch anywhere.
+
+---
+Task ID: 17
+Agent: subagent (post UI updater)
+Task: Update post-editor + public-post views for rich text + ads
+
+Work Log:
+- File 1: src/components/views/post-editor-view.tsx (modified, +79/-79 approx)
+  * Added import: `RichTextEditor` from `@/components/editor/rich-text-editor`.
+  * Removed the legacy `textToBlocks()` + `blocksToText()` helpers (Markdown-lite parsing is now handled by the TipTap editor + renderPostContent renderer — no longer needed client-side).
+  * Widened the `Post.content` type from `any[] | null` to `any` so it accepts both the old array format and the new ProseMirror doc object returned by the API.
+  * Renamed the form-state variable `contentText` (plain string) → `content` (ProseMirror JSON string) to match what the RichTextEditor's `onChange` emits and what the editor's `content` prop expects.
+  * Updated `hydrate()`: now sets `content` to `JSON.stringify(p.content)` when the API returns parsed JSON (object or array), or `''` for empty posts.
+  * Updated `handleSaveDraft()`: parses the JSON string back into an object before sending it to the API (the API does `JSON.stringify(content)` server-side, so the client must pass an object, not a string — otherwise it would double-stringify). Falls back to `null` if the editor is empty or parsing fails. Added `hydrate` to the useCallback dependency array (it was missing in the original — `hydrate` is stable so this is a no-op at runtime but satisfies the react-hooks exhaustive-deps rule).
+  * Replaced the content `<Textarea rows={10}>` + Markdown-lite hint paragraph with a `<RichTextEditor content={content} onChange={(json) => setContent(json)} minHeight={320} />` block.
+  * All other functionality preserved: title input, type selector, cover image + preview, visibility, tags with chip preview, excerpt textarea (with auto-gen hint), collapsible SEO section, sticky action bar (Save draft / Publish / Schedule / Archive / View public / Delete), status badge, saving/saved indicator, confetti on publish, dialogs, alerts, ambient layer.
+- File 2: src/components/views/public-post-view.tsx (modified, +110/-61 approx)
+  * Added imports: `renderPostContent` from `@/lib/render-post-content`, `AdSlot` from `@/components/ad/ad-slot`.
+  * Added new types `Placement`, `Policy`, `ApiResponse` to mirror the new `/api/post/[id]` response shape (post + placements + policy). Mirrored the same shape used by `public-page-view.tsx`.
+  * Widened `PublicPost.content` from `any[] | null` to `any` (the API returns either an old simple-block array or a new ProseMirror doc object).
+  * Replaced the `useState<PublicPost | null>` state with `useState<ApiResponse | null>` so the placements + policy can be stored alongside the post.
+  * Updated the `useEffect` fetch: now stores the full response object (which includes placements + policy) instead of just `res.data.post`.
+  * Removed the legacy `ContentBlock` helper function (handled all 3 old block types: heading/paragraph/default). Replaced with a single `<div className="prose-content" dangerouslySetInnerHTML={{ __html: contentHtml }} />` render. The `contentHtml` is computed once via `renderPostContent(JSON.stringify(post.content))` — `JSON.stringify` is needed because the API returns the parsed JSON object, but `renderPostContent` expects a string.
+  * Wrapped the content render in a `motion.div` with the same fade-up animation the old per-block renderer used.
+  * Added 4 AdSlot placements, all using the same `bg-card/60 backdrop-blur-sm rounded-2xl p-2 shadow-sm` wrapper as `public-page-view.tsx`:
+    - **HEADER** — above the article title (between the back link and the cover image).
+    - **AFTER_FIRST_BLOCK** — placed right before the content body (MVP: rather than splitting the rendered HTML after the first paragraph — which is hard with `dangerouslySetInnerHTML` — we place it between the tags row and the article body).
+    - **BEFORE_FOOTER** — after the "view page" CTA card, before the share CTA.
+    - **FOOTER** — after the share CTA (at the very bottom of the article).
+  * Each `<AdSlot>` receives `responsive={policy?.adSlotResponsive ?? true}`.
+  * All other functionality preserved: loading state, error state, cover image, type + campaign badges, title (gradient-text-evergreen), author row with avatar/profile-link, engagement stats (CountUp), tags, page-CTA card, share CTA card with SparklesComponent, ambient layer (mesh-bg + 1 FloatingOrbs).
+- Pre-existing TypeScript fixes in the new (untracked) TipTap files (needed for build to pass):
+  * `src/components/editor/rich-text-editor.tsx` line 37: changed `import TextStyle from '@tiptap/extension-text-style'` → `import { TextStyle } from '@tiptap/extension-text-style'`. TipTap v3.31.3 publishes TextStyle as a named export only (no default export). The sibling `FontFamily`, `Underline`, `Link`, `Image`, etc. still have default exports — only TextStyle lacks one.
+  * `src/components/editor/rich-text-editor.tsx` line 145: changed `editor.commands.setContent(content, false)` → `editor.commands.setContent(content, { emitUpdate: false })`. TipTap v3's `setContent` second arg is now a `SetContentOptions` object (with `emitUpdate?`, `errorOnInvalidContent?`, `parseOptions?`), not a boolean.
+  * `src/lib/render-post-content.ts` line 24: same TextStyle named-import fix as above.
+  * These three fixes were strictly necessary to make `bunx tsc --noEmit` and `bun run build` pass — without them the build fails with 3 TS errors in files the previous (orchestrator) task created.
+
+Stage Summary:
+- The post editor now uses the full TipTap-based RichTextEditor (toolbar with bold/italic/underline/strike, headings H1-H3, font family + size, text color + highlight, bullet/ordered/task lists, alignment, links, images, blockquotes, code, horizontal rule, undo/redo, character count). Content is stored as ProseMirror JSON (stringified), which is parsed back into an object before being sent to the API. The Markdown-lite `## ` heading syntax has been removed.
+- The public post view renders rich content via `renderPostContent()` (which handles ProseMirror JSON, the old simple-block array format, and plain HTML strings — backward-compatible with all existing posts). The output is sanitized HTML (TipTap `generateHTML()` + `DOMPurifyServer.sanitize()`) injected into a `.prose-content` div that's already styled in globals.css with evergreen headings, gold links, berry blockquotes, etc.
+- The public post view now renders up to 4 AdSlot components per page (HEADER / AFTER_FIRST_BLOCK / BEFORE_FOOTER / FOOTER), mirroring the pattern used by `public-page-view.tsx`. Each ad goes through the same engine (computeRenderedPlacements + slot config + platform-integration enrichment + visibility filtering) and uses iframe isolation for script-based ads to prevent the Adsterra `window.atOptions` global collision.
+- All existing functionality preserved: post create/edit, save draft / publish / schedule / archive / delete, confetti on publish, status badges, visibility selector, cover image + preview, tags, collapsible SEO, sticky action bar, public post loading/error states, author row, engagement stats (CountUp), page-CTA card, share CTA card.
+- Verification:
+  * `bun run lint` — passes (0 errors, exit 0).
+  * `bunx tsc --noEmit` — passes (0 errors, exit 0).
+  * `bun run build` (with DATABASE_URL prefix) — succeeds: "✓ Compiled successfully in 16.9s", "✓ Generating static pages using 1 worker (31/31) in 1107.1ms".

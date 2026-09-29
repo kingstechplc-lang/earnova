@@ -1,7 +1,7 @@
 // Placement Engine — enforces ad-network co-display rules per Chapter 2 of the spec.
-// Given a Special Page's intended placements, returns the subset that may render together.
+// Given a host's (SpecialPage OR Post) intended placements, returns the subset that may render together.
 import { db } from '@/lib/db'
-import type { AdPlacement, AdIntegration, AdNetwork, SpecialPage } from '@prisma/client'
+import type { AdPlacement, AdIntegration, AdNetwork, SpecialPage, Post } from '@prisma/client'
 import { getSlotConfigs, isIntegrationTypeAllowed, type SlotConfigRow } from '@/lib/slot-config'
 
 type PlacementWithRelations = AdPlacement & {
@@ -81,7 +81,7 @@ async function getCompatMatrix(): Promise<Map<string, string>> {
  * but this function returns metadata only — the caller decides how to render.
  */
 export async function computeRenderedPlacements(
-  page: SpecialPage,
+  _host: SpecialPage | Post,
   placements: PlacementWithRelations[],
   policy: PlacementPolicySnapshot
 ): Promise<RenderedPlacement[]> {

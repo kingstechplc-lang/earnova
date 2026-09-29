@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { RichTextEditor } from '@/components/editor/rich-text-editor'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -40,7 +41,12 @@ type Post = {
   slug: string
   title: string
   excerpt: string | null
-  content: any[] | null
+  // Content is stored as a JSON string in the DB. The API parses it before
+  // returning, so the client receives either:
+  //   - the old simple-block array [{type:'paragraph',text:'...'}]
+  //   - the new ProseMirror doc object {type:'doc',content:[...]}
+  //   - null for empty posts
+  content: any
   type: string
   status: PostStatus
   visibility: string
@@ -87,27 +93,8 @@ const STATUS_BADGE: Record<PostStatus, { label: string; cls: string }> = {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-/** Parse a plain-text content textarea value into a JSON array of content blocks. */
-function textToBlocks(text: string): Array<{ type: string; text: string; level?: number }> {
-  // Split on blank lines (one or more newlines)
-  const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
-  return paragraphs.map(p => {
-    // ## prefix → level-2 heading
-    if (p.startsWith('## ')) return { type: 'heading', text: p.slice(3).trim(), level: 2 }
-    if (p.startsWith('# '))  return { type: 'heading', text: p.slice(2).trim(), level: 1 }
-    return { type: 'paragraph', text: p }
-  })
-}
-
-/** Reverse: render content blocks back to plain text for editing. */
-function blocksToText(blocks: any[] | null): string {
-  if (!Array.isArray(blocks)) return ''
-  return blocks.map(b => {
-    if (b.type === 'heading' && b.level === 1) return `# ${b.text}`
-    if (b.type === 'heading') return `## ${b.text}`
-    return b.text || ''
-  }).join('\n\n')
-}
+// (Content parsing is now handled by the RichTextEditor + renderPostContent.
+// The old textToBlocks / blocksToText helpers have been removed.)
 
 // ── Component ───────────────────────────────────────────────────────────────
 export default function PostEditorView({
@@ -125,7 +112,9 @@ export default function PostEditorView({
 
   // Form state
   const [title, setTitle] = useState('')
-  const [contentText, setContentText] = useState('')
+  // Content is stored locally as a ProseMirror JSON string (matches what the
+  // RichTextEditor's onChange emits and what the API expects after JSON.parse).
+  const [content, setContent] = useState('')
   const [excerpt, setExcerpt] = useState('')
   const [type, setType] = useState('TEXT')
   const [coverImage, setCoverImage] = useState('')
@@ -153,7 +142,9 @@ export default function PostEditorView({
     setPost(p)
     setCurrentPostId(p.id)
     setTitle(p.title)
-    setContentText(blocksToText(p.content))
+    // API returns parsed JSON (array or object). Stringify it back so the
+    // RichTextEditor receives a JSON string as expected by its `content` prop.
+    setContent(p.content ? JSON.stringify(p.content) : '')
     setExcerpt(p.excerpt || '')
     setType(p.type)
     setCoverImage(p.coverImage || '')
@@ -206,7 +197,19 @@ export default function PostEditorView({
       return
     }
     setSaving(true)
-    const blocks = textToBlocks(contentText)
+
+    // The RichTextEditor stores content as a ProseMirror JSON string. The API
+    // expects a JS value (object/array) — it will JSON.stringify it for us.
+    // So we parse the string here. If the editor is empty / parse fails, fall
+    // back to null (the API stores '[]' in that case).
+    let contentPayload: any = null
+    if (content.trim()) {
+      try {
+        contentPayload = JSON.parse(content)
+      } catch {
+        contentPayload = null
+      }
+    }
 
     if (currentPostId) {
       // PATCH existing
@@ -214,7 +217,7 @@ export default function PostEditorView({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title, content: blocks, excerpt, type,
+          title, content: contentPayload, excerpt, type,
           coverImage, visibility, tags,
           seoTitle, seoDescription, ogImage,
         }),
@@ -232,7 +235,7 @@ export default function PostEditorView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title, content: blocks, excerpt, type, coverImage, visibility, tags,
+          title, content: contentPayload, excerpt, type, coverImage, visibility, tags,
         }),
       })
       setSaving(false)
@@ -247,7 +250,7 @@ export default function PostEditorView({
         setActionError(res.error)
       }
     }
-  }, [currentPostId, title, contentText, excerpt, type, coverImage, visibility, tags, seoTitle, seoDescription, ogImage])
+  }, [currentPostId, title, content, excerpt, type, coverImage, visibility, tags, seoTitle, seoDescription, ogImage, hydrate])
 
   // ── Publish ─────────────────────────────────────────────────────────────
   async function handlePublish() {
@@ -544,20 +547,16 @@ export default function PostEditorView({
                 </p>
               </div>
 
-              {/* Content editor (MVP: simple Textarea) */}
+              {/* Content editor — TipTap rich text */}
               <div>
                 <Label htmlFor="post-content" className="text-xs uppercase tracking-wide text-muted-foreground">Content</Label>
-                <Textarea
-                  id="post-content"
-                  value={contentText}
-                  onChange={e => setContentText(e.target.value)}
-                  rows={10}
-                  placeholder={'Write your post here. Separate paragraphs with a blank line.\n\n## Use double-hash for a heading'}
-                  className="mt-1 font-sans leading-relaxed"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Separate paragraphs with a blank line. Start a line with <code className="bg-muted/40 px-1 rounded">## </code> for a heading. Rich text editor coming soon.
-                </p>
+                <div className="mt-1">
+                  <RichTextEditor
+                    content={content}
+                    onChange={(json) => setContent(json)}
+                    minHeight={320}
+                  />
+                </div>
               </div>
 
               {/* Tags */}

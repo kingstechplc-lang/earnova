@@ -485,6 +485,7 @@ model Post {
   page            SpecialPage?  @relation(fields: [pageId], references: [id], onDelete: SetNull)
   campaign        Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   moderationEvents ModerationEvent[]
+  placements      AdPlacement[]
 
   @@unique([authorId, slug])   // post slug is unique per author (e.g. /@kingsley/my-first-post)
   @@index([authorId, status, publishedAt])  // feed query: author's published posts by date
@@ -580,7 +581,10 @@ enum IntegrationLifecycle {
 
 model AdPlacement {
   id              String   @id @default(cuid())
-  pageId          String
+  // An ad placement is attached to EITHER a SpecialPage OR a Post.
+  // (pageId XOR postId — exactly one must be set.)
+  pageId          String?
+  postId          String?
   integrationId   String?  // null if this is a platform placement
   source          PlacementSource
   slot            PlacementSlot
@@ -589,10 +593,12 @@ model AdPlacement {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  page            SpecialPage    @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  integration     AdIntegration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+  page            SpecialPage?    @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  post            Post?           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  integration     AdIntegration?  @relation(fields: [integrationId], references: [id], onDelete: SetNull)
 
   @@index([pageId])
+  @@index([postId])
   @@index([integrationId])
 }
 
