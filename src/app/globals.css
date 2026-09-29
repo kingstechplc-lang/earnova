@@ -969,3 +969,40 @@
   padding: 0.125em 0.25em;
   border-radius: 0.25rem;
 }
+
+/* Rich Text Editor resize handle + popup fixes */
+.rich-text-editor__body {
+  position: relative;
+}
+/* Custom resize handle at bottom-right */
+.rich-text-editor__body::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 50%,
+    var(--border) 50%,
+    var(--border) 60%,
+    transparent 60%,
+    transparent 70%,
+    var(--border) 70%,
+    var(--border) 80%,
+    transparent 80%
+  );
+  cursor: ns-resize;
+  pointer-events: none;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.rich-text-editor__body:hover::after {
+  opacity: 1;
+}
+/* Ensure the ProseMirror area fills the resizable container */
+.rich-text-editor__body .ProseMirror {
+  min-height: 100%;
+}

@@ -48,14 +48,45 @@ export default function Home() {
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
-      setUser(d.user)
+      const u = d.user
+      setUser(u)
+      // ── Restore the last view on page refresh ──────────────────────────
+      // Without this, a refresh always falls back to 'landing', which is
+      // jarring if you were editing a post or viewing your dashboard.
+      // We check sessionStorage for a saved view, but ONLY restore it if:
+      //   1. The user is logged in (for authenticated views)
+      //   2. The hash doesn't already specify a public route (#/p/, #/profile/, #/post/)
+      const hash = window.location.hash
+      const hasPublicHash = /^#\/(p|profile|post)\//.test(hash)
+      if (u && !hasPublicHash) {
+        try {
+          const saved = sessionStorage.getItem('earnova_view')
+          if (saved) {
+            const savedView = JSON.parse(saved) as View
+            // Only restore authenticated views (not login/signup/landing)
+            if (savedView.name && !['landing', 'login', 'signup'].includes(savedView.name)) {
+              setView(savedView)
+            }
+          }
+        } catch {
+          // Ignore parse errors — fall back to landing
+        }
+      }
       setLoading(false)
     })
   }, [])
 
   const navigate = useCallback((v: View) => {
     setView(v)
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+    // Persist the current view so a page refresh restores it
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('earnova_view', JSON.stringify(v))
+      } catch {
+        // Ignore storage errors (private mode, quota, etc.)
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }, [])
 
   // Hash-based deep linking for public pages, profiles, and posts
@@ -82,6 +113,9 @@ export default function Home() {
   const onLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     setUser(null)
+    // Clear the saved view so a refresh after logout doesn't restore an
+    // authenticated view (which would immediately redirect to landing anyway)
+    try { sessionStorage.removeItem('earnova_view') } catch {}
     navigate({ name: 'landing' })
   }
 

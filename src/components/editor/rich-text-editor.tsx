@@ -125,8 +125,7 @@ export function RichTextEditor({
     content: content ? safeParseJSON(content) : '<p></p>',
     editorProps: {
       attributes: {
-        class: 'prose prose-lg max-w-none focus:outline-none px-4 py-3 min-h-[' + minHeight + 'px]',
-        style: `min-height: ${minHeight}px`,
+        class: 'prose prose-lg max-w-none focus:outline-none px-4 py-3',
       },
     },
     onUpdate: ({ editor }) => {
@@ -156,9 +155,11 @@ export function RichTextEditor({
   }
 
   return (
-    <div className="rich-text-editor border border-border rounded-xl overflow-hidden bg-card/60 backdrop-blur-sm focus-within:ring-2 focus-within:ring-evergreen/30 transition-all">
+    <div className="rich-text-editor border border-border rounded-xl bg-card/60 backdrop-blur-sm focus-within:ring-2 focus-within:ring-evergreen/30 transition-all">
       <Toolbar editor={editor} />
-      <EditorContent editor={editor} />
+      <div className="rich-text-editor__body resize-y overflow-auto" style={{ minHeight: minHeight, maxHeight: '70vh' }}>
+        <EditorContent editor={editor} />
+      </div>
       <StatusBar editor={editor} />
     </div>
   )
@@ -221,8 +222,8 @@ function Toolbar({ editor }: { editor: Editor }) {
     }`
 
   return (
-    <div className="border-b border-border/60 bg-background/60 backdrop-blur-sm sticky top-0 z-10">
-      <div className="flex flex-wrap items-center gap-0.5 p-1.5">
+    <div className="border-b border-border/60 bg-background/60 backdrop-blur-sm relative z-10">
+      <div className="flex flex-wrap items-center gap-0.5 p-1.5 overflow-x-auto">
         {/* Undo/Redo */}
         <button onClick={() => editor.chain().focus().undo().run()} className={btn(false)} title="Undo">
           <Undo className="h-4 w-4" />
@@ -331,14 +332,15 @@ function Toolbar({ editor }: { editor: Editor }) {
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className="absolute top-9 left-0 z-20 p-2 rounded-lg border border-border bg-card shadow-elevated"
+                className="fixed top-auto z-50 p-2 rounded-lg border border-border bg-card shadow-elevated"
+                style={{ left: 'auto', right: 0 }}
               >
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-1.5">
                   {TEXT_COLORS.map(c => (
                     <button
                       key={c}
                       onClick={() => setTextColor(c)}
-                      className="h-6 w-6 rounded-md border border-border/40 hover:scale-110 transition-transform"
+                      className="h-7 w-7 rounded-md border border-border/40 hover:scale-110 transition-transform flex-shrink-0"
                       style={{ backgroundColor: c }}
                       title={c}
                     />
@@ -557,9 +559,44 @@ function StatusBar({ editor }: { editor: Editor }) {
 
 function safeParseJSON(s: string): any {
   try {
-    return JSON.parse(s)
+    const parsed = JSON.parse(s)
+    // If it's an array, it's the old simple-block format [{type:'paragraph',text:'...'}].
+    // TipTap expects a ProseMirror doc object {type:'doc', content:[...]}, not an array.
+    // Convert it to avoid a "Invalid content" crash.
+    if (Array.isArray(parsed)) {
+      return convertOldBlocksToDoc(parsed)
+    }
+    // If it's already a ProseMirror doc, use as-is
+    if (parsed && typeof parsed === 'object' && parsed.type === 'doc') {
+      return parsed
+    }
+    // If it's an HTML string (e.g. "<p>...</p>"), return as-is
+    return parsed
   } catch {
-    // If it's not JSON, treat it as HTML (backward compat with old Textarea content)
+    // Not JSON — treat as plain HTML string (backward compat)
     return s
   }
+}
+
+/**
+ * Convert the old simple-block format to a ProseMirror doc object.
+ * Old: [{ type: 'paragraph', text: '...' }, { type: 'heading', level: 2, text: '...' }]
+ * New: { type: 'doc', content: [{ type: 'paragraph', content: [{type:'text', text:'...'}] }, ...] }
+ */
+function convertOldBlocksToDoc(blocks: any[]): any {
+  const content = blocks.map((block: any) => {
+    if (block.type === 'heading') {
+      return {
+        type: 'heading',
+        attrs: { level: block.level || 2 },
+        content: block.text ? [{ type: 'text', text: block.text }] : [],
+      }
+    }
+    // Default: paragraph
+    return {
+      type: 'paragraph',
+      content: block.text ? [{ type: 'text', text: block.text }] : [],
+    }
+  })
+  return { type: 'doc', content }
 }

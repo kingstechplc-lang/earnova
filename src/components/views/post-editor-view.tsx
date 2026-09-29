@@ -626,10 +626,11 @@ export default function PostEditorView({
         </FadeIn>
       </div>
 
-      {/* Sticky action bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border/60 bg-background/85 backdrop-blur-lg">
+      {/* Sticky action bar — sticky instead of fixed so it stays within
+          the sidebar-aware content area and doesn't cover the sidebar */}
+      <div className="sticky bottom-0 z-30 border-t border-border/60 bg-background/85 backdrop-blur-lg">
         <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" aria-hidden />
-        <div className="container mx-auto px-4 py-3 max-w-4xl flex flex-wrap items-center gap-2">
+        <div className="px-4 py-3 flex flex-wrap items-center gap-2">
           <Button
             onClick={handleSaveDraft}
             disabled={saving || !title.trim()}
