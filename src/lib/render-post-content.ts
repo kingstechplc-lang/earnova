@@ -32,7 +32,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import Highlight from '@tiptap/extension-highlight'
 import { DOMPurifyServer } from '@/lib/dompurify-server'
 
-// Custom FontSize extension (same as in the editor)
+// Custom FontSize extension (same as in the editor — includes gradient support)
 const FontSize = TextStyle.extend({
   addAttributes() {
     return {
@@ -43,6 +43,17 @@ const FontSize = TextStyle.extend({
         renderHTML: (attributes: Record<string, any>) => {
           if (!attributes.fontSize) return {}
           return { style: `font-size: ${attributes.fontSize}` }
+        },
+      },
+      gradient: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-gradient') || null,
+        renderHTML: (attributes: Record<string, any>) => {
+          if (!attributes.gradient) return {}
+          return {
+            style: `background-image: ${attributes.gradient}; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;`,
+            'data-gradient': attributes.gradient,
+          }
         },
       },
     }

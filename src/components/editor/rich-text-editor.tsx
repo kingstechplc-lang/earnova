@@ -67,6 +67,19 @@ const FontSize = TextStyle.extend({
           return { style: `font-size: ${attributes.fontSize}` }
         },
       },
+      // Gradient text: stored as a `gradient` attribute on textStyle.
+      // Rendered as inline style with background-clip: text + transparent fill.
+      gradient: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-gradient') || null,
+        renderHTML: attributes => {
+          if (!attributes.gradient) return {}
+          return {
+            style: `background-image: ${attributes.gradient}; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;`,
+            'data-gradient': attributes.gradient,
+          }
+        },
+      },
     }
   },
 })
@@ -81,9 +94,21 @@ const FONT_FAMILIES = [
   { label: 'Inter', value: '"Inter", sans-serif' },
 ]
 const TEXT_COLORS = [
-  '#0f0f0f', '#374151', '#6b7280', '#dc2626', '#ea580c', '#d97706',
-  '#65a30d', '#16a34a', '#0891b2', '#2563eb', '#7c3aed', '#c026d3',
-  '#db2777', '#ffffff',
+  '#0f0f0f', '#374151', '#6b7280', '#dc2626', '#ea580c', '#d97706', '#65a30d',
+  '#16a34a', '#0891b2', '#2563eb', '#7c3aed', '#c026d3', '#db2777', '#ffffff',
+]
+
+// Gradient presets — applied via a custom inline style (background-clip: text).
+// The gradient is stored as a CSS `background-image` value on the span.
+const TEXT_GRADIENTS = [
+  { label: 'Evergreen-Gold',   value: 'linear-gradient(135deg, #0f4c3a 0%, #c89b3c 100%)' },
+  { label: 'Gold-Berry',        value: 'linear-gradient(135deg, #c89b3c 0%, #b8345d 100%)' },
+  { label: 'Berry-Cranberry',   value: 'linear-gradient(135deg, #b8345d 0%, #d63d24 100%)' },
+  { label: 'Ocean-Gold',        value: 'linear-gradient(135deg, #0891b2 0%, #c89b3c 100%)' },
+  { label: 'Purple-Pink',       value: 'linear-gradient(135deg, #7c3aed 0%, #db2777 100%)' },
+  { label: 'Sunset',            value: 'linear-gradient(135deg, #d97706 0%, #dc2626 50%, #c026d3 100%)' },
+  { label: 'Forest-Sage',       value: 'linear-gradient(135deg, #0f4c3a 0%, #8b9d77 100%)' },
+  { label: 'Rainbow',           value: 'linear-gradient(135deg, #dc2626 0%, #d97706 25%, #65a30d 50%, #0891b2 75%, #7c3aed 100%)' },
 ]
 
 type RichTextEditorProps = {
@@ -125,7 +150,7 @@ export function RichTextEditor({
     content: content ? safeParseJSON(content) : '<p></p>',
     editorProps: {
       attributes: {
-        class: 'prose prose-lg max-w-none focus:outline-none px-4 py-3',
+        class: 'rich-text-editor-content focus:outline-none px-4 py-3',
       },
     },
     onUpdate: ({ editor }) => {
@@ -210,8 +235,19 @@ function Toolbar({ editor }: { editor: Editor }) {
   }, [editor])
 
   const setTextColor = useCallback((color: string) => {
-    editor.chain().focus().setColor(color).run()
+    // Clear any gradient first, then apply solid color
+    editor.chain().focus().setMark('textStyle', { color, gradient: null }).run()
     setColorOpen(false)
+  }, [editor])
+
+  const setTextGradient = useCallback((gradient: string) => {
+    // Gradient text: set a custom `gradient` attribute on textStyle + clear solid color
+    editor.chain().focus().setMark('textStyle', { color: null, gradient }).run()
+    setColorOpen(false)
+  }, [editor])
+
+  const setCustomColor = useCallback((color: string) => {
+    editor.chain().focus().setMark('textStyle', { color, gradient: null }).run()
   }, [editor])
 
   const btn = (active: boolean) =>
@@ -317,12 +353,12 @@ function Toolbar({ editor }: { editor: Editor }) {
 
         <Divider />
 
-        {/* Text color */}
+        {/* Text color + gradient picker */}
         <div className="relative">
           <button
             onClick={() => setColorOpen(!colorOpen)}
             className={btn(false)}
-            title="Text color"
+            title="Text color & gradients"
           >
             <Palette className="h-4 w-4" />
           </button>
@@ -332,9 +368,11 @@ function Toolbar({ editor }: { editor: Editor }) {
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className="fixed top-auto z-50 p-2 rounded-lg border border-border bg-card shadow-elevated"
+                className="fixed top-auto z-50 p-3 rounded-lg border border-border bg-card shadow-elevated w-[280px]"
                 style={{ left: 'auto', right: 0 }}
               >
+                {/* Solid colors */}
+                <div className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5">Solid Colors</div>
                 <div className="grid grid-cols-7 gap-1.5">
                   {TEXT_COLORS.map(c => (
                     <button
@@ -346,11 +384,52 @@ function Toolbar({ editor }: { editor: Editor }) {
                     />
                   ))}
                 </div>
+
+                {/* Custom color picker */}
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="color"
+                    onChange={e => setCustomColor(e.target.value)}
+                    className="h-8 w-8 rounded-md border border-border/40 cursor-pointer flex-shrink-0"
+                    title="Pick a custom color"
+                  />
+                  <input
+                    type="text"
+                    placeholder="#000000"
+                    onChange={e => { if (/^#[0-9a-fA-F]{6}$/.test(e.target.value)) setCustomColor(e.target.value) }}
+                    className="flex-1 h-8 px-2 rounded-md border border-border/60 bg-background text-xs font-mono"
+                    title="Enter hex color"
+                  />
+                  <button
+                    onClick={() => setColorOpen(false)}
+                    className="h-8 px-2 rounded-md bg-evergreen text-cream text-xs font-medium hover:bg-evergreen-dark flex-shrink-0"
+                  >
+                    Done
+                  </button>
+                </div>
+
+                {/* Gradient presets */}
+                <div className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mt-3 mb-1.5">Gradients</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {TEXT_GRADIENTS.map(g => (
+                    <button
+                      key={g.label}
+                      onClick={() => setTextGradient(g.value)}
+                      className="h-8 rounded-md border border-border/40 hover:scale-105 transition-transform flex items-center justify-center text-[10px] font-bold text-white text-shadow"
+                      style={{ backgroundImage: g.value, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
+                      title={g.label}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Reset */}
                 <button
-                  onClick={() => { editor.chain().focus().unsetColor().run(); setColorOpen(false) }}
-                  className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground px-2 py-1"
+                  onClick={() => { editor.chain().focus().setMark('textStyle', { color: null, gradient: null }).run(); setColorOpen(false) }}
+                  className="mt-2 w-full text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-md hover:bg-muted/40"
                 >
-                  Reset color
+                  Reset to default
                 </button>
               </motion.div>
             )}

@@ -45,7 +45,7 @@ export const DOMPurifyServer = {
       ALLOWED_ATTR: [
         'href', 'target', 'rel', 'title', 'alt', 'src', 'srcset',
         'width', 'height', 'class', 'id', 'style',
-        'data-type', 'data-level', 'data-checked',
+        'data-type', 'data-level', 'data-checked', 'data-gradient',
         'colspan', 'rowspan', 'scope', 'headers',
         'type', 'checked', 'disabled', // for task list checkboxes
       ],

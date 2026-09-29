@@ -46,50 +46,104 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
+  // ── Single source of truth for initial view ─────────────────────────────
+  // Combines auth check + hash routing + sessionStorage restore into ONE
+  // effect so there's no race condition between them.
+  //
+  // Priority on initial load:
+  //   1. Public hash in URL (#/p/, #/profile/, #/post/) → navigate to that public view
+  //   2. Logged in + saved view in sessionStorage → restore that view
+  //   3. Logged in + no saved view → dashboard
+  //   4. Not logged in → landing
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => {
-      const u = d.user
+    let cancelled = false
+    ;(async () => {
+      let u: CurrentUser | null = null
+      try {
+        const res = await fetch('/api/auth/me')
+        const d = await res.json()
+        u = d.user
+      } catch {
+        // Network error — treat as not logged in
+      }
+      if (cancelled) return
       setUser(u)
-      // ── Restore the last view on page refresh ──────────────────────────
-      // Without this, a refresh always falls back to 'landing', which is
-      // jarring if you were editing a post or viewing your dashboard.
-      // We check sessionStorage for a saved view, but ONLY restore it if:
-      //   1. The user is logged in (for authenticated views)
-      //   2. The hash doesn't already specify a public route (#/p/, #/profile/, #/post/)
-      const hash = window.location.hash
-      const hasPublicHash = /^#\/(p|profile|post)\//.test(hash)
-      if (u && !hasPublicHash) {
+
+      const hash = typeof window !== 'undefined' ? window.location.hash : ''
+      const pageMatch = hash.match(/^#\/p\/(.+)$/)
+      const profileMatch = hash.match(/^#\/profile\/(.+)$/)
+      const postMatch = hash.match(/^#\/post\/(.+)$/)
+
+      if (pageMatch) {
+        setView({ name: 'public', slug: decodeURIComponent(pageMatch[1]) })
+      } else if (profileMatch) {
+        setView({ name: 'public-profile', username: decodeURIComponent(profileMatch[1]) })
+      } else if (postMatch) {
+        setView({ name: 'public-post', postId: decodeURIComponent(postMatch[1]) })
+      } else if (u) {
+        // Logged in, no public hash — restore from sessionStorage
         try {
           const saved = sessionStorage.getItem('earnova_view')
           if (saved) {
             const savedView = JSON.parse(saved) as View
-            // Only restore authenticated views (not login/signup/landing)
             if (savedView.name && !['landing', 'login', 'signup'].includes(savedView.name)) {
               setView(savedView)
+            } else {
+              setView({ name: 'dashboard' })
             }
+          } else {
+            setView({ name: 'dashboard' })
           }
         } catch {
-          // Ignore parse errors — fall back to landing
+          setView({ name: 'dashboard' })
         }
+      } else {
+        // Not logged in, no hash → landing
+        setView({ name: 'landing' })
       }
+
       setLoading(false)
-    })
+    })()
+    return () => { cancelled = true }
   }, [])
 
   const navigate = useCallback((v: View) => {
     setView(v)
-    // Persist the current view so a page refresh restores it
     if (typeof window !== 'undefined') {
+      // Persist to sessionStorage so a refresh restores this view
       try {
         sessionStorage.setItem('earnova_view', JSON.stringify(v))
       } catch {
         // Ignore storage errors (private mode, quota, etc.)
       }
+
+      // ── Update/clear the URL hash ──────────────────────────────────────
+      // Public views get a shareable hash (#/p/slug, #/profile/username, #/post/id).
+      // Authenticated views (dashboard, posts, builder, etc.) CLEAR the hash so
+      // a refresh doesn't redirect back to a previously-visited public page.
+      let newHash = ''
+      if (v.name === 'public') newHash = `#/p/${v.slug}`
+      else if (v.name === 'public-profile') newHash = `#/profile/${v.username}`
+      else if (v.name === 'public-post') newHash = `#/post/${v.postId}`
+
+      const currentHash = window.location.hash
+      if (newHash !== currentHash) {
+        // Use replaceState (NOT pushState) so the browser's back button
+        // doesn't get cluttered with hash changes. replaceState also
+        // doesn't trigger the hashchange event, avoiding a re-navigate loop.
+        const newUrl = newHash
+          ? `${window.location.pathname}${window.location.search}${newHash}`
+          : `${window.location.pathname}${window.location.search}`
+        window.history.replaceState(null, '', newUrl)
+      }
+
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }, [])
 
-  // Hash-based deep linking for public pages, profiles, and posts
+  // ── Hashchange listener (browser back/forward + manual URL changes) ─────
+  // Only fires on hashchange events AFTER initial load — the initial hash
+  // is handled by the auth effect above.
   useEffect(() => {
     const handleHash = () => {
       const h = window.location.hash
@@ -100,7 +154,6 @@ export default function Home() {
       if (profileMatch) navigate({ name: 'public-profile', username: decodeURIComponent(profileMatch[1]) })
       if (postMatch) navigate({ name: 'public-post', postId: decodeURIComponent(postMatch[1]) })
     }
-    handleHash()
     window.addEventListener('hashchange', handleHash)
     return () => window.removeEventListener('hashchange', handleHash)
   }, [navigate])
