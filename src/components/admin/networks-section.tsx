@@ -232,7 +232,7 @@ function NetworkDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg p-0 overflow-hidden" showCloseButton={false}>
+      <DialogContent className="max-w-lg p-0 overflow-hidden max-h-[90vh] flex flex-col" showCloseButton={false}>
         <GradientDialogHeader
           variant={network ? 'gold' : 'evergreen'}
           icon={network ? Edit3 : Plus}
@@ -240,7 +240,7 @@ function NetworkDialog({
           description={network ? 'Update network configuration, integration types, and status.' : 'Register a new ad network that creators can connect to.'}
           onClose={onClose}
         />
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Code</Label>

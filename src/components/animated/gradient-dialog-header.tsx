@@ -87,7 +87,7 @@ export function GradientDialogHeader({
 }) {
   const v = VARIANTS[variant]
   return (
-    <div className={`relative overflow-hidden rounded-t-lg ${v.bg} ${v.text}`}>
+    <div className={`relative overflow-hidden rounded-t-lg ${v.bg} ${v.text} flex-shrink-0`}>
       {/* Decorative pattern overlay */}
       <div
         className="absolute inset-0 opacity-20"

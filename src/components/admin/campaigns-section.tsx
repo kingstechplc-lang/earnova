@@ -245,7 +245,7 @@ function CampaignDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg p-0 overflow-hidden" showCloseButton={false}>
+      <DialogContent className="max-w-lg p-0 overflow-hidden max-h-[90vh] flex flex-col" showCloseButton={false}>
         <GradientDialogHeader
           variant={campaign ? 'gold' : 'evergreen'}
           icon={campaign ? Edit3 : Plus}
@@ -253,7 +253,7 @@ function CampaignDialog({
           description={campaign ? 'Update campaign details, dates, and visibility.' : 'Define a new themed season for creators to build pages around.'}
           onClose={onClose}
         />
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Slug</Label>

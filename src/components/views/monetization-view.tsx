@@ -384,7 +384,7 @@ function CreateIntegrationDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg p-0 overflow-hidden" showCloseButton={false}>
+      <DialogContent className="max-w-lg p-0 overflow-hidden max-h-[90vh] flex flex-col" showCloseButton={false}>
         <GradientDialogHeader
           variant="festive"
           icon={Plus}
@@ -393,7 +393,7 @@ function CreateIntegrationDialog({
           onClose={onClose}
         />
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div>
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Ad network</Label>
             <Select value={networkId} onValueChange={(v) => { setNetworkId(v); setIntegrationType('') }}>

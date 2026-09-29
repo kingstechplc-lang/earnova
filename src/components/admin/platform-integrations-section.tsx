@@ -529,7 +529,7 @@ function IntegrationDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg p-0 overflow-hidden" showCloseButton={false}>
+      <DialogContent className="max-w-lg p-0 overflow-hidden max-h-[90vh] flex flex-col" showCloseButton={false}>
         <GradientDialogHeader
           variant={integration ? 'gold' : 'evergreen'}
           icon={integration ? Edit3 : Plus}
@@ -537,7 +537,7 @@ function IntegrationDialog({
           description={integration ? 'Update the zone ID and script reference. Note: changing these resets verification.' : 'Configure your platform\'s own ad-network publisher account so it can serve ads on Special Pages.'}
           onClose={onClose}
         />
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div>
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Ad network</Label>
             <Select value={adNetworkId} onValueChange={setAdNetworkId} disabled={!!integration}>
@@ -710,14 +710,14 @@ function ReasonDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-md p-0 overflow-hidden" showCloseButton={false}>
+      <DialogContent className="max-w-md p-0 overflow-hidden max-h-[90vh] flex flex-col" showCloseButton={false}>
         <GradientDialogHeader
           variant={variant === 'cranberry' ? 'cranberry' : variant === 'gold' ? 'gold' : 'evergreen'}
           icon={Icon}
           title={title}
           onClose={onClose}
         />
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           <p className="text-sm text-muted-foreground">{description}</p>
           <div>
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">

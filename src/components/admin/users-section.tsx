@@ -254,7 +254,7 @@ function UserDetailDialog({
   const hasBannedPages = user.pages.some(p => p.moderationState === 'BANNED')
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden" showCloseButton>
+      <DialogContent className="max-w-2xl p-0 overflow-hidden max-h-[90vh] flex flex-col" showCloseButton>
         <div className="h-1.5 w-full bg-gradient-to-r from-evergreen via-gold to-berry" />
         <DialogHeader className="p-6 pb-3">
           <DialogTitle className="font-serif text-xl flex items-center gap-2">
@@ -267,7 +267,7 @@ function UserDetailDialog({
             <Mail className="h-3 w-3" /> {user.email} · joined {new Date(user.createdAt).toLocaleDateString()}
           </DialogDescription>
         </DialogHeader>
-        <div className="px-6 pb-2 max-h-[60vh] overflow-y-auto space-y-4">
+        <div className="px-6 pb-2 overflow-y-auto flex-1 min-h-0 space-y-4">
           {/* Pages */}
           <div>
             <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">

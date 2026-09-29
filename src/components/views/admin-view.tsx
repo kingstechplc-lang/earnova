@@ -19,6 +19,7 @@ import { PolicySection } from '@/components/admin/policy-section'
 import { UsersSection } from '@/components/admin/users-section'
 import { PagesSection } from '@/components/admin/pages-section'
 import { PlatformIntegrationsSection } from '@/components/admin/platform-integrations-section'
+import { ReviewsSection } from '@/components/admin/reviews-section'
 import type { View, CurrentUser } from '@/app/page'
 
 type Tab = 'overview' | 'campaigns' | 'platform-ads' | 'networks' | 'compatibility' | 'policy' | 'users' | 'pages' | 'reviews'
@@ -188,19 +189,5 @@ export default function AdminView({
         </motion.div>
       </AnimatePresence>
     </div>
-  )
-}
-
-// Inline reviews section (kept here for simplicity — same as before but uses the existing /api/admin/pending route)
-function ReviewsSection() {
-  return (
-    <Card>
-      <CardContent className="py-4">
-        <p className="text-sm text-muted-foreground">
-          The &quot;Reviews&quot; tab content is now on the &quot;Pages&quot; tab — pick a page and change its moderation state.
-          Ad-integration reviews are available on the user detail panel (Users tab → click chevron).
-        </p>
-      </CardContent>
-    </Card>
   )
 }

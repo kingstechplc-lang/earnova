@@ -266,7 +266,7 @@ function RuleDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg p-0 overflow-hidden" showCloseButton={false}>
+      <DialogContent className="max-w-lg p-0 overflow-hidden max-h-[90vh] flex flex-col" showCloseButton={false}>
         <GradientDialogHeader
           variant={rule ? 'gold' : 'evergreen'}
           icon={rule ? Edit3 : Plus}
@@ -274,7 +274,7 @@ function RuleDialog({
           description={rule ? 'Update the verdict and limits for this network pair.' : 'Define whether two ad networks may render on the same Special Page.'}
           onClose={onClose}
         />
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           {!rule && (
             <div className="grid grid-cols-2 gap-3">
               <div>
