@@ -17,6 +17,7 @@ model User {
   email           String   @unique
   name            String?
   username        String?  @unique   // globally unique handle (e.g. "kingsley")
+  usernameLower   String?  @unique   // case-insensitive lookup field
   passwordHash    String?
   image           String?
   coverImage      String?
@@ -28,6 +29,9 @@ model User {
   emailVerified   DateTime?
   twoFactorSecret String?
   twoFactorEnabled Boolean @default(false)
+  profileVisibility ProfileVisibility @default(PUBLIC)
+  interests       String?  // JSON array of interest tags
+  website         String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -40,9 +44,44 @@ model User {
   emailVerifications EmailVerificationToken[]
   passwordResets  PasswordResetToken[]
   auditLogs       AuditLog[]
+  socialLinks     SocialLink[]
+  profileViews    ProfileView[]
 
   @@index([role])
   @@index([emailVerified])
+  @@index([usernameLower])
+}
+
+enum ProfileVisibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+model SocialLink {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform     String   // "twitter", "instagram", "youtube", "facebook", "tiktok", "telegram", "website"
+  url          String
+  label        String?
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, platform])
+  @@index([userId])
+}
+
+model ProfileView {
+  id           String   @id @default(cuid())
+  profileOwnerId String
+  profileOwner  User     @relation(fields: [profileOwnerId], references: [id], onDelete: Cascade)
+  visitorId    String?  // Earnova user ID if logged in, null for anonymous
+  viewedAt     DateTime @default(now())
+  source       String?  // "direct", "search", "social", "earnova"
+  country      String?
+
+  @@index([profileOwnerId, viewedAt])
 }
 
 enum UserRole {

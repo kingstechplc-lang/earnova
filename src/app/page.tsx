@@ -12,6 +12,8 @@ import MonetizationView from '@/components/views/monetization-view'
 import AdminView from '@/components/views/admin-view'
 import PublicPageView from '@/components/views/public-page-view'
 import AnalyticsView from '@/components/views/analytics-view'
+import ProfileSetupView from '@/components/views/profile-setup-view'
+import PublicProfileView from '@/components/views/public-profile-view'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import Sidebar from '@/components/layout/sidebar'
@@ -26,6 +28,8 @@ export type View =
   | { name: 'analytics'; pageId: string }
   | { name: 'admin' }
   | { name: 'public'; slug: string }
+  | { name: 'profile-setup' }
+  | { name: 'public-profile'; username: string }
 
 export type CurrentUser = { id: string; email: string; name: string | null; role: string }
 
@@ -47,12 +51,14 @@ export default function Home() {
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
-  // Hash-based deep linking for public pages: #/p/<slug>
+  // Hash-based deep linking for public pages + profiles
   useEffect(() => {
     const handleHash = () => {
       const h = window.location.hash
-      const m = h.match(/^#\/p\/(.+)$/)
-      if (m) navigate({ name: 'public', slug: decodeURIComponent(m[1]) })
+      const pageMatch = h.match(/^#\/p\/(.+)$/)
+      const profileMatch = h.match(/^#\/profile\/(.+)$/)
+      if (pageMatch) navigate({ name: 'public', slug: decodeURIComponent(pageMatch[1]) })
+      if (profileMatch) navigate({ name: 'public-profile', username: decodeURIComponent(profileMatch[1]) })
     }
     handleHash()
     window.addEventListener('hashchange', handleHash)
@@ -82,7 +88,7 @@ export default function Home() {
   }
 
   // Determine if we should show the sidebar (authenticated + non-public views)
-  const showSidebar = user && view.name !== 'landing' && view.name !== 'login' && view.name !== 'signup' && view.name !== 'public'
+  const showSidebar = user && view.name !== 'landing' && view.name !== 'login' && view.name !== 'signup' && view.name !== 'public' && view.name !== 'public-profile'
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
@@ -103,6 +109,7 @@ export default function Home() {
                 {view.name === 'builder' && user && <BuilderView pageId={view.pageId} user={user} navigate={navigate} />}
                 {view.name === 'monetization' && user && <MonetizationView user={user} navigate={navigate} />}
                 {view.name === 'analytics' && user && <AnalyticsView pageId={view.pageId} user={user} navigate={navigate} />}
+                {view.name === 'profile-setup' && user && <ProfileSetupView user={user} navigate={navigate} />}
                 {view.name === 'admin' && user && (user.role === 'ADMIN' || user.role === 'MODERATOR') && (
                   <AdminView user={user} navigate={navigate} />
                 )}
@@ -120,6 +127,7 @@ export default function Home() {
               {view.name === 'login' && <LoginView onAuth={onAuth} navigate={navigate} />}
               {view.name === 'signup' && <SignupView onAuth={onAuth} navigate={navigate} />}
               {view.name === 'public' && <PublicPageView slug={view.slug} navigate={navigate} />}
+              {view.name === 'public-profile' && <PublicProfileView username={view.username} navigate={navigate} />}
             </PageTransition>
           </main>
           <Footer />

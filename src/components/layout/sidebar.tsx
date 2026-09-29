@@ -20,6 +20,7 @@ export default function Sidebar({
 }) {
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, target: { name: 'dashboard' } as View, active: view.name === 'dashboard' || view.name === 'builder' || view.name === 'analytics' },
+    { label: 'Profile', icon: SparklesIcon, target: { name: 'profile-setup' } as View, active: view.name === 'profile-setup' },
     { label: 'Monetization', icon: Wallet, target: { name: 'monetization' } as View, active: view.name === 'monetization' },
   ]
   if (user.role === 'ADMIN' || user.role === 'MODERATOR') {
@@ -171,6 +172,7 @@ function MobileDrawer({
 
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, target: { name: 'dashboard' } as View, active: view.name === 'dashboard' || view.name === 'builder' || view.name === 'analytics' },
+    { label: 'Profile', icon: SparklesIcon, target: { name: 'profile-setup' } as View, active: view.name === 'profile-setup' },
     { label: 'Monetization', icon: Wallet, target: { name: 'monetization' } as View, active: view.name === 'monetization' },
   ]
   if (user.role === 'ADMIN' || user.role === 'MODERATOR') {
