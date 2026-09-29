@@ -1,5 +1,6 @@
 // Single-page application: all views render at "/" with client-side view-state navigation.
 // Public Special Page is fetched via /api/p/[slug] and rendered in a "view" panel.
+// Public Post is fetched via /api/post/[id] and rendered in a "view" panel.
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { PageTransition } from '@/components/animated/motion'
@@ -14,6 +15,9 @@ import PublicPageView from '@/components/views/public-page-view'
 import AnalyticsView from '@/components/views/analytics-view'
 import ProfileSetupView from '@/components/views/profile-setup-view'
 import PublicProfileView from '@/components/views/public-profile-view'
+import PostsView from '@/components/views/posts-view'
+import PostEditorView from '@/components/views/post-editor-view'
+import PublicPostView from '@/components/views/public-post-view'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import Sidebar from '@/components/layout/sidebar'
@@ -30,6 +34,9 @@ export type View =
   | { name: 'public'; slug: string }
   | { name: 'profile-setup' }
   | { name: 'public-profile'; username: string }
+  | { name: 'posts' }
+  | { name: 'post-editor'; postId?: string }
+  | { name: 'public-post'; postId: string }
 
 export type CurrentUser = { id: string; email: string; name: string | null; role: string }
 
@@ -51,14 +58,16 @@ export default function Home() {
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
-  // Hash-based deep linking for public pages + profiles
+  // Hash-based deep linking for public pages, profiles, and posts
   useEffect(() => {
     const handleHash = () => {
       const h = window.location.hash
       const pageMatch = h.match(/^#\/p\/(.+)$/)
       const profileMatch = h.match(/^#\/profile\/(.+)$/)
+      const postMatch = h.match(/^#\/post\/(.+)$/)
       if (pageMatch) navigate({ name: 'public', slug: decodeURIComponent(pageMatch[1]) })
       if (profileMatch) navigate({ name: 'public-profile', username: decodeURIComponent(profileMatch[1]) })
+      if (postMatch) navigate({ name: 'public-post', postId: decodeURIComponent(postMatch[1]) })
     }
     handleHash()
     window.addEventListener('hashchange', handleHash)
@@ -88,7 +97,7 @@ export default function Home() {
   }
 
   // Determine if we should show the sidebar (authenticated + non-public views)
-  const showSidebar = user && view.name !== 'landing' && view.name !== 'login' && view.name !== 'signup' && view.name !== 'public' && view.name !== 'public-profile'
+  const showSidebar = user && view.name !== 'landing' && view.name !== 'login' && view.name !== 'signup' && view.name !== 'public' && view.name !== 'public-profile' && view.name !== 'public-post'
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
@@ -104,12 +113,14 @@ export default function Home() {
           />
           <div className="flex-1 flex flex-col min-w-0">
             <main className="flex-1">
-              <PageTransition key={view.name + ('pageId' in view ? view.pageId : '') + ('slug' in view ? view.slug : '')}>
+              <PageTransition key={view.name + ('pageId' in view ? view.pageId : '') + ('slug' in view ? view.slug : '') + ('postId' in view ? view.postId : '')}>
                 {view.name === 'dashboard' && user && <DashboardView user={user} navigate={navigate} />}
                 {view.name === 'builder' && user && <BuilderView pageId={view.pageId} user={user} navigate={navigate} />}
                 {view.name === 'monetization' && user && <MonetizationView user={user} navigate={navigate} />}
                 {view.name === 'analytics' && user && <AnalyticsView pageId={view.pageId} user={user} navigate={navigate} />}
                 {view.name === 'profile-setup' && user && <ProfileSetupView user={user} navigate={navigate} />}
+                {view.name === 'posts' && user && <PostsView user={user} navigate={navigate} />}
+                {view.name === 'post-editor' && user && <PostEditorView postId={view.postId} user={user} navigate={navigate} />}
                 {view.name === 'admin' && user && (user.role === 'ADMIN' || user.role === 'MODERATOR') && (
                   <AdminView user={user} navigate={navigate} />
                 )}
@@ -122,12 +133,13 @@ export default function Home() {
         <div className="flex-1 flex flex-col">
           <Header user={user} view={view} navigate={navigate} onLogout={onLogout} />
           <main className="flex-1">
-            <PageTransition key={view.name + ('pageId' in view ? view.pageId : '') + ('slug' in view ? view.slug : '')}>
+            <PageTransition key={view.name + ('pageId' in view ? view.pageId : '') + ('slug' in view ? view.slug : '') + ('postId' in view ? view.postId : '')}>
               {view.name === 'landing' && <LandingView navigate={navigate} user={user} />}
               {view.name === 'login' && <LoginView onAuth={onAuth} navigate={navigate} />}
               {view.name === 'signup' && <SignupView onAuth={onAuth} navigate={navigate} />}
               {view.name === 'public' && <PublicPageView slug={view.slug} navigate={navigate} />}
               {view.name === 'public-profile' && <PublicProfileView username={view.username} navigate={navigate} />}
+              {view.name === 'public-post' && <PublicPostView postId={view.postId} navigate={navigate} />}
             </PageTransition>
           </main>
           <Footer />

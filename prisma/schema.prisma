@@ -36,6 +36,7 @@ model User {
   updatedAt       DateTime @updatedAt
 
   pages           SpecialPage[]
+  posts           Post[]
   adIntegrations  AdIntegration[]
   subscriptions    CreatorSubscription[]
   moderationActions ModerationEvent[]
@@ -364,6 +365,7 @@ model SpecialPage {
   placements      AdPlacement[]
   trustScores     TrustScore[]
   moderationEvents ModerationEvent[]
+  posts           Post[]
   analytics       PageAnalytics?
 
   @@index([ownerId])
@@ -392,6 +394,104 @@ enum ModerationState {
   RESTRICTED
   SUSPENDED
   BANNED
+}
+
+// ─── POSTS SYSTEM (Phase 3 — Content Platform) ───────────────────────────────
+//
+// A first-class Post entity, separate from SpecialPage + ContentBlock.
+//
+// Per spec section 8:
+//   "A Special Page is a destination. A Post is fresh content."
+//
+// Posts support: text, image, video, article, link, poll, event, announcement,
+// question, quiz, card, gallery.
+//
+// Lifecycle states (spec section 8):
+//   DRAFT → SCHEDULED → PUBLISHED → ARCHIVED
+//                 ↘ UNDER_REVIEW ↗
+//                              ↘ REMOVED
+//
+// Posts can be standalone (no pageId) or attached to a Special Page.
+// A creator's feed consists of their published posts; the platform's
+// explore/discovery feed surfaces posts across creators.
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+  REMOVED
+  UNDER_REVIEW
+}
+
+enum PostType {
+  TEXT         // plain text update (like a tweet)
+  ARTICLE      // long-form with rich text
+  IMAGE        // single image
+  GALLERY      // multiple images
+  VIDEO        // external embed or hosted video
+  LINK         // link share with preview
+  POLL         // voting poll
+  EVENT        // event announcement
+  ANNOUNCEMENT // creator announcement
+  QUESTION     // Q&A style
+  QUIZ         // interactive quiz
+  CARD         // greeting card / social card
+}
+
+enum PostVisibility {
+  PUBLIC    // anyone can view, indexed by search
+  UNLISTED  // only via direct link, not indexed
+  PRIVATE   // only the author (drafts/private notes)
+}
+
+model Post {
+  id              String        @id @default(cuid())
+  authorId        String
+  // Optional: a post can be attached to a Special Page (e.g., a page owner
+  // posts updates on their page) or stand alone on the creator's profile.
+  pageId          String?
+  slug            String        // unique per author — used in /post/[slug] URLs
+  title           String
+  excerpt         String?       // short summary for feeds/previews (auto-generated if null)
+  content         String        // JSON: array of content blocks (paragraphs, embeds, polls, etc.)
+  type            PostType      @default(TEXT)
+  status          PostStatus    @default(DRAFT)
+  visibility      PostVisibility @default(PUBLIC)
+  coverImage      String?
+  // Scheduling — when status=SCHEDULED, scheduledAt is when it auto-publishes.
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
+  // SEO metadata (auto-generated from title/excerpt if not set)
+  seoTitle        String?
+  seoDescription  String?
+  ogImage         String?
+  // Engagement counters (kept denormalized for fast feed reads)
+  viewCount       Int           @default(0)
+  likeCount       Int           @default(0)
+  commentCount   Int           @default(0)
+  shareCount     Int           @default(0)
+  saveCount      Int           @default(0)
+  // Moderation
+  moderationState ModerationState @default(PENDING)
+  // Optional campaign association (e.g., Christmas 2026 posts)
+  campaignId      String?
+  // Tags — comma-separated simple tags for now (topics/categories come in Phase 5)
+  tags            String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  author          User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  page            SpecialPage?  @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  campaign        Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  moderationEvents ModerationEvent[]
+
+  @@unique([authorId, slug])   // post slug is unique per author (e.g. /@kingsley/my-first-post)
+  @@index([authorId, status, publishedAt])  // feed query: author's published posts by date
+  @@index([status, publishedAt])            // global feed: all published posts by date
+  @@index([pageId, status])                 // page's published posts
+  @@index([campaignId, status])             // campaign posts
+  @@index([moderationState])
 }
 
 model ContentBlock {
@@ -532,6 +632,7 @@ model TrustScore {
 model ModerationEvent {
   id              String   @id @default(cuid())
   pageId          String?
+  postId          String?
   integrationId   String?
   fromState       String?
   toState         String
@@ -542,10 +643,12 @@ model ModerationEvent {
   createdAt       DateTime @default(now())
 
   page            SpecialPage?   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  post            Post?          @relation(fields: [postId], references: [id], onDelete: Cascade)
   integration     AdIntegration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   moderator       User?          @relation(fields: [triggeredById], references: [id])
 
   @@index([pageId])
+  @@index([postId])
   @@index([integrationId])
   @@index([createdAt])
 }
@@ -565,6 +668,7 @@ model Campaign {
   updatedAt       DateTime @updatedAt
 
   pages           SpecialPage[]
+  posts           Post[]
 }
 
 // ─── REVENUE LAYERS (Chapter 5) ─────────────────────────────────────────────

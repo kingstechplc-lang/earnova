@@ -704,3 +704,57 @@ Stage Summary:
   * Sidebar, Header, Footer — Task 12 (dedicated background colors)
 - The admin's 8 tabs (Overview, Campaigns, Platform ads, Integrations, Ad networks, Compatibility, Slot config, Policy, Users, Pages, Reviews) all now render on the ambient surface.
 - Pushed to GitHub as commit d565be1.
+
+---
+Task ID: 16
+Agent: subagent (posts UI builder)
+Task: Build PostsView + PostEditorView + PublicPostView for Phase 3 Posts system
+
+Work Log:
+- Read existing view patterns: dashboard-view (ambient layer + TiltCard stat cards), builder-view (loading/not-found/save indicator), public-page-view (parallax + share CTA), public-profile-view (branded glass-card loading + cranberry Alert error), monetization-view (create-dialog + useToast), safe-fetch (returns {data,error,status}), confetti (useConfetti API with fire + ConfettiLayer), motion (FadeIn, StaggerContainer, StaggerItem).
+- Read all post API routes (GET/POST /api/posts, GET/PATCH/DELETE /api/posts/[id], POST publish/archive/schedule, GET /api/post/[id] public) to match the exact request/response shapes in the views.
+- File 1: src/components/views/posts-view.tsx (484 lines):
+  * Default export PostsView({user, navigate}) with ambient layer (mesh-bg opacity-40 + 2 evergreen/gold FloatingOrbs opacity-20).
+  * Header: "Your Posts" gradient-text-evergreen title + subtitle + "New post" evergreen btn-glow button → navigate({name:'post-editor'}) (no postId = create new).
+  * Stats row: 4 TiltCard stat cards mirroring dashboard pattern — Total (evergreen), Published (gold), Drafts (berry), Total views (sage) — all with CountUp + accent-themed gradients + blurred orbs.
+  * Status filter tabs: All/Published/Drafts/Scheduled/Archived buttons with active pill state (bg-evergreen text-cream shadow-festive btn-glow) + inactive glass state.
+  * Posts grid: 1 col mobile / 2 col md+ — each card has status accent line, cover image (if any, with gradient fade), status+type+campaign badges, title (line-clamp-2), excerpt, engagement pills (views/likes/comments/shares + optional page link), Edit + View public buttons.
+  * Empty state: "No posts yet" with FileText icon in evergreen gradient tile + "Create your first post" CTA (per spec section 108).
+  * Error state: cranberry Alert with "Try again" button.
+  * Loading state: 4 shimmer-bg skeleton cards in 2-col grid.
+  * Cursor pagination: "Load more" button visible when nextCursor present, with spinner + ArrowRight icon.
+- File 2: src/components/views/post-editor-view.tsx (773 lines):
+  * Default export PostEditorView({postId?, user, navigate}) — handles both create (no postId) and edit (postId) modes.
+  * Loading state: branded glass-card with Loader2 spinner + "Loading post…" + sub-text.
+  * Not-found state: cranberry Alert with "Back to Posts" button.
+  * Header: Back button + status pill + "Saving…/Saved" indicator + serif gradient title ("Edit post" or "New post").
+  * Editor card (glass-strong shadow-festive): tri-color accent line (evergreen→gold→berry), title input (font-serif text-lg), URL display (/post/[id] in evergreen-tinted code chip with stability hint), Type selector (12 PostTypes with emojis), Visibility selector (PUBLIC/UNLISTED/PRIVATE with descriptions + Globe2/Link2/Lock icons), Cover image URL input + live preview, Excerpt textarea with auto-generate hint, Content Textarea (10 rows) with Markdown-lite hint (## for headings, blank line between paragraphs), Tags input with live preview chips.
+  * Collapsible "Advanced SEO" section: seoTitle, seoDescription, ogImage inputs.
+  * Sticky bottom action bar: Save draft (evergreen outline, btn-glow), Publish (evergreen filled, btn-glow — fires 100-particle confetti via useConfetti on success), Schedule (gold outline — opens datetime dialog), Archive (when PUBLISHED), View public (when PUBLISHED), Delete (cranberry ghost — opens AlertDialog confirm).
+  * ConfettiLayer rendered at top of view; uses useToast for "Post published!" / "Post scheduled" / "Post archived" / "Post deleted" feedback.
+  * hydrate() wrapped in useCallback to satisfy react-hooks/immutability rule.
+  * currentPostIdRef used so handlePublish can read the latest currentPostId after handleSaveDraft creates a new post.
+  * Content ↔ blocks converter helpers (textToBlocks/blocksToText): splits on blank lines, supports `# ` and `## ` prefixes for headings.
+- File 3: src/components/views/public-post-view.tsx (454 lines):
+  * Default export PublicPostView({postId, navigate}) — visitor view of a published post.
+  * Loading state: branded glass-card with Earnova gradient logo badge + "Loading post…" + shimmer progress bar (matches public-profile-view loading pattern).
+  * Error state: cranberry Alert with "Back to home" button (matches public-profile-view error pattern).
+  * Main view: ambient layer (mesh-bg opacity-20 + 1 evergreen FloatingOrb opacity-15 — subtle, doesn't compete with content).
+  * Article container (max-w-3xl): back-to-home link, cover image (full-width rounded-2xl shadow-elevated), type+campaign+unlisted badges, gradient-text-evergreen title (font-serif text-3xl md:text-4xl), author row (avatar or gradient initial circle, name + @username + "View profile" link → navigates to {name:'public-profile', username} if username exists, published date with Clock icon), engagement stat pills (views/likes/comments/shares — each with CountUp), tag pills (gradient evergreen/gold), content blocks rendered via ContentBlock helper (paragraph → <p>, heading level 1 → <h1>, heading level 2 → <h2> with gold dot + anim-sparkle-pulse).
+  * "View page this post belongs to" card (if page relation exists): glass-card with Layers icon + page title + chevron — navigates to {name:'public', slug: page.slug}.
+  * Share CTA at bottom: gold-accent card with SparklesComponent + Share2 icon + "Enjoyed this post? Share it." + "Share this post" button (Web Share API first, falls back to clipboard + toast "Link copied").
+  * ContentBlock helper supports future block types via default branch (renders text if present, else nothing).
+- Fixed two lint issues during build:
+  * VISIBILITIES array literal containing JSX icons triggered react/jsx-key rule — restructured from tuple array `Array<[string, string, string, React.ReactNode]>` to object array `Array<{value, label, description, icon}>` with `key={v.value}` on SelectItem.
+  * `hydrate` function declaration used inside useEffect before its declaration line triggered react-hooks/immutability rule — converted to `useCallback` with `[]` deps and added to useEffect dependency array.
+- Verification:
+  * `bun run lint` — passes (0 errors, no output).
+  * `bunx tsc --noEmit` — passes (0 errors, no output).
+  * `bun run build` — ✓ Compiled successfully in 14.2s; ✓ Generating static pages (31/31) in 159.5ms (was 30/30 before; the new public-post dynamic route added one more prerendered entry).
+
+Stage Summary:
+- Phase 3 Posts UI is now live: 3 new view components (1711 total lines) wired into the page.tsx router. The router already imported these files (lines 18-20) and rendered them (lines 122-123, 142), so the build was broken until this task completed; it now compiles cleanly with 31/31 static pages.
+- PostsView mirrors the dashboard's ambient layer + TiltCard stats + StaggerContainer grid pattern, with per-status filter tabs, color-coded status pills (draft/scheduled/published/archived/removed), per-card cover image preview + engagement stats, and cursor pagination via "Load more".
+- PostEditorView is a full create/edit lifecycle: title + content + excerpt + cover + type + visibility + tags + collapsible SEO; sticky action bar with Save draft / Publish (100-particle confetti) / Schedule (datetime dialog) / Archive / Delete (AlertDialog confirm) / View public; MVP content editor uses a Textarea with Markdown-lite syntax (## for headings, blank lines between paragraphs) — content is converted to/from JSON block arrays via textToBlocks/blocksToText helpers.
+- PublicPostView renders a published post for visitors: branded glass-card loading state, cranberry Alert error state, ambient article container, gradient-text-evergreen title, author row with avatar + "View profile" link, engagement stat pills with CountUp, content blocks (paragraph + heading levels 1/2), optional "View page this post belongs to" card, and a Share CTA using Web Share API with clipboard fallback + toast notification.
+- All three views follow existing visual language (mesh-bg ambient + low-opacity FloatingOrbs, glass cards, gradient accents, brand palette, anim-pulse-glow / anim-sparkle-pulse / shimmer-bg / view-fade utilities) and use safeFetch for every API call — no raw fetch anywhere.

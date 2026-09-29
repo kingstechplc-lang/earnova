@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import {
   Sparkles, LayoutDashboard, Wallet, Shield, LogOut, Menu, X,
-  ChevronLeft, ChevronRight, Eye, Globe2, Sparkles as SparklesIcon,
+  ChevronLeft, ChevronRight, Eye, Globe2, Sparkles as SparklesIcon, FileText,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import type { View, CurrentUser } from '@/app/page'
@@ -30,6 +30,7 @@ export default function Sidebar({
 }) {
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, target: { name: 'dashboard' } as View, active: view.name === 'dashboard' || view.name === 'builder' || view.name === 'analytics' },
+    { label: 'Posts', icon: FileText, target: { name: 'posts' } as View, active: view.name === 'posts' || view.name === 'post-editor' },
     { label: 'Profile', icon: SparklesIcon, target: { name: 'profile-setup' } as View, active: view.name === 'profile-setup' },
     { label: 'Monetization', icon: Wallet, target: { name: 'monetization' } as View, active: view.name === 'monetization' },
   ]
@@ -193,6 +194,7 @@ function MobileDrawer({
 
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, target: { name: 'dashboard' } as View, active: view.name === 'dashboard' || view.name === 'builder' || view.name === 'analytics' },
+    { label: 'Posts', icon: FileText, target: { name: 'posts' } as View, active: view.name === 'posts' || view.name === 'post-editor' },
     { label: 'Profile', icon: SparklesIcon, target: { name: 'profile-setup' } as View, active: view.name === 'profile-setup' },
     { label: 'Monetization', icon: Wallet, target: { name: 'monetization' } as View, active: view.name === 'monetization' },
   ]

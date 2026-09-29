@@ -9,3 +9,6 @@ next-env.d.ts
 scripts/
 tool-results/
 tsconfig.tsbuildinfo
+upload/
+scripts/smoke-test-posts.sh
+scripts/seed-published-post.ts
