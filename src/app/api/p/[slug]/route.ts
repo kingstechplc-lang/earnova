@@ -1,7 +1,8 @@
-// GET /api/p/[slug] — fetch public Special Page with computed placements
+// GET /api/p/[slug] — fetch public Special Page with computed placements + ad-tag metadata
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { computeRenderedPlacements, getActivePolicy } from '@/lib/placement-engine'
+import { renderAdTag } from '@/lib/ad-renderer'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -28,13 +29,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const policy = await getActivePolicy()
   const renderedPlacements = await computeRenderedPlacements(page, page.placements as any, policy)
 
-  // Enrich platform placements with the actual ad-network code from PlatformAdNetworkIntegration.
-  // (The placement engine returns "platform" as a placeholder for non-user placements; here we
-  // resolve the actual network so the renderer knows which ad-network tag to emit.)
-  //
-  // CRITICAL: Only VERIFIED platform integrations are eligible to render. This is the
-  // admin-verification gate — until the admin has tested + verified the integration,
-  // no platform ads will appear on Special Pages (the slot will render "No active inventory").
+  // Enrich platform placements with VERIFIED platform integrations.
+  // Only VERIFIED + active platform integrations are eligible — this is the admin-verification gate.
   const platformIntegrations = await db.platformAdNetworkIntegration.findMany({
     where: {
       isActive: true,
@@ -42,17 +38,54 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     },
     include: { adNetwork: true },
   })
+
   const enrichedPlacements = renderedPlacements.map(p => {
     if (p.source !== 'USER_INTEGRATION' && p.adNetworkCode === 'platform') {
-      // Round-robin among VERIFIED platform integrations (simple MVP — in production this would be
-      // a more sophisticated auction or priority-based selection)
+      // Round-robin among VERIFIED platform integrations
       const platInt = platformIntegrations[0]
       if (platInt) {
+        // Render the actual ad-network script tag using the AdRenderer
+        const adTag = renderAdTag({
+          networkCode: platInt.adNetwork.code,
+          integrationType: platInt.integrationType,
+          zoneKey: platInt.zoneKey,
+          zoneId: platInt.zoneIdentifier,
+          cdnUrl: platInt.cdnUrl,
+          formatOptions: platInt.formatOptions ? JSON.parse(platInt.formatOptions) : null,
+        })
         return {
           ...p,
           adNetworkCode: platInt.adNetwork.code,
           integrationType: platInt.integrationType,
           scriptReference: platInt.scriptReference,
+          // Ad-tag metadata for the client-side AdSlot to inject
+          adTagHtml: adTag.html,
+          adTagDescription: adTag.description,
+          adTagType: adTag.type,
+          adTagScriptSrc: adTag.scriptSrc,
+          isLive: adTag.isLive,
+        }
+      }
+    }
+    // For user integrations, also render the ad tag if the integration has CDN config
+    if (p.source === 'USER_INTEGRATION') {
+      const integration = page.placements.find(pl => pl.id === p.id)?.integration
+      if (integration && integration.cdnUrl && (integration.zoneKey || integration.zoneIdentifier)) {
+        const adTag = renderAdTag({
+          networkCode: integration.adNetwork.code,
+          integrationType: integration.integrationType,
+          zoneKey: integration.zoneKey,
+          zoneId: integration.zoneIdentifier,
+          cdnUrl: integration.cdnUrl,
+          formatOptions: integration.formatOptions ? JSON.parse(integration.formatOptions) : null,
+        })
+        return {
+          ...p,
+          adTagHtml: adTag.html,
+          adTagDescription: adTag.description,
+          adTagType: adTag.type,
+          adTagScriptSrc: adTag.scriptSrc,
+          isLive: adTag.isLive,
         }
       }
     }

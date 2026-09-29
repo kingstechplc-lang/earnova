@@ -95,7 +95,11 @@ async function main() {
         adNetworkId: adsterra.id,
         integrationType: 'BANNER',
         zoneIdentifier: 'PLATFORM_ADSTERRA_BANNER_001',
-        scriptReference: 'platform-adsterra-banner-001',  // sanitized key — actual script emitted by Renderer
+        // Real Adsterra ad-tag config — admin replaces these with their actual values
+        zoneKey: 'YOUR_ADSTERRA_ZONE_KEY',           // e.g. 'abc123def456' from Adsterra dashboard
+        cdnUrl: 'www.highperformanceformat.com',      // Adsterra's CDN domain for banner ads
+        formatOptions: JSON.stringify({ width: 300, height: 250, format: 'iframe' }),
+        scriptReference: 'platform-adsterra-banner-001',
         isActive: true,
         verificationState: 'UNVERIFIED',  // admin must verify before ads render
       },
@@ -110,6 +114,10 @@ async function main() {
         adNetworkId: monetag.id,
         integrationType: 'IN_PAGE',
         zoneIdentifier: 'PLATFORM_MONETAG_INPAGE_001',
+        // Real Monetag ad-tag config — admin replaces these with their actual values
+        zoneKey: 'YOUR_MONETAG_ZONE_ID',              // e.g. '1234567' from Monetag dashboard
+        cdnUrl: 'YOUR_MONETAG_CDN_DOMAIN',            // e.g. 'pl12345.profitabledisplaynetwork.com'
+        formatOptions: null,
         scriptReference: 'platform-monetag-inpage-001',
         isActive: true,
         verificationState: 'UNVERIFIED',  // admin must verify before ads render

@@ -19,7 +19,7 @@ import { safeFetch } from '@/lib/safe-fetch'
 import { useConfetti } from '@/components/animated/confetti'
 import {
   Plus, Edit3, Trash2, Zap, ShieldCheck, ShieldAlert, FlaskConical, CheckCircle2,
-  XCircle, Clock, Layers, AlertTriangle, RotateCcw, Pause, ExternalLink,
+  XCircle, Clock, Layers, AlertTriangle, RotateCcw, Pause, ExternalLink, Eye,
 } from 'lucide-react'
 
 type AdNetworkLite = { id: string; code: string; displayName: string }
@@ -35,6 +35,9 @@ type Integration = {
   adNetwork: AdNetworkLite
   integrationType: string
   zoneIdentifier: string
+  zoneKey: string | null
+  cdnUrl: string | null
+  formatOptions: { width?: number; height?: number; format?: string } | null
   scriptReference: string
   isActive: boolean
   verificationState: 'UNVERIFIED' | 'VERIFYING' | 'VERIFIED' | 'SUSPENDED'
@@ -42,6 +45,10 @@ type Integration = {
   lastTestedAt: string | null
   lastTestResult: TestResult | null
   verificationNotes: string | null
+  adTagHtml: string
+  adTagDescription: string
+  adTagScriptSrc: string | null
+  isLive: boolean
   createdAt: string
   updatedAt: string
 }
@@ -225,7 +232,20 @@ export function PlatformIntegrationsSection() {
                           <span className="font-medium text-foreground">Zone:</span> <code className="font-mono">{int.zoneIdentifier}</code>
                         </div>
                         <div>
-                          <span className="font-medium text-foreground">Script ref:</span> <code className="font-mono">{int.scriptReference}</code>
+                          <span className="font-medium text-foreground">Zone key:</span>{' '}
+                          <code className="font-mono">{int.zoneKey || '—'}</code>
+                        </div>
+                        <div>
+                          <span className="font-medium text-foreground">CDN:</span>{' '}
+                          <code className="font-mono text-[10px]">{int.cdnUrl || '—'}</code>
+                        </div>
+                        <div>
+                          <span className="font-medium text-foreground">Live:</span>{' '}
+                          {int.isLive ? (
+                            <span className="text-evergreen font-medium">✓ Yes</span>
+                          ) : (
+                            <span className="text-muted-foreground">No (placeholder)</span>
+                          )}
                         </div>
                         <div>
                           {int.verifiedAt ? (
@@ -270,6 +290,21 @@ export function PlatformIntegrationsSection() {
                     <div className="p-2 rounded-lg bg-muted/30 mb-3 text-xs text-muted-foreground">
                       <span className="font-medium text-foreground">Notes:</span> {int.verificationNotes}
                     </div>
+                  )}
+
+                  {/* Generated ad tag preview */}
+                  {int.adTagHtml && (
+                    <details className="mb-3 group">
+                      <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1.5 mb-1">
+                        <Eye className="h-3 w-3" />
+                        <span className="inline-block transition-transform group-open:rotate-90">▸</span>
+                        Generated ad tag ({int.isLive ? 'live' : 'placeholder'})
+                      </summary>
+                      <pre className="text-[10px] font-mono text-muted-foreground p-2 rounded-lg bg-muted/30 overflow-x-auto whitespace-pre-wrap break-all mt-1">
+                        {int.adTagHtml || '<!-- empty — configure CDN URL + zone key -->'}
+                      </pre>
+                      <p className="text-[10px] text-muted-foreground mt-1">{int.adTagDescription}</p>
+                    </details>
                   )}
 
                   {/* Actions */}
@@ -445,6 +480,10 @@ function IntegrationDialog({
   const [adNetworkId, setAdNetworkId] = useState(integration?.adNetwork.id || '')
   const [integrationType, setIntegrationType] = useState(integration?.integrationType || 'BANNER')
   const [zoneIdentifier, setZoneIdentifier] = useState(integration?.zoneIdentifier || '')
+  const [zoneKey, setZoneKey] = useState(integration?.zoneKey || '')
+  const [cdnUrl, setCdnUrl] = useState(integration?.cdnUrl || '')
+  const [bannerWidth, setBannerWidth] = useState(integration?.formatOptions?.width?.toString() || '300')
+  const [bannerHeight, setBannerHeight] = useState(integration?.formatOptions?.height?.toString() || '250')
   const [scriptReference, setScriptReference] = useState(integration?.scriptReference || '')
   const [isActive, setIsActive] = useState(integration?.isActive ?? true)
   const [error, setError] = useState('')
@@ -452,17 +491,25 @@ function IntegrationDialog({
 
   async function submit() {
     setError('')
-    if (!adNetworkId || !integrationType || !zoneIdentifier.trim() || !scriptReference.trim()) {
-      setError('All fields are required.')
+    if (!adNetworkId || !integrationType || !zoneIdentifier.trim()) {
+      setError('Network, integration type, and zone identifier are required.')
       setLoading(false)
       return
     }
     setLoading(true)
-    const payload = {
+    const formatOptions = integrationType === 'BANNER' ? {
+      width: parseInt(bannerWidth) || 300,
+      height: parseInt(bannerHeight) || 250,
+      format: 'iframe',
+    } : null
+    const payload: any = {
       adNetworkId,
       integrationType,
       zoneIdentifier: zoneIdentifier.trim(),
-      scriptReference: scriptReference.trim(),
+      zoneKey: zoneKey.trim() || null,
+      cdnUrl: cdnUrl.trim() || null,
+      formatOptions,
+      scriptReference: scriptReference.trim() || `${adNetworkId}-${integrationType.toLowerCase()}-${zoneIdentifier.trim()}`,
       isActive,
     }
     const url = integration ? `/api/admin/platform-integrations/${integration.id}` : '/api/admin/platform-integrations'
@@ -474,9 +521,8 @@ function IntegrationDialog({
     })
     setLoading(false)
     if (res.error) { setError(res.error); return }
-    if (integration && (zoneIdentifier !== integration.zoneIdentifier || scriptReference !== integration.scriptReference)) {
-      // zone/script changed — verification was reset to UNVERIFIED, inform user
-      alert('Saved. Note: zone/script changes reset verification to UNVERIFIED — re-test and re-verify before ads will render.')
+    if (integration && (zoneIdentifier !== integration.zoneIdentifier || zoneKey !== (integration.zoneKey || '') || cdnUrl !== (integration.cdnUrl || ''))) {
+      alert('Saved. Note: changing zone/CDN/key resets verification to UNVERIFIED — re-test and re-verify before ads will render.')
     }
     onSaved()
   }
@@ -532,6 +578,60 @@ function IntegrationDialog({
             <p className="text-[10px] text-muted-foreground mt-1">The zone ID from your ad-network publisher dashboard.</p>
           </div>
           <div>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Zone key (alphanumeric)</Label>
+            <Input
+              value={zoneKey}
+              onChange={e => setZoneKey(e.target.value)}
+              placeholder="e.g. abc123def456 (Adsterra) or 1234567 (Monetag)"
+              className="mt-1 font-mono text-sm"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">The ad-network-specific zone key used in the script src URL. Found in your ad-network dashboard.</p>
+          </div>
+          <div>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">CDN URL (ad network's tag delivery domain)</Label>
+            <Input
+              value={cdnUrl}
+              onChange={e => setCdnUrl(e.target.value)}
+              placeholder="e.g. www.highperformanceformat.com (Adsterra) or pl12345.profitabledisplaynetwork.com (Monetag)"
+              className="mt-1 font-mono text-sm"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">The CDN domain your ad network serves tags from. Found in the ad code snippet from your publisher dashboard.</p>
+          </div>
+          {integrationType === 'BANNER' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Banner width (px)</Label>
+                <Input
+                  type="number"
+                  value={bannerWidth}
+                  onChange={e => setBannerWidth(e.target.value)}
+                  className="mt-1 font-mono text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Banner height (px)</Label>
+                <Input
+                  type="number"
+                  value={bannerHeight}
+                  onChange={e => setBannerHeight(e.target.value)}
+                  className="mt-1 font-mono text-sm"
+                />
+              </div>
+            </div>
+          )}
+          {/* Ad-tag preview */}
+          {integration?.adTagHtml && (
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/60">
+              <p className="text-xs font-semibold mb-1 flex items-center gap-1">
+                <Eye className="h-3 w-3 text-evergreen" /> Generated ad tag preview
+              </p>
+              <pre className="text-[10px] font-mono text-muted-foreground overflow-x-auto whitespace-pre-wrap break-all">
+                {integration.adTagHtml}
+              </pre>
+              <p className="text-[10px] text-muted-foreground mt-1">{integration.adTagDescription}</p>
+            </div>
+          )}
+          <div>
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Script reference (sanitized)</Label>
             <Input
               value={scriptReference}
@@ -540,7 +640,7 @@ function IntegrationDialog({
               className="mt-1 font-mono text-sm"
             />
             <p className="text-[10px] text-muted-foreground mt-1">
-              A sanitized identifier used by the renderer. Never paste raw JavaScript — the platform emits tags from this reference.
+              A sanitized identifier used for audit. Never paste raw JavaScript — the platform emits tags from the CDN URL + zone key.
             </p>
           </div>
           <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">

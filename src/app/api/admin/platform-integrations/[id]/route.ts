@@ -12,25 +12,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Admin only' }, { status: 403 })
   }
   const body = await req.json()
-  const { integrationType, zoneIdentifier, scriptReference, isActive } = body as {
+  const { integrationType, zoneIdentifier, zoneKey, cdnUrl, formatOptions, scriptReference, isActive } = body as {
     integrationType?: string
     zoneIdentifier?: string
+    zoneKey?: string | null
+    cdnUrl?: string | null
+    formatOptions?: { width?: number; height?: number; format?: string } | null
     scriptReference?: string
     isActive?: boolean
   }
   const existing = await db.platformAdNetworkIntegration.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // If zone/script changes, reset verification to UNVERIFIED (must re-verify)
+  // If zone/CDN/script changes, reset verification to UNVERIFIED (must re-verify)
   const zoneChanged = zoneIdentifier && zoneIdentifier !== existing.zoneIdentifier
+  const zoneKeyChanged = zoneKey !== undefined && zoneKey !== existing.zoneKey
+  const cdnChanged = cdnUrl !== undefined && cdnUrl !== existing.cdnUrl
   const scriptChanged = scriptReference && scriptReference !== existing.scriptReference
 
   const data: any = {}
   if (integrationType !== undefined) data.integrationType = integrationType as any
   if (zoneIdentifier !== undefined) data.zoneIdentifier = zoneIdentifier
+  if (zoneKey !== undefined) data.zoneKey = zoneKey || null
+  if (cdnUrl !== undefined) data.cdnUrl = cdnUrl || null
+  if (formatOptions !== undefined) data.formatOptions = formatOptions ? JSON.stringify(formatOptions) : null
   if (scriptReference !== undefined) data.scriptReference = scriptReference
   if (isActive !== undefined) data.isActive = isActive
-  if (zoneChanged || scriptChanged) {
+  if (zoneChanged || zoneKeyChanged || cdnChanged || scriptChanged) {
     data.verificationState = 'UNVERIFIED'
     data.verifiedAt = null
     data.verifiedById = null

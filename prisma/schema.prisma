@@ -231,7 +231,10 @@ model AdIntegration {
   integrationType   IntegrationType
   siteIdentifier    String?   // the website/domain registered at the network
   zoneIdentifier    String?   // zone/tag ID from the network
-  scriptReference   String?   // sanitized reference to ad code (NEVER raw JS)
+  zoneKey           String?   // ad-network-specific zone key (e.g. Adsterra's alphanumeric key)
+  cdnUrl            String?   // CDN domain the ad network serves tags from
+  formatOptions     String?   // JSON: format-specific options (width, height, etc.)
+  scriptReference   String?   // sanitized reference (legacy — kept for audit)
   lifecycleState    IntegrationLifecycle @default(DRAFT)
   rejectionReason   String?
   approvedAt        DateTime?
@@ -374,16 +377,21 @@ model PlatformAdNetworkIntegration {
   //   1. Add the platform domain to their ad-network publisher account
   //   2. Verify site ownership (DNS TXT / meta tag) at the ad network
   //   3. Create an ad zone and obtain the zone ID
-  //   4. Enter the zone ID + sanitized script reference here
+  //   4. Enter the zone ID + CDN URL + format options here
   //   5. Click "Run test" to simulate a test request
   //   6. Click "Verify" once they've confirmed the integration works
   //
   // Only VERIFIED integrations are eligible to render ads on Special Pages.
+  // The AdRenderer uses cdnUrl + zoneKey + integrationType to emit the actual
+  // ad-network script tag that loads real ads.
   id                String                  @id @default(cuid())
   adNetworkId       String
   integrationType   IntegrationType
-  zoneIdentifier    String
-  scriptReference   String                  // sanitized
+  zoneIdentifier    String                  // legacy field — the zone ID from the ad network dashboard
+  zoneKey           String?                 // ad-network-specific zone key (e.g. Adsterra's alphanumeric key)
+  cdnUrl            String?                 // the CDN domain the ad network serves tags from (e.g. "pl12345.profitabledisplaynetwork.com")
+  formatOptions     String?                 // JSON: format-specific options (width, height, etc. for banners)
+  scriptReference   String                  // sanitized identifier (legacy — kept for audit)
   isActive          Boolean                 @default(true)
   verificationState PlatformVerificationState @default(UNVERIFIED)
   verifiedAt        DateTime?
