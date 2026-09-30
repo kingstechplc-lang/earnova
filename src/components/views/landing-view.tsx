@@ -1,5 +1,15 @@
 'use client'
-import { motion } from 'framer-motion'
+import {
+  motion,
+  MotionConfig,
+  useScroll,
+  useTransform,
+  useMotionValue,
+  useSpring,
+  useInView,
+  useReducedMotion,
+} from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { TiltCard } from '@/components/animated/tilt-card'
@@ -104,6 +114,119 @@ const LOCAL_FEATURES: Array<{ icon: LucideIcon; label: string; value: string }> 
 ]
 
 /* ──────────────────────────────────────────────────────────────────────────
+   Hooks + helpers used by the enhanced animations below.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** Returns true when the viewport is mobile-width. Used to dial down particle
+ * counts and disable magnetic hover (which is awkward on touch). */
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    const update = () => setIsMobile(mql.matches)
+    update()
+    mql.addEventListener('change', update)
+    return () => mql.removeEventListener('change', update)
+  }, [breakpoint])
+  return isMobile
+}
+
+/** MagneticWrap — wraps any child in a motion.div that subtly translates
+ * toward the cursor on mouse-move. Returns to origin on leave. Springy.
+ * Disabled on touch / mobile via `disabled` prop. */
+function MagneticWrap({
+  children,
+  intensity = 0.25,
+  disabled = false,
+}: {
+  children: React.ReactNode
+  intensity?: number
+  disabled?: boolean
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+  const sx = useSpring(x, { stiffness: 220, damping: 14, mass: 0.4 })
+  const sy = useSpring(y, { stiffness: 220, damping: 14, mass: 0.4 })
+
+  function onMove(e: React.MouseEvent<HTMLDivElement>) {
+    if (disabled) return
+    const rect = ref.current?.getBoundingClientRect()
+    if (!rect) return
+    const dx = e.clientX - (rect.left + rect.width / 2)
+    const dy = e.clientY - (rect.top + rect.height / 2)
+    x.set(dx * intensity)
+    y.set(dy * intensity)
+  }
+  function onLeave() {
+    x.set(0)
+    y.set(0)
+  }
+
+  return (
+    <motion.div
+      ref={ref}
+      onMouseMove={onMove}
+      onMouseLeave={onLeave}
+      style={{ x: sx, y: sy, display: 'inline-block' }}
+      whileTap={{ scale: 0.96 }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+/** SplitHeadline — animates each word of a phrase with a staggered
+ * slide-up + fade. Words that match `goldWord` get the shimmering
+ * gradient-text-gold treatment plus the new fast shimmer keyframe. */
+function SplitHeadline({
+  words,
+  goldWord,
+}: {
+  words: string[]
+  goldWord?: string
+}) {
+  const container = {
+    hidden: {},
+    visible: {
+      transition: { staggerChildren: 0.12, delayChildren: 0.15 },
+    },
+  }
+  const wordVariant = {
+    hidden: { opacity: 0, y: 36 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { type: 'spring' as const, stiffness: 220, damping: 22 },
+    },
+  }
+  return (
+    <motion.h1
+      variants={container}
+      initial="hidden"
+      animate="visible"
+      className="font-serif text-5xl md:text-7xl font-bold tracking-tight leading-[1.05] mb-6"
+    >
+      {words.map((w, i) => (
+        <span key={i} className="block">
+          <motion.span
+            variants={wordVariant}
+            className={
+              w === goldWord
+                ? 'inline-block gradient-text-gold animate-text-shimmer'
+                : 'inline-block text-cream'
+            }
+          >
+            {w}
+          </motion.span>
+        </span>
+      ))}
+    </motion.h1>
+  )
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
    LandingView — the redesigned home page.
    ────────────────────────────────────────────────────────────────────────── */
 export default function LandingView({
@@ -115,6 +238,28 @@ export default function LandingView({
   // Logged-in users get routed to dashboard; logged-out users to signup.
   const primaryCtaTarget: View = user ? { name: 'dashboard' } : { name: 'signup' }
 
+  // Mobile detection — used to dial down particle counts and disable
+  // magnetic hover on touch devices (where there is no cursor).
+  const isMobile = useIsMobile()
+  const prefersReducedMotion = useReducedMotion()
+
+  // Hero parallax — orbs + sparkle layer translate slower than content
+  // as the user scrolls past the hero. Disabled for reduced-motion.
+  const heroRef = useRef<HTMLElement>(null)
+  const { scrollYProgress: heroScrollY } = useScroll({
+    target: heroRef,
+    offset: ['start start', 'end start'],
+  })
+  const heroBgY = useTransform(heroScrollY, [0, 1], [0, prefersReducedMotion ? 0 : 120])
+  const heroBgOpacity = useTransform(heroScrollY, [0, 1], [1, prefersReducedMotion ? 1 : 0.3])
+  const heroContentY = useTransform(heroScrollY, [0, 1], [0, prefersReducedMotion ? 0 : -40])
+
+  // Trust-bar stats trigger — CountUp should run only once, when the
+  // section enters the viewport. `useInView` returns a stable boolean
+  // after the first intersection.
+  const statsRef = useRef<HTMLDivElement>(null)
+  const statsInView = useInView(statsRef, { once: true, margin: '-80px' })
+
   // Smooth-scroll to the monetization section (no hash routing conflicts).
   const scrollToMonetization = () => {
     if (typeof document !== 'undefined') {
@@ -125,18 +270,28 @@ export default function LandingView({
     }
   }
 
+  // Particle counts are dialled down on mobile for performance.
+  const heroOrbCount = isMobile ? 3 : 5
+  const heroSparkleCount = isMobile ? 6 : 10
+
   return (
+    <MotionConfig reducedMotion="user">
     <div className="overflow-x-hidden">
       {/* ─────────────────────────────────────────────────────────────────
           1. HERO — full-height, layered ambient background, centered CTA
           ─────────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+      <section ref={heroRef} className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
         {/* Background layers */}
         <div className="absolute inset-0 bg-gradient-to-br from-evergreen-dark via-evergreen to-berry/30" aria-hidden />
         <div className="absolute inset-0 bg-pine-pattern opacity-20" aria-hidden />
         <div className="absolute inset-0 mesh-bg opacity-30" aria-hidden />
-        <FloatingOrbs count={5} colors={['gold', 'berry', 'sage', 'evergreen', 'gold']} />
-        <SparklesComponent count={10} />
+
+        {/* Parallax-wrapped orbs + sparkles — they drift at a different rate
+            than the content as the user scrolls past the hero. */}
+        <motion.div style={{ y: heroBgY, opacity: heroBgOpacity }} className="absolute inset-0">
+          <FloatingOrbs count={heroOrbCount} colors={['gold', 'berry', 'sage', 'evergreen', 'gold']} />
+          <SparklesComponent count={heroSparkleCount} />
+        </motion.div>
 
         {/* Soft vignette for text legibility at top + bottom edges */}
         <div
@@ -144,7 +299,7 @@ export default function LandingView({
           aria-hidden
         />
 
-        <div className="container mx-auto px-4 max-w-4xl text-center relative z-10 py-24">
+        <motion.div style={{ y: heroContentY }} className="container mx-auto px-4 max-w-4xl text-center relative z-10 py-24">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -157,28 +312,14 @@ export default function LandingView({
             </Badge>
           </motion.div>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-            className="font-serif text-5xl md:text-7xl font-bold tracking-tight leading-[1.05] mb-6"
-          >
-            <span className="block text-cream">Create.</span>
-            <span className="block text-cream">Share.</span>
-            <motion.span
-              className="block gradient-text-gold"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.8, delay: 0.5 }}
-            >
-              Shine.
-            </motion.span>
-          </motion.h1>
+          {/* Word-by-word spring stagger reveal — "Shine." gets the
+              shimmering gold gradient (animated CSS keyframe). */}
+          <SplitHeadline words={['Create.', 'Share.', 'Shine.']} goldWord="Shine." />
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
             className="text-base md:text-xl text-cream/85 max-w-2xl mx-auto mb-10 leading-relaxed"
           >
             Build beautiful pages, grow your audience, and optionally monetize your content.
@@ -188,10 +329,12 @@ export default function LandingView({
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
             className="flex flex-wrap items-center justify-center gap-3 mb-6"
           >
-            <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+            {/* Primary CTA — magnetic hover. The button subtly slides toward
+                the cursor on desktop. Disabled on touch / reduced-motion. */}
+            <MagneticWrap intensity={0.3} disabled={isMobile || !!prefersReducedMotion}>
               <Button
                 size="lg"
                 onClick={() => navigate(primaryCtaTarget)}
@@ -202,7 +345,7 @@ export default function LandingView({
                   <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover:translate-x-1" />
                 </span>
               </Button>
-            </motion.div>
+            </MagneticWrap>
             <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
               <Button
                 size="lg"
@@ -220,20 +363,20 @@ export default function LandingView({
             type="button"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.7 }}
+            transition={{ duration: 0.6, delay: 0.9 }}
             onClick={scrollToMonetization}
             className="inline-flex items-center gap-1 text-sm text-gold-light hover:text-gold transition-colors underline-offset-4 hover:underline"
           >
             Learn how monetization works
             <ArrowRight className="h-3.5 w-3.5" />
           </motion.button>
-        </div>
+        </motion.div>
 
         {/* Animated scroll indicator */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 1 }}
+          transition={{ duration: 0.6, delay: 1.1 }}
           className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 pointer-events-none"
           aria-hidden
         >
@@ -263,31 +406,38 @@ export default function LandingView({
             </p>
           </FadeIn>
 
-          <StaggerContainer className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {TRUST_STATS.map((s) => {
-              const Icon = s.icon
-              return (
-                <StaggerItem key={s.big}>
-                  <TiltCard intensity={4} className="h-full">
-                    <div className="glass-card rounded-2xl p-5 shadow-festive border border-border/40 h-full flex flex-col gap-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className={`inline-flex h-12 w-12 items-center justify-center rounded-xl ${accentIconBg[s.accent]}`}>
-                          <Icon className="h-5 w-5" />
+          <div ref={statsRef}>
+            <StaggerContainer className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {TRUST_STATS.map((s, i) => {
+                const Icon = s.icon
+                return (
+                  <StaggerItem key={s.big}>
+                    <TiltCard intensity={4} className="h-full">
+                      <div className="glass-card rounded-2xl p-5 shadow-festive border border-border/40 h-full flex flex-col gap-3 transition-shadow duration-300 hover:shadow-elevated hover:border-gold/40">
+                        <div className="flex items-start justify-between gap-3">
+                          {/* Gradient icon badge gently floats — each with its
+                              own staggered delay so they don't sync up. */}
+                          <div
+                            className={`inline-flex h-12 w-12 items-center justify-center rounded-xl ${accentIconBg[s.accent]} animate-float-icon`}
+                            style={{ animationDelay: `${i * 0.6}s` }}
+                          >
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className={`font-serif font-bold text-2xl md:text-3xl ${accentText[s.accent]}`}>
+                            {s.count.prefix}<CountUp value={s.count.value} duration={1400} active={statsInView} />{s.count.suffix}
+                          </div>
                         </div>
-                        <div className={`font-serif font-bold text-2xl md:text-3xl ${accentText[s.accent]}`}>
-                          {s.count.prefix}<CountUp value={s.count.value} duration={1400} />{s.count.suffix}
+                        <div>
+                          <h3 className="font-serif text-lg md:text-xl font-bold leading-tight">{s.big}</h3>
+                          <p className="text-xs text-muted-foreground mt-1">{s.sub}</p>
                         </div>
                       </div>
-                      <div>
-                        <h3 className="font-serif text-lg md:text-xl font-bold leading-tight">{s.big}</h3>
-                        <p className="text-xs text-muted-foreground mt-1">{s.sub}</p>
-                      </div>
-                    </div>
-                  </TiltCard>
-                </StaggerItem>
-              )
-            })}
-          </StaggerContainer>
+                    </TiltCard>
+                  </StaggerItem>
+                )
+              })}
+            </StaggerContainer>
+          </div>
         </div>
       </section>
 
@@ -314,10 +464,13 @@ export default function LandingView({
             return (
               <StaggerItem key={f.title}>
                 <TiltCard intensity={4} className="h-full">
-                  <div className="glass-card rounded-2xl p-6 shadow-festive border border-border/40 h-full flex flex-col gap-4 transition-all hover:shadow-elevated hover:-translate-y-1">
-                    <div className={`inline-flex h-12 w-12 items-center justify-center rounded-xl ${accentIconBg[f.accent]}`}>
+                  <div className="glass-card rounded-2xl p-6 shadow-festive border border-border/40 h-full flex flex-col gap-4 transition-all duration-300 hover:shadow-elevated hover:-translate-y-1 hover:border-gold/40 group">
+                    {/* Icon badge springs up + glows on card hover. */}
+                    <motion.div
+                      className={`inline-flex h-12 w-12 items-center justify-center rounded-xl ${accentIconBg[f.accent]} transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3`}
+                    >
                       <Icon className="h-5 w-5" />
-                    </div>
+                    </motion.div>
                     <div>
                       <h3 className="font-serif text-xl font-bold mb-2">{f.title}</h3>
                       <p className="text-sm text-muted-foreground leading-relaxed">{f.body}</p>
@@ -352,8 +505,8 @@ export default function LandingView({
             {PAGE_TYPES.map((p) => (
               <StaggerItem key={p.label}>
                 <motion.div
-                  whileHover={{ scale: 1.04, y: -4 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                  whileHover={{ scale: 1.05, rotate: 2, y: -4 }}
+                  transition={{ type: 'spring', stiffness: 320, damping: 18 }}
                   className="group relative glass-card rounded-2xl p-5 border border-border/40 shadow-festive h-full flex flex-col items-center text-center gap-3 overflow-hidden cursor-default"
                 >
                   {/* Gradient wash on hover */}
@@ -361,11 +514,14 @@ export default function LandingView({
                     className={`absolute inset-0 bg-gradient-to-br ${accentGradient[p.accent]} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
                     aria-hidden
                   />
-                  <div
-                    className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${accentGradient[p.accent]} shadow-md transition-transform group-hover:scale-110`}
+                  {/* Emoji badge spring-scales + counter-rotates on hover */}
+                  <motion.div
+                    whileHover={{ scale: 1.18, rotate: -6 }}
+                    transition={{ type: 'spring', stiffness: 350, damping: 14 }}
+                    className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${accentGradient[p.accent]} shadow-md`}
                   >
                     <span className="text-2xl" aria-hidden>{p.emoji}</span>
-                  </div>
+                  </motion.div>
                   <div className="relative">
                     <div className="font-serif font-bold text-base">{p.label}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">{p.desc}</div>
@@ -407,20 +563,22 @@ export default function LandingView({
         </FadeIn>
 
         <div className="grid gap-8 md:grid-cols-4 relative">
-          {/* Connecting line */}
+          {/* Connecting line — draws in from left to right when scrolled
+              into view, with the rich tri-color gradient + glow. */}
           <motion.div
             initial={{ scaleX: 0 }}
             whileInView={{ scaleX: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 1.2, delay: 0.3 }}
-            className="hidden md:block absolute top-8 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-evergreen via-gold to-berry origin-left opacity-40"
+            viewport={{ once: true, margin: '-80px' }}
+            transition={{ duration: 1.2, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="hidden md:block absolute top-8 left-[12.5%] right-[12.5%] h-0.5 timeline-line origin-left opacity-70"
             aria-hidden
           />
 
           {STEPS.map((s, i) => (
-            <FadeIn key={s.n} delay={i * 0.1}>
+            <FadeIn key={s.n} delay={i * 0.1} y={30}>
               <div className="relative text-center md:text-left">
                 <div className="inline-flex">
+                  {/* Number badge springs in (subtle rotate on hover) */}
                   <motion.div
                     whileHover={{ scale: 1.08, rotate: 4 }}
                     transition={{ type: 'spring', stiffness: 300 }}
@@ -443,8 +601,11 @@ export default function LandingView({
       <section id="monetization" className="relative overflow-hidden border-y border-gold/20 scroll-mt-20">
         <div className="absolute inset-0 bg-gradient-to-br from-gold/10 via-berry/5 to-evergreen/10" aria-hidden />
         <div className="absolute inset-0 bg-pine-pattern opacity-10" aria-hidden />
-        <FloatingOrbs count={3} colors={['gold', 'berry', 'gold']} className="opacity-50" />
-        <SparklesComponent count={6} />
+        <FloatingOrbs count={isMobile ? 2 : 3} colors={['gold', 'berry', 'gold']} className="opacity-50" />
+        {/* Dynamic sparkle field — more particles on desktop, fewer on
+            mobile. The Sparkles component already randomizes size, delay,
+            duration, and rotation per particle. */}
+        <SparklesComponent count={isMobile ? 4 : 12} />
 
         <div className="container mx-auto px-4 py-20 max-w-6xl relative">
           <FadeIn className="text-center mb-14 max-w-3xl mx-auto">
@@ -509,7 +670,7 @@ export default function LandingView({
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 gradient-hero opacity-70" aria-hidden />
         <div className="absolute inset-0 mesh-bg opacity-20" aria-hidden />
-        <FloatingOrbs count={3} colors={['evergreen', 'gold', 'sage']} className="opacity-50" />
+        <FloatingOrbs count={isMobile ? 2 : 3} colors={['evergreen', 'gold', 'sage']} className="opacity-50" />
 
         <div className="container mx-auto px-4 py-20 max-w-6xl relative">
           <FadeIn className="text-center mb-14 max-w-3xl mx-auto">
@@ -532,10 +693,10 @@ export default function LandingView({
                   key={region}
                   initial={{ opacity: 0, scale: 0.85 }}
                   whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
+                  viewport={{ once: true, margin: '-60px' }}
                   transition={{ duration: 0.4, delay: i * 0.06, type: 'spring', stiffness: 200 }}
-                  whileHover={{ y: -2 }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card border border-border/50 shadow-festive text-sm font-medium"
+                  whileHover={{ y: -2, scale: 1.04 }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card border border-border/50 shadow-festive text-sm font-medium transition-shadow duration-300 hover:shadow-elevated hover:border-gold/40"
                 >
                   <MapPin className="h-3.5 w-3.5 text-evergreen" />
                   {region}
@@ -550,15 +711,19 @@ export default function LandingView({
               const Icon = f.icon
               return (
                 <StaggerItem key={f.label}>
-                  <div className="glass-card rounded-2xl p-5 border border-border/40 shadow-festive h-full text-center flex flex-col items-center gap-2">
-                    <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-evergreen/10 text-evergreen">
+                  <motion.div
+                    whileHover={{ y: -4 }}
+                    transition={{ type: 'spring', stiffness: 280, damping: 18 }}
+                    className="glass-card rounded-2xl p-5 border border-border/40 shadow-festive h-full text-center flex flex-col items-center gap-2 transition-shadow duration-300 hover:shadow-elevated hover:border-gold/40 group"
+                  >
+                    <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-evergreen/10 text-evergreen transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3">
                       <Icon className="h-5 w-5" />
                     </div>
                     <div>
                       <div className="text-xs uppercase tracking-wider text-muted-foreground">{f.label}</div>
                       <div className="text-sm font-medium mt-0.5">{f.value}</div>
                     </div>
-                  </div>
+                  </motion.div>
                 </StaggerItem>
               )
             })}
@@ -567,14 +732,14 @@ export default function LandingView({
       </section>
 
       {/* ─────────────────────────────────────────────────────────────────
-          8. FINAL CTA — large gradient card
+          8. FINAL CTA — large gradient card with breathing gold glow
           ─────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden px-4 py-20">
         <div className="container mx-auto max-w-5xl relative">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: '-80px' }}
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="relative rounded-3xl overflow-hidden shadow-elevated"
           >
@@ -582,7 +747,17 @@ export default function LandingView({
             <div className="absolute inset-0 bg-gradient-to-br from-evergreen-dark via-evergreen to-berry/40" aria-hidden />
             <div className="absolute inset-0 bg-gradient-to-tr from-gold/20 via-transparent to-berry/30 mix-blend-overlay" aria-hidden />
             <div className="absolute inset-0 bg-pine-pattern opacity-20" aria-hidden />
-            <FloatingOrbs count={3} colors={['gold', 'berry', 'sage']} />
+            <FloatingOrbs count={isMobile ? 2 : 3} colors={['gold', 'berry', 'sage']} />
+            {/* Breathing gold glow overlay — opacity + scale pulse over 4s.
+                Disabled by reduced-motion via the global CSS media query. */}
+            <div
+              className="absolute inset-0 pointer-events-none animate-cta-glow"
+              style={{
+                backgroundImage:
+                  'radial-gradient(ellipse at center, oklch(0.78 0.14 84 / 0.35) 0%, transparent 60%)',
+              }}
+              aria-hidden
+            />
 
             <div className="relative z-10 px-6 md:px-16 py-16 md:py-20 text-center">
               <motion.div
@@ -603,7 +778,7 @@ export default function LandingView({
               </p>
 
               <div className="flex flex-wrap items-center justify-center gap-3">
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}>
+                <MagneticWrap intensity={0.25} disabled={isMobile || !!prefersReducedMotion}>
                   <Button
                     size="lg"
                     onClick={() => navigate(primaryCtaTarget)}
@@ -614,7 +789,7 @@ export default function LandingView({
                       <ArrowRight className="h-4 w-4 ml-2 transition-transform group-hover:translate-x-1" />
                     </span>
                   </Button>
-                </motion.div>
+                </MagneticWrap>
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}>
                   <Button
                     size="lg"
@@ -659,5 +834,6 @@ export default function LandingView({
         </div>
       </section>
     </div>
+    </MotionConfig>
   )
 }

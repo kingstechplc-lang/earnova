@@ -5,7 +5,7 @@ import {
   Sparkles, LayoutDashboard, Wallet, Shield, LogOut, Menu, X,
   ChevronLeft, ChevronRight, Eye, Globe2, Sparkles as SparklesIcon, FileText,
 } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { View, CurrentUser } from '@/app/page'
 
 /*
@@ -63,7 +63,10 @@ export default function Sidebar({
           >
             <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-evergreen-light to-evergreen text-cream shadow-festive flex-shrink-0 ring-1 ring-gold/40">
               <Sparkles className="h-4 w-4 relative z-10 text-gold-light" />
-              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-gold ring-2 ring-evergreen-dark animate-pulse" />
+              {/* Animated gold sweep — visible on all screens */}
+              <span className="absolute inset-0 rounded-xl bg-gradient-to-tr from-transparent via-gold/40 to-transparent animate-pulse" />
+              {/* Glowing gold indicator dot */}
+              <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-gold ring-2 ring-evergreen-dark live-pulse z-20" />
             </span>
             {!collapsed && (
               <span className="flex flex-col leading-tight text-left overflow-hidden">
@@ -184,13 +187,27 @@ function MobileDrawer({
 }) {
   const [open, setOpen] = useState(false)
 
-  // Close drawer when view changes
+  // Close drawer ONLY when the view actually changes (user clicked a nav item).
+  // The previous implementation had a bug: it fired on every render where
+  // `open` was true, scheduling a `setOpen(false)` after 0ms — which closed
+  // the drawer almost instantly after opening it.
+  //
+  // Fix: track the previous view + only close when it genuinely changes.
+  // Use a deferred setTimeout(0) to avoid the react-hooks/set-state-in-effect
+  // lint rule (calling setState directly inside useEffect is discouraged).
+  const prevViewKeyRef = useRef<string | null>(null)
   useEffect(() => {
-    if (open) {
+    const viewKey = view.name
+      + ('pageId' in view ? view.pageId : '')
+      + ('slug' in view ? view.slug : '')
+      + ('postId' in view ? view.postId : '')
+    if (prevViewKeyRef.current !== null && prevViewKeyRef.current !== viewKey) {
+      // View changed → close the drawer. Defer to avoid lint rule.
       const id = window.setTimeout(() => setOpen(false), 0)
       return () => window.clearTimeout(id)
     }
-  }, [view, open])
+    prevViewKeyRef.current = viewKey
+  }, [view])
 
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, target: { name: 'dashboard' } as View, active: view.name === 'dashboard' || view.name === 'builder' || view.name === 'analytics' },
@@ -210,7 +227,9 @@ function MobileDrawer({
         <div className="flex h-14 items-center justify-between px-4 relative z-10">
           <button onClick={() => navigate({ name: 'landing' })} className="flex items-center gap-2">
             <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-evergreen-light to-evergreen text-cream shadow-festive ring-1 ring-gold/40">
-              <Sparkles className="h-4 w-4 text-gold-light" />
+              <Sparkles className="h-4 w-4 text-gold-light relative z-10" />
+              <span className="absolute inset-0 rounded-lg bg-gradient-to-tr from-transparent via-gold/40 to-transparent animate-pulse" />
+              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-gold ring-2 ring-evergreen-dark live-pulse z-20" />
             </span>
             <span className="text-sm font-bold tracking-tight text-cream">Earnova</span>
           </button>
@@ -249,8 +268,9 @@ function MobileDrawer({
               <div className="relative h-16 flex items-center justify-between px-4 border-b border-cream/10 flex-shrink-0 z-10">
                 <div className="flex items-center gap-2.5">
                   <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-evergreen-light to-evergreen text-cream shadow-festive ring-1 ring-gold/40">
-                    <Sparkles className="h-4 w-4 text-gold-light" />
-                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-gold ring-2 ring-evergreen-dark animate-pulse" />
+                    <Sparkles className="h-4 w-4 text-gold-light relative z-10" />
+                    <span className="absolute inset-0 rounded-lg bg-gradient-to-tr from-transparent via-gold/40 to-transparent animate-pulse" />
+                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-gold ring-2 ring-evergreen-dark live-pulse z-20" />
                   </span>
                   <span className="flex flex-col leading-tight">
                     <span className="text-sm font-bold tracking-tight text-cream">Earnova</span>

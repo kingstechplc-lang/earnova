@@ -153,6 +153,9 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground;
     background-image:
@@ -756,6 +759,61 @@
 @keyframes orbit {
   from { transform: rotate(0deg) translateX(60px) rotate(0deg); }
   to   { transform: rotate(360deg) translateX(60px) rotate(-360deg); }
+}
+
+/* ── Premium landing-page animations (Task 21) ───────────────────────────── */
+
+/* Fast shimmer for the "Shine." headline — gold gradient slides left-to-right
+ * continuously over 3s. Linear keeps the speed constant for a fluid sheen. */
+@keyframes text-shimmer {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+.animate-text-shimmer {
+  background-size: 200% auto;
+  animation: text-shimmer 3s linear infinite;
+}
+
+/* Soft breathing pulse for the final CTA gold overlay (opacity 0.3 → 0.55).
+ * Slower (4s) so the "breath" feels meditative, not flashing. */
+@keyframes cta-glow-breathe {
+  0%, 100% { opacity: 0.30; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(1.04); }
+}
+.animate-cta-glow {
+  animation: cta-glow-breathe 4s ease-in-out infinite;
+}
+
+/* Gentle float for trust-bar stat icons — translateY -4px ↔ 4px over 4s.
+ * Used with inline animationDelay to stagger each icon. */
+@keyframes float-icon {
+  0%, 100% { transform: translateY(-4px); }
+  50%      { transform: translateY(4px); }
+}
+.animate-float-icon {
+  animation: float-icon 4s ease-in-out infinite;
+}
+
+/* Subtle pulse for stat-card numeric values when hovered — keeps CountUp
+ * feeling alive without re-running the count. */
+@keyframes pulse-soft {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 1.4s ease-in-out infinite;
+}
+
+/* Draw-in line for the "How it works" timeline — handled by Framer Motion
+ * `scaleX`, but we expose the helper class for the gradient color stop. */
+.timeline-line {
+  background: linear-gradient(
+    90deg,
+    oklch(0.32 0.06 165) 0%,
+    oklch(0.78 0.14 84) 50%,
+    oklch(0.50 0.18 350) 100%
+  );
+  box-shadow: 0 0 12px oklch(0.78 0.14 84 / 0.35);
 }
 
 /* Animation utility classes */

@@ -975,3 +975,65 @@ Stage Summary:
 - Visual language is consistent with Tasks 12–15: glass-card + glass-strong, gradient-text-gold/evergreen/festive, mesh-bg + bg-pine-pattern ambient layers, FloatingOrbs + SparklesComponent decorative particles, btn-glow on every primary button, shadow-festive/shadow-gold/shadow-elevated on cards, TiltCard on every interactive card, accent rotation across evergreen/gold/berry/sage for visual rhythm. Reused the `accentIconBg`/`accentText`/`accentGradient` lookup maps so the entire page renders from one palette source-of-truth.
 - Performance kept light: 5 orbs in the hero (max useful — FloatingOrbs only has 5 distinct positions), 2–3 orbs elsewhere, 6–10 sparkles in hero/monetization only. No heavy inline SVGs or images. CountUp animations use rAF with `easeOutExpo` and finish in 1.4s. All section reveals use `whileInView={{ once: true }}` so they don't re-fire on scroll-up.
 - User-awareness: when `user` is non-null, the hero primary CTA label switches from "Create Your Page" → "Go to dashboard", the build-anything CTA switches from "Start building — free" → "Go to dashboard", and the final CTA switches from "Get started — free" → "Go to dashboard" — matching the constraint that logged-in users see a dashboard-bound CTA.
+
+---
+Task ID: 21
+Agent: subagent (landing animations enhancer)
+Task: Add more animations to landing page
+
+Work Log:
+- src/app/globals.css (+58 lines):
+  * Added `scroll-behavior: smooth` to `html` under `@layer base` — gives the "Learn how monetization works" smooth-scroll a buttery native feel (the existing `scroll-mt-20` on the monetization section keeps the target below the sticky header). The global `@media (prefers-reduced-motion: reduce)` block at the bottom of the file already overrides animation/transition durations, so smooth-scroll is the only addition that bypasses reduced-motion by design.
+  * Added 4 new keyframes + utility classes after the `@keyframes orbit` block:
+    - `text-shimmer` (3s linear infinite) — `background-position: 0% → 200%` shift for the hero "Shine." word. Used via `.animate-text-shimmer` (with `background-size: 200% auto`). Composes with the existing `gradient-text-gold` class so the gold gradient AND the shimmer both apply.
+    - `cta-glow-breathe` (4s ease-in-out infinite) — opacity 0.30 → 0.55 + scale 1 → 1.04 breathing pulse for the final CTA's gold overlay. Used via `.animate-cta-glow`.
+    - `float-icon` (4s ease-in-out infinite) — translateY -4px → 4px float for trust-bar stat icons. Used via `.animate-float-icon` with inline `animationDelay` for staggered sync.
+    - `pulse-soft` (1.4s ease-in-out infinite) — scale 1 → 1.04 pulse, available via `.animate-pulse-soft` for hover-triggered stat pulses.
+  * Added a `.timeline-line` component utility — a tri-color linear gradient (evergreen → gold → berry) with a soft 12px gold glow shadow. Used by the "How it works" connecting line so the draw-in `scaleX` animation has a richer color stop than the previous `from-evergreen via-gold to-berry` Tailwind gradient.
+
+- src/components/animated/count-up.tsx (+9 lines, behavior change):
+  * Added a new optional `active` prop (default `true`) — when `false`, the `useEffect` early-returns and the count stays at 0 (rendered as the start value) until the parent flips `active` to `true`.
+  * This lets the trust-bar stats trigger on scroll-in: parent passes `active={statsInView}` (from a `useInView` hook). Before, CountUp started on mount — which meant it had already finished by the time the user scrolled to the trust bar.
+  * Backward compatible: existing callers (none outside the landing) that don't pass `active` get the original on-mount behavior.
+
+- src/components/views/landing-view.tsx (+332/-96 lines):
+  * Expanded imports from `framer-motion`: added `MotionConfig`, `useScroll`, `useTransform`, `useMotionValue`, `useSpring`, `useInView`, `useReducedMotion`. Added `useEffect`, `useRef`, `useState` from React (for the new `useIsMobile` hook + parallax refs).
+  * Added 3 new module-scope helpers above the LandingView component:
+    1. `useIsMobile(breakpoint=768)` — subscribes to `window.matchMedia` and returns a stable boolean. SSR-safe (early-returns if `window` is undefined). Used to dial down particle counts (5 orbs → 3, 10 sparkles → 6, 12 monetization sparkles → 4) and disable magnetic hover on touch.
+    2. `MagneticWrap` — wraps any child in a `motion.div` whose `x`/`y` spring toward the cursor on `onMouseMove` (intensity 0.25 default, returns to origin on `onLeave`). Uses `useMotionValue` + `useSpring` with stiffness 220 / damping 14 / mass 0.4 for a springy feel. Accepts a `disabled` prop to skip on touch + reduced-motion. Used on the hero primary CTA (intensity 0.3) and the final CTA primary button (intensity 0.25).
+    3. `SplitHeadline` — animates the hero headline word-by-word using Framer Motion's `staggerChildren` (0.12s stagger, 0.15s initial delay) + spring transition (stiffness 220, damping 22). Each word slides up from `y: 36` + fades in. The word matching `goldWord` ("Shine.") gets `gradient-text-gold animate-text-shimmer` for the shimmering animated gold effect.
+  * In the LandingView component:
+    - Added `useIsMobile()`, `useReducedMotion()`, hero parallax (`useScroll` + `useTransform` for bg-y/content-y/opacity), and `statsInView = useInView(statsRef, { once: true, margin: '-80px' })`.
+    - Hero parallax: wrapped `<FloatingOrbs>` + `<SparklesComponent>` in `motion.div` with `style={{ y: heroBgY, opacity: heroBgOpacity }}` (bg drifts DOWN 120px + fades to 30% opacity as the user scrolls past). Hero content wrapped in `motion.div` with `style={{ y: heroContentY }}` (drifts UP 40px — creates a subtle parallax depth effect). Both transforms are zeroed when `prefersReducedMotion` is true.
+    - Replaced the entire `<motion.h1>` hero headline with `<SplitHeadline words={['Create.', 'Share.', 'Shine.']} goldWord="Shine." />` — word-by-word spring stagger reveal, with "Shine." getting the shimmering animated gold gradient.
+    - Replaced the hero primary CTA's `motion.div whileHover` wrapper with `<MagneticWrap intensity={0.3} disabled={isMobile || !!prefersReducedMotion}>` — the button subtly slides toward the cursor on desktop. Disabled on touch/reduced-motion.
+    - Trust-bar stats: wrapped `<StaggerContainer>` in a `<div ref={statsRef}>` so `useInView` can detect when the section enters view. Each stat icon badge gets `animate-float-icon` + inline `animationDelay: ${i * 0.6}s` for staggered floating. Each `<CountUp>` now receives `active={statsInView}` so it only counts up when scrolled into view (not on mount). Each card gets `hover:shadow-elevated hover:border-gold/40` for the gold-glow hover.
+    - Feature cards (section 3): added `hover:border-gold/40 group` to the card, and the icon badge uses `transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3` for a subtle pop+tilt on hover.
+    - Page-type tiles (section 4): changed `whileHover={{ scale: 1.04, y: -4 }}` to `whileHover={{ scale: 1.05, rotate: 2, y: -4 }}` with a stiffer spring (320/18). The emoji badge inside now uses `motion.div whileHover={{ scale: 1.18, rotate: -6 }}` with a separate spring (350/14) for a counter-rotating pop.
+    - Timeline connecting line (section 5): replaced `bg-gradient-to-r from-evergreen via-gold to-berry opacity-40` with the new `timeline-line opacity-70` class (richer tri-color gradient + glow). Added `viewport={{ once: true, margin: '-80px' }}` so it draws in just before entering view. Added a custom ease `[0.22, 1, 0.36, 1]` for a smoother draw. Step items now use `<FadeIn y={30}>` (was default `y=20`) for a slightly more pronounced rise.
+    - Monetization section (section 6): FloatingOrbs count scales with mobile (`isMobile ? 2 : 3`), SparklesComponent count scales with mobile (`isMobile ? 4 : 12`, was 6 on all devices).
+    - Global platform section (section 7): FloatingOrbs count scales with mobile. Region pills get `viewport={{ once: true, margin: '-60px' }}` + `whileHover={{ y: -2, scale: 1.04 }}` + `hover:shadow-elevated hover:border-gold/40`. Local-features cards converted to `motion.div whileHover={{ y: -4 }}` spring + `hover:shadow-elevated hover:border-gold/40` + icon badge `group-hover:scale-110 group-hover:-rotate-3`.
+    - Final CTA (section 8): added a new breathing gold overlay div with `animate-cta-glow` class + inline `radial-gradient(ellipse at center, oklch(0.78 0.14 84 / 0.35) 0%, transparent 60%)` background-image. Opacity breathes 0.30 → 0.55 → 0.30 over 4s. FloatingOrbs count scales with mobile. The primary CTA button wrapped in `<MagneticWrap intensity={0.25} disabled={isMobile || !!prefersReducedMotion}>` so it also has magnetic hover on desktop. Added `viewport={{ once: true, margin: '-80px' }}` to the card's whileInView.
+    - Wrapped the entire return in `<MotionConfig reducedMotion="user">` so every Framer Motion animation respects the user's `prefers-reduced-motion` system setting (animations become instant instead of timed).
+
+- Verification:
+  * `bunx eslint src/components/views/landing-view.tsx src/components/animated/count-up.tsx` — passes (0 errors, 0 warnings on my modified files). NOTE: a pre-existing lint error exists in `src/components/layout/sidebar.tsx` (line 200, `react-hooks/set-state-in-effect`), introduced by another concurrent task's uncommitted changes — NOT by this task. My files are clean.
+  * `bunx tsc --noEmit` — passes (0 errors, exit 0, no output).
+  * `DATABASE_URL=… bun run build` — succeeds: "✓ Compiled successfully in 16.9s", "✓ Generating static pages using 1 worker (35/35) in 763.4ms".
+
+Stage Summary:
+- 12 distinct animation improvements layered onto the existing landing page structure without altering layout, copy, or the `navigate()` / `user` props:
+  1. Hero headline word-by-word spring stagger reveal ("Create." → "Share." → "Shine.").
+  2. Hero primary CTA magnetic hover (cursor-following spring translate, disabled on touch).
+  3. Hero parallax — FloatingOrbs + Sparkles drift down + fade as user scrolls; content drifts up (depth illusion).
+  4. Animated gradient text on "Shine." — fast 3s linear shimmer sliding across the gold gradient.
+  5. Scroll-triggered CountUp — stats stay at 0 until the trust bar enters view, then ease-out-expo count up (once).
+  6. Floating stat icon badges — gentle 4s translateY -4↔+4 with per-icon staggered delay (0s, 0.6s, 1.2s, 1.8s).
+  7. Animated timeline connecting line — `scaleX 0 → 1` draw-in with the new tri-color `timeline-line` gradient + glow, triggered `viewport.margin: -80px`.
+  8. Page-type tiles — spring scale 1.05 + rotate 2deg on hover, with the emoji badge counter-rotating -6deg + scaling 1.18 independently.
+  9. Feature cards — gold border glow + icon badge scales 110% and rotates -3deg on hover.
+  10. Final CTA — breathing gold radial overlay (opacity 0.30 → 0.55 → 0.30 over 4s) + magnetic primary button.
+  11. Region pills — staggered spring scale-in from 0.85 + hover lift with gold border glow.
+  12. Smooth-scroll behavior added to `html` (with the existing `prefers-reduced-motion` override keeping it instant for users who request it).
+- Accessibility + performance hardened: `<MotionConfig reducedMotion="user">` wraps the entire view so every Framer Motion transform respects the OS-level motion preference. All heavy animations use `transform` + `opacity` (GPU-accelerated). Particle counts dial down on mobile (5→3 hero orbs, 10→6 hero sparkles, 12→4 monetization sparkles, 3→2 global/final-CTA orbs). Magnetic hover is disabled on touch devices. `useInView` uses `once: true` so animations don't re-fire on scroll-up.
+- Files modified: `src/app/globals.css`, `src/components/animated/count-up.tsx`, `src/components/views/landing-view.tsx`. No layout structure changed, no copy changed, no `navigate()` / `user` prop semantics changed.

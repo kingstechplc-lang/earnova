@@ -104,7 +104,7 @@ export default function DashboardView({
       <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" aria-hidden />
       <FloatingOrbs count={2} colors={['evergreen', 'gold']} className="opacity-25" />
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
+      <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl overflow-x-hidden">
       {/* Email verification banner */}
       <EmailVerificationBanner />
       {/* Header */}
@@ -343,14 +343,14 @@ export default function DashboardView({
         <StaggerContainer className="grid gap-3">
           {pages.map(p => (
             <StaggerItem key={p.id} y={15}>
-              <Card className="overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-0.5 hover:border-evergreen/30 bg-card/80 backdrop-blur-sm">
+              <Card className="overflow-hidden transition-all hover:shadow-elevated hover:-translate-y-0.5 hover:border-evergreen/30 bg-card/80 backdrop-blur-sm min-w-0">
                 <div className={`h-1 w-full ${
                   p.moderationState === 'APPROVED' ? 'bg-gradient-to-r from-evergreen to-evergreen-light' :
                   p.moderationState === 'PENDING' ? 'bg-gradient-to-r from-gold to-gold-dark' :
                   p.moderationState === 'BANNED' || p.moderationState === 'SUSPENDED' ? 'bg-gradient-to-r from-cranberry to-berry' :
                   'bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/20'
                 }`} />
-                <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
+                <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4 min-w-0">
                   <div className="min-w-0 flex-1 w-full sm:w-auto">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h3 className="font-semibold text-lg truncate">{p.title}</h3>
@@ -365,7 +365,7 @@ export default function DashboardView({
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground truncate font-mono">
+                    <p className="text-sm text-muted-foreground truncate font-mono break-all">
                       /p/{p.slug} · {p._count.blocks} blocks · {p.campaign?.title || 'No campaign'}
                     </p>
                   </div>

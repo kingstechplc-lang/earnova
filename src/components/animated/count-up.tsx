@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 /**
  * CountUp — animates a number from 0 (or previous value) to target.
  * Uses requestAnimationFrame with easeOutExpo.
+ *
+ * Pass `active={false}` to defer the start; flip it to `true` when the
+ * element enters view (e.g. via Framer Motion's `useInView`). This keeps
+ * the count hidden (rendered as the start value) until triggered.
  */
 export function CountUp({
   value,
@@ -12,6 +16,7 @@ export function CountUp({
   prefix = '',
   suffix = '',
   format = 'number',
+  active = true,
 }: {
   value: number
   duration?: number
@@ -19,12 +24,14 @@ export function CountUp({
   prefix?: string
   suffix?: string
   format?: 'number' | 'percent'
+  active?: boolean
 }) {
   const [display, setDisplay] = useState(0)
   const previousValue = useRef(0)
   const rafId = useRef<number>(0)
 
   useEffect(() => {
+    if (!active) return // Wait for parent to flip `active` true
     const startValue = previousValue.current
     const delta = value - startValue
     const startTime = performance.now()
@@ -43,7 +50,7 @@ export function CountUp({
     }
     rafId.current = requestAnimationFrame(tick)
     return () => { if (rafId.current) cancelAnimationFrame(rafId.current) }
-  }, [value, duration])
+  }, [value, duration, active])
 
   const formatted = format === 'percent' ? `${display}%` : display.toLocaleString()
   return (

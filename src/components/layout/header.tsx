@@ -65,10 +65,12 @@ export default function Header({
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
-          <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-evergreen to-evergreen-dark text-cream shadow-festive overflow-hidden ring-1 ring-gold/30">
+          <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-evergreen to-evergreen-dark text-cream shadow-festive ring-1 ring-gold/30">
             <Sparkles className="h-4 w-4 relative z-10" />
-            <span className="absolute inset-0 bg-gradient-to-tr from-transparent via-gold/30 to-transparent animate-pulse" />
-            <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-gold ring-2 ring-background live-pulse" />
+            {/* Animated gold sweep — more visible on all screens */}
+            <span className="absolute inset-0 rounded-xl bg-gradient-to-tr from-transparent via-gold/40 to-transparent animate-pulse" />
+            {/* Glowing gold indicator dot — outside the badge so it can't be clipped */}
+            <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-gold ring-2 ring-background live-pulse z-20" />
           </span>
           <span className="flex flex-col leading-tight text-left min-w-0">
             <span className="text-sm font-bold tracking-tight text-foreground">Earnova</span>
