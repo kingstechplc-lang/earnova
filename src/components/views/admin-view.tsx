@@ -121,8 +121,8 @@ export default function AdminView({
               <span className="text-xs uppercase tracking-wider font-semibold text-evergreen">Admin Console</span>
             </div>
             <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight mb-2">Platform controls</h1>
-            <p className="text-muted-foreground">
-              Logged in as <strong className="text-foreground">{user.email}</strong> ·{' '}
+            <p className="text-muted-foreground break-words">
+              Logged in as <strong className="text-foreground break-all">{user.email}</strong> ·{' '}
               <span className="text-evergreen font-medium">{user.role}</span>
             </p>
           </div>

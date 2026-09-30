@@ -200,12 +200,12 @@ export default function MonetizationView({
       )}
 
       {/* Existing integrations */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <h2 className="font-serif text-2xl font-bold">Your ad integrations</h2>
         <Button
           onClick={() => setShowCreate(true)}
           disabled={!disclaimer?.acknowledged}
-          className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden"
+          className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden flex-shrink-0"
         >
           <Plus className="h-4 w-4 mr-1.5" /> Connect ad network
         </Button>
@@ -253,11 +253,11 @@ export default function MonetizationView({
                           {cfg.icon}{cfg.label}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-mono text-xs">{int.integrationType}</span> · Zone: <span className="font-mono text-xs">{int.zoneIdentifier || '—'}</span>
+                      <p className="text-sm text-muted-foreground break-words">
+                        <span className="font-mono text-xs break-all">{int.integrationType}</span> · Zone: <span className="font-mono text-xs break-all">{int.zoneIdentifier || '—'}</span>
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Site: <span className="font-mono">{int.siteIdentifier || '—'}</span> · Created {new Date(int.createdAt).toLocaleDateString()}
+                      <p className="text-xs text-muted-foreground mt-1 break-words">
+                        Site: <span className="font-mono break-all">{int.siteIdentifier || '—'}</span> · Created {new Date(int.createdAt).toLocaleDateString()}
                       </p>
                       {int.rejectionReason && (
                         <p className="text-xs text-cranberry mt-1.5 flex items-center gap-1">
@@ -265,7 +265,7 @@ export default function MonetizationView({
                         </p>
                       )}
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex gap-2 flex-shrink-0 flex-wrap">
                       {int.lifecycleState === 'DRAFT' && (
                         <SubmitButton integrationId={int.id} onDone={reload} />
                       )}

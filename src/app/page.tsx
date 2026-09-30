@@ -189,7 +189,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex bg-background text-foreground">
       {showSidebar ? (
-        <div className="flex w-full">
+        <div className="flex flex-col md:flex-row w-full">
           <Sidebar
             user={user}
             view={view}
@@ -198,8 +198,8 @@ export default function Home() {
             collapsed={sidebarCollapsed}
             setCollapsed={setSidebarCollapsed}
           />
-          <div className="flex-1 flex flex-col min-w-0">
-            <main className="flex-1">
+          <div className="flex-1 flex flex-col min-w-0 w-full md:w-auto">
+            <main className="flex-1 min-w-0">
               <PageTransition key={view.name + ('pageId' in view ? view.pageId : '') + ('slug' in view ? view.slug : '') + ('postId' in view ? view.postId : '')}>
                 {view.name === 'dashboard' && user && <DashboardView user={user} navigate={navigate} />}
                 {view.name === 'builder' && user && <BuilderView pageId={view.pageId} user={user} navigate={navigate} />}

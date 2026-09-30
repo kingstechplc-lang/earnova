@@ -281,7 +281,7 @@ export function CommentsSection({
       <div className="mb-6">
         {currentUser ? (
           <div className="glass-card rounded-2xl border border-border/60 p-3">
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2 sm:gap-3">
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-evergreen to-evergreen-dark text-cream text-sm font-bold flex-shrink-0">
                 {(currentUser.name || currentUser.email)[0]?.toUpperCase()}
               </span>
@@ -299,7 +299,7 @@ export function CommentsSection({
                     }
                   }}
                 />
-                <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center justify-between mt-2 gap-2">
                   <span className="text-[10px] text-muted-foreground">
                     {draft.length}/5000 · ⌘/Ctrl+Enter to post
                   </span>
@@ -307,7 +307,7 @@ export function CommentsSection({
                     size="sm"
                     onClick={postComment}
                     disabled={!draft.trim() || posting}
-                    className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden"
+                    className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden flex-shrink-0"
                   >
                     {posting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Send className="h-3.5 w-3.5 mr-1" />}
                     Post
@@ -317,15 +317,15 @@ export function CommentsSection({
             </div>
           </div>
         ) : (
-          <div className="glass-card rounded-2xl border border-border/60 p-4 flex items-center gap-3">
+          <div className="glass-card rounded-2xl border border-border/60 p-4 flex items-center gap-3 flex-wrap">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground flex-shrink-0">
               <LogIn className="h-4 w-4" />
             </span>
-            <div className="flex-1">
+            <div className="flex-1 min-w-[12rem]">
               <p className="text-sm font-medium">Want to join the conversation?</p>
               <p className="text-xs text-muted-foreground">Log in to post a comment.</p>
             </div>
-            <Button size="sm" onClick={onLogin} className="bg-evergreen text-cream hover:bg-evergreen-dark">
+            <Button size="sm" onClick={onLogin} className="bg-evergreen text-cream hover:bg-evergreen-dark flex-shrink-0">
               Log in to comment
             </Button>
           </div>
@@ -459,9 +459,9 @@ function CommentItem({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      className={cn('rounded-xl', depth > 0 && 'pl-3 sm:pl-5 border-l-2 border-border/50 hover:border-evergreen/40 transition-colors')}
+      className={cn('rounded-xl', depth > 0 && depth <= 3 && 'pl-3 sm:pl-5 border-l-2 border-border/50 hover:border-evergreen/40 transition-colors')}
     >
-      <div className="flex items-start gap-3 py-2">
+      <div className="flex items-start gap-2 sm:gap-3 py-2">
         {/* Author avatar */}
         {comment.author.image ? (
           <img
@@ -478,9 +478,9 @@ function CommentItem({
         <div className="flex-1 min-w-0">
           {/* Author meta */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium">{authorName}</span>
+            <span className="text-sm font-medium break-words">{authorName}</span>
             {comment.author.username && (
-              <span className="text-xs text-muted-foreground">@{comment.author.username}</span>
+              <span className="text-xs text-muted-foreground truncate">@{comment.author.username}</span>
             )}
             <span className="text-[10px] text-muted-foreground">·</span>
             <span className="text-xs text-muted-foreground">{relativeTime(comment.createdAt)}</span>
@@ -521,11 +521,11 @@ function CommentItem({
 
           {/* Actions (only if not deleted) */}
           {!comment.isDeleted && !isEditing && (
-            <div className="flex items-center gap-1 mt-1">
+            <div className="flex items-center gap-1 mt-1 flex-wrap">
               {currentUser ? (
                 <button
                   onClick={() => setReplyingTo(isReplyOpen ? null : comment.id)}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded text-muted-foreground hover:text-evergreen hover:bg-evergreen/5 transition-colors"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded text-muted-foreground hover:text-evergreen hover:bg-evergreen/5 transition-colors min-h-[28px]"
                 >
                   <Reply className="h-3 w-3" />
                   Reply
@@ -533,7 +533,7 @@ function CommentItem({
               ) : (
                 <button
                   onClick={onLogin}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded text-muted-foreground hover:text-evergreen hover:bg-evergreen/5 transition-colors"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded text-muted-foreground hover:text-evergreen hover:bg-evergreen/5 transition-colors min-h-[28px]"
                 >
                   <LogIn className="h-3 w-3" /> Log in to reply
                 </button>
@@ -541,7 +541,7 @@ function CommentItem({
               {canEdit && (
                 <button
                   onClick={() => onStartEdit(comment)}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded text-muted-foreground hover:text-gold-dark hover:bg-gold/5 transition-colors"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded text-muted-foreground hover:text-gold-dark hover:bg-gold/5 transition-colors min-h-[28px]"
                 >
                   <Pencil className="h-3 w-3" />
                   Edit
@@ -551,7 +551,7 @@ function CommentItem({
                 <button
                   onClick={() => onDelete(comment.id)}
                   disabled={isDeleting}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded text-muted-foreground hover:text-cranberry hover:bg-cranberry/5 transition-colors disabled:opacity-60"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded text-muted-foreground hover:text-cranberry hover:bg-cranberry/5 transition-colors disabled:opacity-60 min-h-[28px]"
                 >
                   {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
                   Delete

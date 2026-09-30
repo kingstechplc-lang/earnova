@@ -351,7 +351,7 @@ export default function DashboardView({
                   'bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/20'
                 }`} />
                 <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 w-full sm:w-auto">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h3 className="font-semibold text-lg truncate">{p.title}</h3>
                       <ModBadge state={p.moderationState} />
@@ -369,7 +369,7 @@ export default function DashboardView({
                       /p/{p.slug} · {p._count.blocks} blocks · {p.campaign?.title || 'No campaign'}
                     </p>
                   </div>
-                  <div className="flex gap-2 flex-shrink-0">
+                  <div className="flex gap-2 flex-shrink-0 flex-wrap">
                     <Button size="sm" variant="ghost" onClick={() => navigate({ name: 'analytics', pageId: p.id })} className="hover:bg-evergreen/5 hover:text-evergreen">
                       <BarChart3 className="h-4 w-4 mr-1" /> Analytics
                     </Button>
@@ -407,11 +407,11 @@ function EmailVerificationBanner() {
 
   return (
     <FadeIn>
-      <div className="mb-6 p-3 rounded-xl border border-gold/40 bg-gradient-to-r from-gold/10 to-transparent flex items-center gap-3">
+      <div className="mb-6 p-3 rounded-xl border border-gold/40 bg-gradient-to-r from-gold/10 to-transparent flex items-center gap-3 flex-wrap">
         <div className="rounded-full bg-gold/20 p-2 flex-shrink-0">
           <Mail className="h-4 w-4 text-gold-dark" />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-[12rem]">
           <p className="text-sm font-medium">Verify your email to unlock all features</p>
           <p className="text-xs text-muted-foreground">Unverified accounts cannot create ad integrations.</p>
         </div>

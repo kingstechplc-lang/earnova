@@ -418,7 +418,7 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
           {profile.socialLinks.map((sl, i) => (
             <div
               key={i}
-              className="flex gap-2 items-center p-2 rounded-xl bg-gradient-to-r from-card/80 to-card/40 backdrop-blur-sm border border-border/50 hover:border-evergreen/30 transition-colors"
+              className="flex gap-2 items-center p-2 rounded-xl bg-gradient-to-r from-card/80 to-card/40 backdrop-blur-sm border border-border/50 hover:border-evergreen/30 transition-colors flex-wrap"
             >
               <span className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-evergreen/15 to-gold/10 text-evergreen font-bold text-xs uppercase">
                 {sl.platform ? sl.platform[0] : <Globe2 className="h-3.5 w-3.5" />}
@@ -431,7 +431,7 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
                   setProfile({ ...profile, socialLinks: links })
                 }}
                 placeholder="platform"
-                className="w-28 font-mono text-sm h-9 border-transparent bg-transparent focus-visible:border-border"
+                className="w-20 sm:w-28 font-mono text-sm h-9 border-transparent bg-transparent focus-visible:border-border flex-shrink-0"
               />
               <Input
                 value={sl.url}
@@ -441,13 +441,13 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
                   setProfile({ ...profile, socialLinks: links })
                 }}
                 placeholder="https://..."
-                className="flex-1 font-mono text-sm h-9 border-transparent bg-transparent focus-visible:border-border"
+                className="flex-1 min-w-[8rem] font-mono text-sm h-9 border-transparent bg-transparent focus-visible:border-border"
               />
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => setProfile({ ...profile, socialLinks: profile.socialLinks.filter((_, idx) => idx !== i) })}
-                className="text-muted-foreground hover:text-cranberry hover:bg-cranberry/5 h-9 px-2"
+                className="text-muted-foreground hover:text-cranberry hover:bg-cranberry/5 h-9 px-2 flex-shrink-0"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -471,11 +471,11 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3">
-        <Button variant="ghost" onClick={() => navigate({ name: 'dashboard' })}>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Button variant="ghost" onClick={() => navigate({ name: 'dashboard' })} className="flex-shrink-0">
           Skip for now
         </Button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-shrink-0">
           {savedFlash && (
             <motion.span
               initial={{ opacity: 0, scale: 0.8 }}

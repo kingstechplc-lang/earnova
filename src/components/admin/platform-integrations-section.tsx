@@ -224,7 +224,7 @@ export function PlatformIntegrationsSection() {
                           <Badge variant="outline" className="text-muted-foreground">Inactive</Badge>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
                         <div>
                           <span className="font-medium text-foreground">Type:</span> <code className="font-mono">{int.integrationType}</code>
                         </div>
@@ -598,7 +598,7 @@ function IntegrationDialog({
             <p className="text-[10px] text-muted-foreground mt-1">The CDN domain your ad network serves tags from. Found in the ad code snippet from your publisher dashboard.</p>
           </div>
           {integrationType === 'BANNER' && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">Banner width (px)</Label>
                 <Input

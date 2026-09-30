@@ -251,7 +251,7 @@ function Toolbar({ editor }: { editor: Editor }) {
   }, [editor])
 
   const btn = (active: boolean) =>
-    `inline-flex items-center justify-center h-8 w-8 rounded-md text-sm transition-all ${
+    `inline-flex items-center justify-center h-9 w-9 rounded-md text-sm transition-all flex-shrink-0 ${
       active
         ? 'bg-evergreen/15 text-evergreen'
         : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
@@ -330,7 +330,7 @@ function Toolbar({ editor }: { editor: Editor }) {
         {/* Font family + size */}
         <select
           onChange={e => setFontFamily(e.target.value)}
-          className="h-8 rounded-md border border-border/60 bg-background text-xs px-2 cursor-pointer hover:bg-muted/40"
+          className="h-9 rounded-md border border-border/60 bg-background text-xs px-2 cursor-pointer hover:bg-muted/40 flex-shrink-0 max-w-[8rem]"
           title="Font family"
           defaultValue=""
         >
@@ -342,7 +342,7 @@ function Toolbar({ editor }: { editor: Editor }) {
         </select>
         <select
           onChange={e => setFontSize(e.target.value)}
-          className="h-8 rounded-md border border-border/60 bg-background text-xs px-2 cursor-pointer hover:bg-muted/40"
+          className="h-9 rounded-md border border-border/60 bg-background text-xs px-2 cursor-pointer hover:bg-muted/40 flex-shrink-0"
           title="Font size"
           defaultValue="16px"
         >
@@ -368,7 +368,7 @@ function Toolbar({ editor }: { editor: Editor }) {
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className="fixed top-auto z-50 p-3 rounded-lg border border-border bg-card shadow-elevated w-[280px]"
+                className="fixed top-auto z-50 p-3 rounded-lg border border-border bg-card shadow-elevated w-[280px] max-w-[calc(100vw-2rem)]"
                 style={{ left: 'auto', right: 0 }}
               >
                 {/* Solid colors */}
@@ -547,25 +547,25 @@ function Toolbar({ editor }: { editor: Editor }) {
             exit={{ opacity: 0, height: 0 }}
             className="border-t border-border/60 bg-background/80 backdrop-blur-sm overflow-hidden"
           >
-            <div className="flex items-center gap-2 p-2">
+            <div className="flex items-center gap-2 p-2 flex-wrap">
               <input
                 type="url"
                 value={linkUrl}
                 onChange={e => setLinkUrl(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirmLink() } }}
                 placeholder="https://example.com"
-                className="flex-1 h-9 px-3 rounded-md border border-border bg-background text-sm"
+                className="flex-1 min-w-[12rem] h-9 px-3 rounded-md border border-border bg-background text-sm"
                 autoFocus
               />
               <button
                 onClick={confirmLink}
-                className="inline-flex items-center justify-center h-9 px-3 rounded-md bg-evergreen text-cream text-sm font-medium hover:bg-evergreen-dark"
+                className="inline-flex items-center justify-center h-9 px-3 rounded-md bg-evergreen text-cream text-sm font-medium hover:bg-evergreen-dark flex-shrink-0"
               >
                 <Check className="h-4 w-4 mr-1" /> Apply
               </button>
               <button
                 onClick={() => setLinkOpen(false)}
-                className="inline-flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground hover:bg-muted"
+                className="inline-flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground hover:bg-muted flex-shrink-0"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -583,25 +583,25 @@ function Toolbar({ editor }: { editor: Editor }) {
             exit={{ opacity: 0, height: 0 }}
             className="border-t border-border/60 bg-background/80 backdrop-blur-sm overflow-hidden"
           >
-            <div className="flex items-center gap-2 p-2">
+            <div className="flex items-center gap-2 p-2 flex-wrap">
               <input
                 type="url"
                 value={imageUrl}
                 onChange={e => setImageUrl(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirmImage() } }}
                 placeholder="https://example.com/image.jpg"
-                className="flex-1 h-9 px-3 rounded-md border border-border bg-background text-sm"
+                className="flex-1 min-w-[12rem] h-9 px-3 rounded-md border border-border bg-background text-sm"
                 autoFocus
               />
               <button
                 onClick={confirmImage}
-                className="inline-flex items-center justify-center h-9 px-3 rounded-md bg-evergreen text-cream text-sm font-medium hover:bg-evergreen-dark"
+                className="inline-flex items-center justify-center h-9 px-3 rounded-md bg-evergreen text-cream text-sm font-medium hover:bg-evergreen-dark flex-shrink-0"
               >
                 <ImageIcon className="h-4 w-4 mr-1" /> Insert
               </button>
               <button
                 onClick={() => { setImageOpen(false); setImageUrl('') }}
-                className="inline-flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground hover:bg-muted"
+                className="inline-flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground hover:bg-muted flex-shrink-0"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -614,19 +614,19 @@ function Toolbar({ editor }: { editor: Editor }) {
 }
 
 function Divider() {
-  return <span className="w-px h-6 bg-border/60 mx-0.5" />
+  return <span className="w-px h-6 bg-border/60 mx-0.5 flex-shrink-0" />
 }
 
 // ─── Status bar ──────────────────────────────────────────────────────────────
 
 function StatusBar({ editor }: { editor: Editor }) {
   return (
-    <div className="border-t border-border/60 bg-background/40 px-3 py-1.5 flex items-center justify-between text-xs text-muted-foreground">
-      <div className="flex items-center gap-3">
-        <span>{editor.storage.characterCount?.characters() || 0} chars</span>
-        <span>{editor.storage.characterCount?.words() || 0} words</span>
+    <div className="border-t border-border/60 bg-background/40 px-3 py-1.5 flex items-center justify-between text-xs text-muted-foreground gap-2">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="flex-shrink-0">{editor.storage.characterCount?.characters() || 0} chars</span>
+        <span className="flex-shrink-0">{editor.storage.characterCount?.words() || 0} words</span>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-shrink-0">
         {editor.isActive('link') && <span className="text-evergreen">🔗 Link active</span>}
         {editor.can().undo() && <span>↶ Undo available</span>}
       </div>

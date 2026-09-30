@@ -418,12 +418,12 @@ function SlotCard({
     <Card className={`overflow-hidden ${!config.enabled ? 'opacity-60' : ''}`}>
       <div className={`h-1.5 w-full bg-gradient-to-r ${accent}`} />
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <span className="rounded-md bg-muted/40 p-1.5 text-foreground">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="text-base flex items-center gap-2 min-w-0">
+            <span className="rounded-md bg-muted/40 p-1.5 text-foreground flex-shrink-0">
               {icon}
             </span>
-            <span>{slotLabel}</span>
+            <span className="truncate">{slotLabel}</span>
           </CardTitle>
           {sourceBadge}
         </div>

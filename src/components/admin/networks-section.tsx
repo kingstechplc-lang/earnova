@@ -73,15 +73,15 @@ export function NetworksSection() {
   return (
     <div className="space-y-4">
       <FadeIn>
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <div>
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <div className="min-w-0 flex-1">
             <h3 className="font-serif text-xl font-bold flex items-center gap-2">
               <Network className="h-5 w-5 text-evergreen" />
               Ad Networks
             </h3>
             <p className="text-sm text-muted-foreground">{networks.length} total · {networks.filter(n => n.status === 'ACTIVE').length} active</p>
           </div>
-          <Button onClick={() => setCreating(true)} className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden">
+          <Button onClick={() => setCreating(true)} className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden flex-shrink-0">
             <Plus className="h-4 w-4 mr-1" /> New network
           </Button>
         </div>
@@ -241,7 +241,7 @@ function NetworkDialog({
           onClose={onClose}
         />
         <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Code</Label>
               <Input
@@ -282,7 +282,7 @@ function NetworkDialog({
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Policy doc URL (optional)</Label>
               <Input

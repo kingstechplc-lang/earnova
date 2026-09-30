@@ -74,15 +74,15 @@ export function CompatibilitySection() {
   return (
     <div className="space-y-4">
       <FadeIn>
-        <div className="flex items-center justify-between gap-3 mb-2">
-          <div>
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <div className="min-w-0 flex-1">
             <h3 className="font-serif text-xl font-bold flex items-center gap-2">
               <Grid3x3 className="h-5 w-5 text-evergreen" />
               Compatibility matrix
             </h3>
             <p className="text-sm text-muted-foreground">Rules that govern which ad networks can render together on the same page.</p>
           </div>
-          <Button onClick={() => setCreating(true)} className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden">
+          <Button onClick={() => setCreating(true)} className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden flex-shrink-0">
             <Plus className="h-4 w-4 mr-1" /> New rule
           </Button>
         </div>
@@ -276,7 +276,7 @@ function RuleDialog({
         />
         <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           {!rule && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">Network A</Label>
                 <Select value={networkAId} onValueChange={setNetworkAId}>
@@ -322,7 +322,7 @@ function RuleDialog({
             </div>
           </div>
           {verdict !== 'FORBIDDEN' && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">Max simultaneous units</Label>
                 <Input

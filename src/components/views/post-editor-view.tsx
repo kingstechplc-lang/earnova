@@ -463,11 +463,11 @@ export default function PostEditorView({
               {post && (
                 <div>
                   <Label className="text-xs uppercase tracking-wide text-muted-foreground">URL</Label>
-                  <div className="mt-1 flex items-center gap-2 text-sm">
-                    <code className="font-mono text-evergreen bg-evergreen/5 px-2 py-1 rounded border border-evergreen/20">
+                  <div className="mt-1 flex items-center gap-2 text-sm flex-wrap">
+                    <code className="font-mono text-evergreen bg-evergreen/5 px-2 py-1 rounded border border-evergreen/20 break-all max-w-full">
                       /post/{post.id}
                     </code>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground flex-1 min-w-[12rem]">
                       URL uses the post ID for stability (slug changes won&apos;t break shared links).
                     </span>
                   </div>
@@ -630,7 +630,7 @@ export default function PostEditorView({
           the sidebar-aware content area and doesn't cover the sidebar */}
       <div className="sticky bottom-0 z-30 border-t border-border/60 bg-background/85 backdrop-blur-lg">
         <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-gold/40 to-transparent" aria-hidden />
-        <div className="px-4 py-3 flex flex-wrap items-center gap-2">
+        <div className="px-4 py-3 flex flex-wrap items-center gap-2 justify-end">
           <Button
             onClick={handleSaveDraft}
             disabled={saving || !title.trim()}
@@ -690,8 +690,6 @@ export default function PostEditorView({
             </Button>
           )}
 
-          <div className="flex-1" />
-
           {/* Delete (only when post exists) */}
           {currentPostId && (
             <Button
@@ -699,7 +697,7 @@ export default function PostEditorView({
               disabled={saving}
               variant="ghost"
               size="sm"
-              className="text-cranberry hover:bg-cranberry/5"
+              className="text-cranberry hover:bg-cranberry/5 flex-shrink-0"
             >
               <Trash2 className="h-4 w-4 mr-1.5" /> Delete
             </Button>

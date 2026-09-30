@@ -192,15 +192,15 @@ export default function PublicProfileView({ username, navigate }: { username: st
             </div>
 
             {/* Name + meta */}
-            <div className="flex-1 text-center md:text-left">
-              <h1 className="font-serif text-2xl md:text-3xl font-bold text-cream">
+            <div className="flex-1 text-center md:text-left min-w-0">
+              <h1 className="font-serif text-2xl md:text-3xl font-bold text-cream break-words">
                 {profile.name || profile.username}
               </h1>
               {profile.username && (
-                <p className="text-cream/70 text-sm">@{profile.username}</p>
+                <p className="text-cream/70 text-sm truncate">@{profile.username}</p>
               )}
               {profile.bio && (
-                <p className="text-cream/80 text-sm mt-2 max-w-md">{profile.bio}</p>
+                <p className="text-cream/80 text-sm mt-2 max-w-md break-words">{profile.bio}</p>
               )}
               <div className="flex flex-wrap gap-2 mt-2 justify-center md:justify-start">
                 {profile.country && (

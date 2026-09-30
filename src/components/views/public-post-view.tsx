@@ -301,7 +301,7 @@ export default function PublicPostView({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="font-serif text-3xl md:text-4xl font-bold tracking-tight leading-tight mb-6"
+            className="font-serif text-3xl md:text-4xl font-bold tracking-tight leading-tight mb-6 break-words"
           >
             <span className="gradient-text-evergreen">{post.title}</span>
           </motion.h1>
@@ -311,11 +311,11 @@ export default function PublicPostView({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
-            className="flex items-center gap-3 pb-6 mb-6 border-b border-border/60"
+            className="flex items-center gap-3 pb-6 mb-6 border-b border-border/60 flex-wrap"
           >
             <button
               onClick={() => post.author.username && navigate({ name: 'public-profile', username: post.author.username })}
-              className="flex items-center gap-3 group"
+              className="flex items-center gap-3 group min-w-0 flex-1 sm:flex-none"
               disabled={!post.author.username}
               title={post.author.username ? `View ${authorName}'s profile` : 'Author has no public profile'}
             >
@@ -323,26 +323,26 @@ export default function PublicPostView({
                 <img
                   src={post.author.image}
                   alt={authorName}
-                  className="h-11 w-11 rounded-full object-cover border-2 border-background shadow-festive"
+                  className="h-11 w-11 rounded-full object-cover border-2 border-background shadow-festive flex-shrink-0"
                 />
               ) : (
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-gold to-gold-dark text-cream text-lg font-bold shadow-gold ring-2 ring-background">
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-gold to-gold-dark text-cream text-lg font-bold shadow-gold ring-2 ring-background flex-shrink-0">
                   {authorInitial}
                 </span>
               )}
-              <span className="text-left">
-                <span className="block font-medium text-foreground group-hover:text-evergreen transition-colors">
+              <span className="text-left min-w-0">
+                <span className="block font-medium text-foreground group-hover:text-evergreen transition-colors truncate">
                   {authorName}
                 </span>
                 {post.author.username && (
-                  <span className="block text-xs text-muted-foreground group-hover:text-evergreen/70 transition-colors">
+                  <span className="block text-xs text-muted-foreground group-hover:text-evergreen/70 transition-colors truncate">
                     @{post.author.username} · View profile
                   </span>
                 )}
               </span>
             </button>
             {publishedDate && (
-              <span className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <span className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
                 <Clock className="h-3 w-3" /> {publishedDate}
               </span>
             )}

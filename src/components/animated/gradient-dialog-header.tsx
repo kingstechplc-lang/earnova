@@ -110,13 +110,13 @@ export function GradientDialogHeader({
       />
 
       <DialogHeader className="relative p-6 pb-4 pr-12 space-y-2">
-        <DialogTitle className={`font-serif text-2xl font-bold flex items-center gap-3 ${v.text}`}>
+        <DialogTitle className={`font-serif text-xl sm:text-2xl font-bold flex items-center gap-3 ${v.text} flex-wrap`}>
           {Icon && (
             <motion.span
               initial={{ scale: 0, rotate: -30 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', stiffness: 200, delay: 0.1 }}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm ring-2 ring-white/30"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm ring-2 ring-white/30 flex-shrink-0"
             >
               <Icon className="h-5 w-5" />
             </motion.span>
@@ -125,10 +125,11 @@ export function GradientDialogHeader({
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.15 }}
+            className="break-words min-w-0 flex-1"
           >
             {title}
           </motion.span>
-          <Sparkles className={`h-4 w-4 ml-auto ${v.sparkle} anim-sparkle-pulse`} />
+          <Sparkles className={`h-4 w-4 ml-auto ${v.sparkle} anim-sparkle-pulse flex-shrink-0`} />
         </DialogTitle>
         {description && (
           <motion.div
