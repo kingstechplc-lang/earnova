@@ -18,6 +18,9 @@ import PublicProfileView from '@/components/views/public-profile-view'
 import PostsView from '@/components/views/posts-view'
 import PostEditorView from '@/components/views/post-editor-view'
 import PublicPostView from '@/components/views/public-post-view'
+import ExploreView from '@/components/views/explore-view'
+import SearchView from '@/components/views/search-view'
+import FeedView from '@/components/views/feed-view'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import Sidebar from '@/components/layout/sidebar'
@@ -37,6 +40,9 @@ export type View =
   | { name: 'posts' }
   | { name: 'post-editor'; postId?: string }
   | { name: 'public-post'; postId?: string; username?: string; slug?: string }
+  | { name: 'explore' }
+  | { name: 'search'; query?: string }
+  | { name: 'feed'; tab?: string }
 
 export type CurrentUser = { id: string; email: string; name: string | null; username: string | null; role: string; emailVerified?: boolean }
 
@@ -75,6 +81,10 @@ export default function Home() {
       // Support BOTH new format #/post/[username]/[slug] AND legacy #/post/[id]
       const postByUserMatch = hash.match(/^#\/post\/([^/]+)\/(.+)$/)
       const postByIdMatch = hash.match(/^#\/post\/([^/]+)$/)
+      // Discovery views: #/explore, #/search?q=..., #/feed?tab=...
+      const exploreMatch = hash.match(/^#\/explore(?:\?.*)?$/)
+      const searchMatch = hash.match(/^#\/search(?:\?(.*))?$/)
+      const feedMatch = hash.match(/^#\/feed(?:\?(.*))?$/)
 
       if (pageMatch) {
         setView({ name: 'public', slug: decodeURIComponent(pageMatch[1]) })
@@ -89,6 +99,16 @@ export default function Home() {
       } else if (postByIdMatch) {
         // Legacy format: #/post/[cuid] — still works, just less pretty
         setView({ name: 'public-post', postId: decodeURIComponent(postByIdMatch[1]) })
+      } else if (exploreMatch) {
+        setView({ name: 'explore' })
+      } else if (searchMatch) {
+        const params = new URLSearchParams(searchMatch[1] || '')
+        const q = params.get('q') || undefined
+        setView({ name: 'search', query: q })
+      } else if (feedMatch) {
+        const params = new URLSearchParams(feedMatch[1] || '')
+        const tab = params.get('tab') || undefined
+        setView({ name: 'feed', tab })
       } else if (u) {
         // Logged in, no public hash — restore from sessionStorage
         try {
@@ -140,6 +160,12 @@ export default function Home() {
         } else if (v.postId) {
           newHash = `#/post/${v.postId}`
         }
+      } else if (v.name === 'explore') {
+        newHash = '#/explore'
+      } else if (v.name === 'search') {
+        newHash = v.query ? `#/search?q=${encodeURIComponent(v.query)}` : '#/search'
+      } else if (v.name === 'feed') {
+        newHash = v.tab ? `#/feed?tab=${encodeURIComponent(v.tab)}` : '#/feed'
       }
 
       const currentHash = window.location.hash
@@ -167,9 +193,12 @@ export default function Home() {
       const profileMatch = h.match(/^#\/profile\/(.+)$/)
       const postByUserMatch = h.match(/^#\/post\/([^/]+)\/(.+)$/)
       const postByIdMatch = h.match(/^#\/post\/([^/]+)$/)
+      const exploreMatch = h.match(/^#\/explore(?:\?.*)?$/)
+      const searchMatch = h.match(/^#\/search(?:\?(.*))?$/)
+      const feedMatch = h.match(/^#\/feed(?:\?(.*))?$/)
       if (pageMatch) navigate({ name: 'public', slug: decodeURIComponent(pageMatch[1]) })
-      if (profileMatch) navigate({ name: 'public-profile', username: decodeURIComponent(profileMatch[1]) })
-      if (postByUserMatch) {
+      else if (profileMatch) navigate({ name: 'public-profile', username: decodeURIComponent(profileMatch[1]) })
+      else if (postByUserMatch) {
         navigate({
           name: 'public-post',
           username: decodeURIComponent(postByUserMatch[1]),
@@ -177,6 +206,14 @@ export default function Home() {
         })
       } else if (postByIdMatch) {
         navigate({ name: 'public-post', postId: decodeURIComponent(postByIdMatch[1]) })
+      } else if (exploreMatch) {
+        navigate({ name: 'explore' })
+      } else if (searchMatch) {
+        const params = new URLSearchParams(searchMatch[1] || '')
+        navigate({ name: 'search', query: params.get('q') || undefined })
+      } else if (feedMatch) {
+        const params = new URLSearchParams(feedMatch[1] || '')
+        navigate({ name: 'feed', tab: params.get('tab') || undefined })
       }
     }
     window.addEventListener('hashchange', handleHash)
@@ -225,7 +262,7 @@ export default function Home() {
           />
           <div className="flex-1 flex flex-col min-w-0 w-full md:w-auto">
             <main className="flex-1 min-w-0">
-              <PageTransition key={view.name + ('pageId' in view ? view.pageId : '') + ('slug' in view ? view.slug : '') + ('postId' in view ? view.postId : '')}>
+              <PageTransition key={view.name + ('pageId' in view ? view.pageId : '') + ('slug' in view ? view.slug : '') + ('postId' in view ? view.postId : '') + ('query' in view ? view.query : '') + ('tab' in view ? view.tab : '')}>
                 {view.name === 'dashboard' && user && <DashboardView user={user} navigate={navigate} />}
                 {view.name === 'builder' && user && <BuilderView pageId={view.pageId} user={user} navigate={navigate} />}
                 {view.name === 'monetization' && user && <MonetizationView user={user} navigate={navigate} />}
@@ -236,6 +273,10 @@ export default function Home() {
                 {view.name === 'admin' && user && (user.role === 'ADMIN' || user.role === 'MODERATOR') && (
                   <AdminView user={user} navigate={navigate} />
                 )}
+                {/* Discovery views — accessible to logged-in users from the sidebar. */}
+                {view.name === 'explore' && <ExploreView navigate={navigate} user={user} />}
+                {view.name === 'search' && <SearchView navigate={navigate} user={user} initialQuery={view.query} />}
+                {view.name === 'feed' && <FeedView navigate={navigate} user={user} initialTab={view.tab} />}
               </PageTransition>
             </main>
             <Footer />
@@ -245,13 +286,17 @@ export default function Home() {
         <div className="flex-1 flex flex-col">
           <Header user={user} view={view} navigate={navigate} onLogout={onLogout} />
           <main className="flex-1">
-            <PageTransition key={view.name + ('pageId' in view ? view.pageId : '') + ('slug' in view ? view.slug : '') + ('postId' in view ? view.postId : '')}>
+            <PageTransition key={view.name + ('pageId' in view ? view.pageId : '') + ('slug' in view ? view.slug : '') + ('postId' in view ? view.postId : '') + ('query' in view ? view.query : '') + ('tab' in view ? view.tab : '')}>
               {view.name === 'landing' && <LandingView navigate={navigate} user={user} />}
               {view.name === 'login' && <LoginView onAuth={onAuth} navigate={navigate} />}
               {view.name === 'signup' && <SignupView onAuth={onAuth} navigate={navigate} />}
               {view.name === 'public' && <PublicPageView slug={view.slug} navigate={navigate} />}
               {view.name === 'public-profile' && <PublicProfileView username={view.username} navigate={navigate} />}
               {view.name === 'public-post' && <PublicPostView postId={view.postId} username={view.username} slug={view.slug} navigate={navigate} />}
+              {/* Discovery views — also accessible to logged-out users via the header. */}
+              {view.name === 'explore' && <ExploreView navigate={navigate} user={user} />}
+              {view.name === 'search' && <SearchView navigate={navigate} user={user} initialQuery={view.query} />}
+              {view.name === 'feed' && <FeedView navigate={navigate} user={user} initialTab={view.tab} />}
             </PageTransition>
           </main>
           <Footer />

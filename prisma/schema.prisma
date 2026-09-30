@@ -498,6 +498,7 @@ model Post {
   reactions       Reaction[]
   comments        Comment[]
   saves           Save[]
+  categories      PostCategory[]
 
   @@unique([authorId, slug])   // post slug is unique per author (e.g. /@kingsley/my-first-post)
   @@index([authorId, status, publishedAt])  // feed query: author's published posts by date
@@ -600,6 +601,49 @@ model Save {
 
   @@unique([userId, postId])  // prevents duplicate saves
   @@index([userId, createdAt])
+}
+
+// ─── DISCOVERY (Phase 5) ───────────────────────────────────────────────────
+//
+// Per spec sections 10, 16-18:
+//   - Explore page with trending, new creators, rising creators, popular pages
+//   - Global search across creators, pages, posts, events, campaigns
+//   - Trending weighted by engagement velocity (not just raw view count)
+//   - Feed with For You / Following / Trending / Latest tabs
+//
+// Categories provide structured content discovery. Posts can be tagged with
+// one or more categories. The explore page surfaces categories with the
+// most published content.
+
+model Category {
+  id          String   @id @default(cuid())
+  slug        String   @unique  // e.g. "music", "photography", "gaming"
+  name        String             // display name
+  description String?
+  icon        String?            // emoji or icon name
+  color       String?            // hex color for UI accent
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  posts       PostCategory[]
+
+  @@index([slug])
+}
+
+// Join table — a post can belong to multiple categories.
+// E.g., a post about "Christmas music" could be in both "music" + "celebration".
+model PostCategory {
+  id          String   @id @default(cuid())
+  postId      String
+  categoryId  String
+  createdAt   DateTime @default(now())
+
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, categoryId])  // prevents duplicate category assignments
+  @@index([categoryId])
+  @@index([postId])
 }
 
 // ── Notifications ───────────────────────────────────────────────────────────
