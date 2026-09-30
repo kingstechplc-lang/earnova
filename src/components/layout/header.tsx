@@ -1,6 +1,6 @@
 'use client'
 import { Button } from '@/components/ui/button'
-import { Sparkles, LayoutDashboard, Wallet, Shield, LogOut, Menu, X } from 'lucide-react'
+import { Sparkles, LayoutDashboard, Wallet, Shield, LogOut, Menu, X, Compass, Rss } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { NotificationsBell } from '@/components/social/notifications-bell'
@@ -86,6 +86,8 @@ export default function Header({
           {user ? (
             <>
               {navItem('Dashboard', <LayoutDashboard className="h-4 w-4" />, { name: 'dashboard' }, view.name === 'dashboard')}
+              {navItem('Explore', <Compass className="h-4 w-4" />, { name: 'explore' }, view.name === 'explore')}
+              {navItem('Feed', <Rss className="h-4 w-4" />, { name: 'feed' }, view.name === 'feed')}
               {navItem('Monetization', <Wallet className="h-4 w-4" />, { name: 'monetization' }, view.name === 'monetization')}
               {(user.role === 'ADMIN' || user.role === 'MODERATOR') &&
                 navItem('Admin', <Shield className="h-4 w-4" />, { name: 'admin' }, view.name === 'admin')
@@ -117,6 +119,9 @@ export default function Header({
             </>
           ) : (
             <>
+              {/* Discovery nav — Explore + Feed are accessible to logged-out users. */}
+              {navItem('Explore', <Compass className="h-4 w-4" />, { name: 'explore' }, view.name === 'explore')}
+              {navItem('Feed', <Rss className="h-4 w-4" />, { name: 'feed' }, view.name === 'feed')}
               <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'login' })} className="text-foreground/70 hover:text-foreground">
                 Log in
               </Button>
@@ -188,6 +193,8 @@ export default function Header({
               {user ? (
                 <>
                   <MobileNavItem icon={<LayoutDashboard className="h-4 w-4" />} label="Dashboard" onClick={() => { navigate({ name: 'dashboard' }); setMobileOpen(false) }} active={view.name === 'dashboard'} />
+                  <MobileNavItem icon={<Compass className="h-4 w-4" />} label="Explore" onClick={() => { navigate({ name: 'explore' }); setMobileOpen(false) }} active={view.name === 'explore'} />
+                  <MobileNavItem icon={<Rss className="h-4 w-4" />} label="Feed" onClick={() => { navigate({ name: 'feed' }); setMobileOpen(false) }} active={view.name === 'feed'} />
                   <MobileNavItem icon={<Wallet className="h-4 w-4" />} label="Monetization" onClick={() => { navigate({ name: 'monetization' }); setMobileOpen(false) }} active={view.name === 'monetization'} />
                   {(user.role === 'ADMIN' || user.role === 'MODERATOR') && (
                     <MobileNavItem icon={<Shield className="h-4 w-4" />} label="Admin" onClick={() => { navigate({ name: 'admin' }); setMobileOpen(false) }} active={view.name === 'admin'} />
@@ -198,6 +205,8 @@ export default function Header({
                 </>
               ) : (
                 <>
+                  <MobileNavItem icon={<Compass className="h-4 w-4" />} label="Explore" onClick={() => { navigate({ name: 'explore' }); setMobileOpen(false) }} active={view.name === 'explore'} />
+                  <MobileNavItem icon={<Rss className="h-4 w-4" />} label="Feed" onClick={() => { navigate({ name: 'feed' }); setMobileOpen(false) }} active={view.name === 'feed'} />
                   <MobileNavItem label="Log in" onClick={() => { navigate({ name: 'login' }); setMobileOpen(false) }} />
                   <Button size="sm" onClick={() => { navigate({ name: 'signup' }); setMobileOpen(false) }} className="bg-evergreen text-cream mt-1">
                     Get started

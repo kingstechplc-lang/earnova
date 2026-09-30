@@ -1037,3 +1037,124 @@ Stage Summary:
   12. Smooth-scroll behavior added to `html` (with the existing `prefers-reduced-motion` override keeping it instant for users who request it).
 - Accessibility + performance hardened: `<MotionConfig reducedMotion="user">` wraps the entire view so every Framer Motion transform respects the OS-level motion preference. All heavy animations use `transform` + `opacity` (GPU-accelerated). Particle counts dial down on mobile (5→3 hero orbs, 10→6 hero sparkles, 12→4 monetization sparkles, 3→2 global/final-CTA orbs). Magnetic hover is disabled on touch devices. `useInView` uses `once: true` so animations don't re-fire on scroll-up.
 - Files modified: `src/app/globals.css`, `src/components/animated/count-up.tsx`, `src/components/views/landing-view.tsx`. No layout structure changed, no copy changed, no `navigate()` / `user` prop semantics changed.
+
+---
+Task ID: 22
+Agent: subagent (Phase 5 discovery APIs)
+Task: Build Explore + Search + Feed API routes
+
+Work Log:
+- Read worklog.md to load Phase 3 (Posts) + Phase 4 (Social) context — confirmed Follow model, Post engagement counters, Category/PostCategory join, Campaign lifecycle, ProfileVisibility enum, trust-score composite on TrustScore, and the `getCurrentUser` + cursor-pagination conventions used by /api/posts and /api/followers/[username].
+- src/app/api/explore/route.ts (NEW, ~260 lines, GET only):
+  * Single bundle endpoint returning trendingPosts / newCreators / risingCreators / popularPages / categories / featuredCampaigns.
+  * Trending posts via `db.$queryRaw` with Prisma.sql — score = `(like_count*3) + (comment_count*2) + (share_count*4) + (save_count*2) + (view_count*0.1)` computed + sorted in Postgres. Filters: status=PUBLISHED, visibility=PUBLIC, moderationState=APPROVED, published_at >= NOW() - INTERVAL '7 days'. Top 5. Author/page/campaign/categories hydrated in a single follow-up findMany to avoid N+1.
+  * New creators: users created in last 7 days with profileVisibility=PUBLIC + username set. Over-fetch 50, sort by `_count.followers` DESC in JS (User has no denormalized followerCount field), take 5. Returns username/name/image/bio/createdAt/followerCount.
+  * Rising creators: `db.follow.groupBy({ by: ['followeeId'], where: { createdAt: { gte: sevenDaysAgo } } })` ordered by `_count.id` DESC, take 5. Hydrate with the user record + total follower count. Skips users with non-PUBLIC profile visibility.
+  * Popular pages: PUBLISHED + APPROVED, sorted by latest TrustScore composite DESC, fallback to PageAnalytics.pageViews30d. Returns owner info, trustScore, pageViews30d, publishedPostCount.
+  * Categories: all categories with `_count.posts` filtered to PUBLISHED+PUBLIC+APPROVED posts. Sort by postCount DESC.
+  * Featured campaigns: active campaigns (isActive=true AND startsAt<=now<=endsAt), ordered by featured DESC, take 3.
+- src/app/api/search/route.ts (NEW, ~200 lines, GET only):
+  * `?q=[query]&type=[creators|pages|posts|all]&cursor=X&limit=N`.
+  * Creators: usernameLower + name contains (case-insensitive, `mode: 'insensitive'`), profileVisibility=PUBLIC, username not null. Sorted by follower count DESC. No cursor (top-N is stable across pages — re-sorting each page is correct since the candidate pool rarely changes mid-search).
+  * Pages: title + description + slug contains, PUBLISHED + APPROVED. Cursor pagination (limit 20, max 50).
+  * Posts: title + excerpt + tags contains, PUBLISHED + PUBLIC + APPROVED. Cursor pagination.
+  * type=all (default): ignores cursor/limit, returns top 10 of each.
+  * Minimum query length 2 — shorter queries return empty arrays (no error).
+- src/app/api/feed/route.ts (NEW, ~440 lines, GET only):
+  * `?tab=[for-you|following|trending|latest]&cursor=X&limit=N`. Shared POST_SELECT shape so all tabs return the same post shape (id/slug/title/excerpt/type/coverImage/publishedAt + 5 engagement counters + author + page + campaign + categories).
+  * Latest tab: PUBLISHED+PUBLIC+APPROVED, orderBy publishedAt DESC, standard cursor (post.id).
+  * Trending tab: same score algorithm as /api/explore, but paginated. Cursor = `base64url(JSON.stringify({ s: score, i: id }))`. SQL filter on next page: `score < cursor.score OR (score = cursor.score AND id < cursor.id)`. Malformed cursor → restart from top.
+  * Following tab: requires `getCurrentUser()`. Fetches followed creator IDs, then their PUBLISHED+PUBLIC+APPROVED posts. Logged-out → `{ posts: [], nextCursor: null, message: 'Log in to see posts from creators you follow' }`.
+  * For You tab: requires `getCurrentUser()`. Falls back to Trending tab for logged-out users. Pulls followed creator IDs + user's `interests` JSON array up front. Mixes 60% from followed creators + 40% discovery (non-followed, ordered by publishedAt DESC). Personalized score: `engagement * recencyBonus * followedBonus * interestBonus` where recencyBonus = `1/(1+hoursSincePublished)`, followedBonus = 1.6 if author is followed else 1.0, interestBonus = 1.4 if post tags intersect user interests else 1.0. Cursor = last post.id; resolves to `publishedAt < cursorPost.publishedAt` cutoff so pages don't overlap when mixing pools.
+- Verification:
+  * `bun run lint` — passes (0 errors, exit 0, no output).
+  * `bunx tsc --noEmit` — passes after 2 fixes:
+    (a) `cursorClause` return type widened to `{ cursor?: { id: string }; skip?: number }` so the empty-object case spreads cleanly into Prisma findMany args without TS complaining about `cursor: undefined` narrowing.
+    (b) For-You score loop: use `p.author.id` (POST_SELECT only includes the nested `author`, not the flat `authorId`); use `p.tags!` non-null assertion inside the `.some()` predicate since `tags` is `string | null` but the `&&` already guards it.
+  * `DATABASE_URL=… bun run build` — succeeds: "✓ Compiled successfully in 17.9s", "✓ Generating static pages using 1 worker (38/38) in 759.7ms". All 3 routes show in the route table as ƒ (Dynamic) entries: `/api/explore`, `/api/feed`, `/api/search`.
+
+Stage Summary:
+- 3 new API route files (~900 total lines) wired into the existing /api/* tree. All follow the established conventions: `import { db } from '@/lib/db'`, `import { getCurrentUser } from '@/lib/auth'`, cursor pagination (`take: limit + 1`, `nextCursor = last.id`), JSON responses, PUBLISHED+PUBLIC+APPROVED content gates.
+- Trending score computed in SQL (not JS) per the spec — keeps the ORDER BY in Postgres for performance, supports index-friendly 7-day window filter.
+- Search uses `mode: 'insensitive'` for case-insensitive Postgres contains across username/title/description/slug/excerpt/tags.
+- Feed For-You algorithm blends followed-creator posts (60%) with discovery posts (40%) and sorts by a 4-factor personalized score (engagement × recency × followed-bonus × interest-bonus). Logged-out users fall back to Trending so the page never looks empty.
+- Trending tab cursor encodes the (score, id) tuple as base64url — keeps the cursor opaque to the client while supporting stable score-sorted pagination.
+- All 4 feed tabs share an identical response shape (posts[] + nextCursor), so the client can render a single FeedList component for any tab.
+
+---
+Task ID: 23
+Agent: subagent (Phase 5 discovery UI)
+Task: Build ExploreView + SearchView + FeedView + wire into router
+
+Work Log:
+- Read worklog.md (Phase 3 Posts + Phase 4 Social + design language from Tasks 12-15-22) and existing view patterns: dashboard-view (ambient layer + TiltCard stat cards), posts-view (PostCard + status tabs + safeFetch pagination), public-profile-view (creator avatar + FollowButton), public-post-view (loading + Alert error states), landing-view (Section layout + accent maps), safe-fetch (SafeFetchResult shape), motion (FadeIn / StaggerContainer / StaggerItem / PageTransition), header + sidebar nav structures.
+- Confirmed Task 22's API response shapes (trendingPosts with score, newCreators / risingCreators with followerCount, popularPages with trustScore, categories with postCount, featuredCampaigns) so the views can render every field returned by /api/explore, /api/search, /api/feed without re-fetching.
+- File 1: src/components/views/explore-view.tsx (NEW, ~800 lines):
+  * Ambient layer — mesh-bg opacity-40 + 2 FloatingOrbs (evergreen + gold) opacity-20, matches dashboard/posts views.
+  * Header — "Explore Earnova" gradient-text-evergreen title + "Discover creators, pages, and posts…" subtitle + "Search" outline button (navigates to { name: 'search' }).
+  * 6 sections rendered in order: Featured Campaigns (if any), Trending Posts, Rising Creators, New Creators, Popular Pages, Browse by Category. Each section uses a Section wrapper with title + accent icon + accent line + optional "See more →" action.
+  * Trending Posts row — horizontal scroll-snap row of TrendingPostCard (280px wide each). Each card: cover image (optional), type badge + first category, title, excerpt, engagement pills (views/likes/comments/shares with CountUp), author avatar + name. Click → navigate to public-post.
+  * Rising Creators row — same horizontal pattern but cards get a "🔥 +N this week" badge up top + berry accent line.
+  * New Creators row — same horizontal pattern with gold accent line. Uses the shared CreatorCard sub-component that shows avatar (gradient initial fallback), name + @username, follower count, bio (truncated), FollowButton (handles logged-out via "Log in to follow" CTA), and a "View →" link to public-profile.
+  * Popular Pages — StaggerContainer grid (1 / 2 / 3 cols) of PopularPageCard: page-type emoji tile, title + /p/slug, description (truncated), owner avatar + name, "View →" button. Card click → navigate to public page + sets window.location.hash.
+  * Categories — StaggerContainer grid (2 / 3 / 4 / 5 cols) of CategoryTile buttons: emoji icon, name, post count. Click → navigate to { name: 'search', query: category.name } (reuses search view as the category browser for MVP).
+  * Featured Campaigns — StaggerContainer grid (1 / 2 / 3 cols) of CampaignCard: "Featured" badge if featured, title, description, days-left countdown, post count, "Explore →" button → search with campaign title.
+  * Empty states for each section (e.g. "No trending posts yet — The trending shelf refreshes every hour — check back soon.").
+  * Loading state: ExploreHeaderSkeleton + 3 SectionSkeleton blocks.
+  * Error state: cranberry Alert + "Try again" button.
+  * Logged-out footer CTA: "Join Earnova today" card with Sparkles icon + Get started button → signup.
+- File 2: src/components/views/search-view.tsx (NEW, ~816 lines):
+  * Ambient layer matching ExploreView.
+  * Header — "Find anything" gradient-text-evergreen + subtitle + "Search across creators, pages, and posts."
+  * Large search input (h-12, rounded-xl, with Search icon on left + X clear button on right when query is non-empty). Auto-focuses on desktop (window.innerWidth >= 768 check).
+  * Type filter tabs (All / Creators / Pages / Posts) — pill buttons with icons, active state uses evergreen background + btn-glow.
+  * Debounced search (300ms) via setTimeout in useEffect. Minimum 2 characters to search — shorter queries clear the results.
+  * URL hash sync — updates window.location.hash to #/search?q=... via replaceState on debouncedQuery change. Doesn't trigger hashchange loop.
+  * type=all — renders 3 ResultsSection blocks (Creators, Pages, Posts), each capped at 6 cards. Section header shows count + "See all →" if the API returned 10+ results.
+  * type=creators / pages / posts — renders paginated grid + "Load more" button when nextCursor is present.
+  * Empty states: "Search for creators, pages, or posts" (no query yet), "No results for '...'" (after search with no results) with "Explore instead" CTA.
+  * Loading state: 3 skeleton cards (h-24 shimmer-bg).
+  * Error state: cranberry Alert + "Try again" button.
+  * Sub-components: CreatorCard (avatar + name + @username + follower count + bio + FollowButton + View link), PageCard (emoji tile + title + slug + description + owner + View button), PostCard (cover image + type badge + title + excerpt + engagement pills + author).
+  * Lint fix: wrapped runSearch() call + the type-change reset setState calls in window.setTimeout(0) to satisfy the react-hooks/set-state-in-effect rule (same pattern used by public-post-view.tsx).
+- File 3: src/components/views/feed-view.tsx (NEW, ~568 lines):
+  * Ambient layer + header "Your Feed" gradient-text-evergreen + subtitle + "Refresh" outline button (with RefreshCw icon, spins while refreshing).
+  * Tab bar — sticky top-2, glass-card container with 4 pill tabs: For You (Sparkles), Following (Users), Trending (TrendingUp), Latest (Clock). Active tab uses evergreen background + motion.span gradient underline (layoutId="feed-tab-underline").
+  * Following tab + not logged in → renders dedicated login CTA card ("Log in to see posts from creators you follow" + Log in + Explore creators buttons).
+  * Feed list — vertical StaggerContainer of FeedPostCard. Each card: cover image (h-44 sm:h-56), type + categories (up to 2) + campaign badges, title + excerpt, author row (avatar + name + @username + relative time), engagement pills (views/likes/comments/shares/saves with CountUp + page link).
+  * Infinite scroll — IntersectionObserver on a sentinel div with 400px rootMargin. When intersecting + nextCursor present + not loading → calls loadMore(). "Loading more…" spinner below list while fetching.
+  * End-of-feed marker — "You're all caught up" pill when nextCursor is null + posts exist.
+  * Per-tab empty states: For You ("Try following some creators!"), Following ("You're not following anyone yet"), Trending ("No trending posts right now"), Latest ("No posts yet. Be the first to publish!"). Each has a contextual CTA.
+  * URL hash sync — updates #/feed?tab=... via replaceState on tab change.
+  * Server message rendering — if the API returns a `message` field (e.g. "Log in to see posts from creators you follow" for the Following tab when logged out), renders a gold callout card above the feed.
+  * Pull-to-refresh MVP — Refresh button at top-right that re-fetches from scratch (no cursor).
+  * Lint fix: converted `post.author.username && navigate(...)` expression statement to a proper `if` block (no-unused-expressions warning).
+- File 4: src/app/page.tsx (MODIFIED, ~307 lines):
+  * Added imports for ExploreView, SearchView, FeedView.
+  * Extended `View` union type with 3 new variants: `{ name: 'explore' }`, `{ name: 'search'; query?: string }`, `{ name: 'feed'; tab?: string }`.
+  * Initial-load hash matching now recognizes #/explore, #/search?q=..., #/feed?tab=... (each with optional querystring via `(?:\?.*)?` or `(?:\?(.*))?`). Matches fall through to existing logic when not present.
+  * navigate() generates the correct hash for each new view (with encodeURIComponent for query/tab values).
+  * hashchange listener (browser back/forward) now also handles the 3 new hash patterns.
+  * Render branches added in BOTH the sidebar branch (logged-in) AND the header branch (logged-out) so Explore/Search/Feed work for both audiences. showSidebar already excluded only landing/login/signup/public/public-profile/public-post, so explore/search/feed naturally fall in the sidebar path when the user is logged in.
+  * PageTransition `key` extended with `'query' in view ? view.query : ''` + `'tab' in view ? view.tab : ''` so the search/feed transitions fire on query/tab changes.
+- File 5: src/components/layout/header.tsx (MODIFIED, ~238 lines):
+  * Imported Compass + Rss icons.
+  * Logged-in desktop nav: added "Explore" + "Feed" items between Dashboard and Monetization (4 items total before Admin/Monetization).
+  * Logged-out desktop nav: added "Explore" + "Feed" items before "Log in" so discovery is the primary nav for visitors.
+  * Mobile menu: parallel structure — logged-in users see Explore + Feed between Dashboard and Monetization; logged-out users see Explore + Feed before "Log in" + "Get started".
+- File 6: src/components/layout/sidebar.tsx (MODIFIED, ~348 lines):
+  * Imported Compass + Rss icons.
+  * Both desktop sidebar navItems array AND MobileDrawer navItems array updated: "Explore" + "Feed" inserted between Dashboard and Posts (Dashboard → Explore → Feed → Posts → Profile → Monetization → [Admin]).
+  * Active state for Explore also fires when view.name === 'search' (so the Explore pill stays highlighted while searching).
+- Verification:
+  * `bun run lint` — passes (0 errors, 0 warnings, exit 0, no output).
+  * `bunx tsc --noEmit` — passes (exit 0, no output).
+  * `DATABASE_URL=… bun run build` — succeeds: "✓ Compiled successfully in 19.3s", "✓ Generating static pages using 1 worker (38/38) in 711.5ms". All 3 new views + 3 new API routes (/api/explore, /api/feed, /api/search) appear in the route table.
+
+Stage Summary:
+- 3 new view components (~2,184 total lines) + 3 layout/router files modified. All views follow the established design language: 'use client' directive, ambient mesh-bg + FloatingOrbs layer, gradient-text-evergreen titles, glass cards with hover lift + evergreen border, CountUp for animated numbers, FadeIn/StaggerContainer/StaggerItem for reveal animations, safeFetch from @/lib/safe-fetch, mobile-first responsive (every section uses flex-wrap + grid-cols-2 sm:grid-cols-3 lg:grid-cols-N + overflow-x-auto for horizontal scrollers).
+- All 3 views handle BOTH logged-in + logged-out users: Explore/Search/Feed are wired into BOTH the sidebar branch (authenticated) and the header branch (public). Logged-out users see the same content + can click into public posts/pages/profiles; FollowButton shows a "Log in to follow" CTA.
+- URL hash routing: #/explore, #/search?q=... (with debounced querystring sync from the input), #/feed?tab=... (with tab sync from the tab bar). All use replaceState so browser history stays clean. Browser back/forward works via the hashchange listener.
+- Explore view presents a discovery bundle in 6 ordered sections (campaigns → trending → rising → new → pages → categories) with horizontal-snap scrollers for creator/post rows + grid layouts for pages/categories — avoids the "wall of cards" UX trap. Each section has its own empty state.
+- Search view debounces input (300ms), enforces a 2-char minimum, switches between type=all (3 sections capped at 6 cards each with "See all →" CTAs) and specific-type paginated lists with "Load more" buttons. URL hash syncs to the querystring so search results are shareable.
+- Feed view implements true infinite scroll via IntersectionObserver (400px rootMargin) + cursor pagination from /api/feed. Following tab gracefully degrades to a login CTA when logged out. Each of the 4 tabs has its own empty state with a contextual CTA (Explore creators, Create a post, etc.).
