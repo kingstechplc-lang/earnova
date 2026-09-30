@@ -5,5 +5,14 @@ import { getCurrentUser } from '@/lib/auth'
 export async function GET() {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ user: null })
-  return NextResponse.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } })
+  return NextResponse.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      username: user.username,
+      role: user.role,
+      emailVerified: !!user.emailVerified,
+    }
+  })
 }

@@ -228,7 +228,7 @@ export default function PublicPageView({
       )}
 
       {/* Content + ad placements */}
-      <article className="relative z-10 container mx-auto px-4 py-8 max-w-3xl">
+      <article className="relative z-10 container mx-auto px-4 py-8 max-w-3xl overflow-x-hidden">
         {placementBySlot('HEADER') && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

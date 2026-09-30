@@ -96,9 +96,11 @@ const POST_TYPE_EMOJI: Record<string, string> = {
 
 // ── Component ───────────────────────────────────────────────────────────────
 export default function PublicPostView({
-  postId, navigate,
+  postId, username, slug, navigate,
 }: {
-  postId: string
+  postId?: string
+  username?: string
+  slug?: string
   navigate: (v: View) => void
 }) {
   const [data, setData] = useState<ApiResponse | null>(null)
@@ -115,12 +117,30 @@ export default function PublicPostView({
   // button can smooth-scroll to it.
   const commentsRef = useRef<HTMLDivElement | null>(null)
 
+  // Determine which API path to use. Prefer the pretty /username/slug form
+  // (shareable + trustworthy), fall back to /id for legacy links.
+  // The pretty form lives at /api/public/post/[username]/[slug] (under
+  // /api/public/ to avoid Next.js routing conflicts with /api/posts/[id]).
+  const apiPath = (username && slug)
+    ? `/api/public/post/${encodeURIComponent(username)}/${encodeURIComponent(slug)}`
+    : postId
+      ? `/api/post/${postId}`
+      : null
+
   useEffect(() => {
+    if (!apiPath) {
+      // Defer to avoid the react-hooks/set-state-in-effect lint rule
+      const id = window.setTimeout(() => {
+        setError('Invalid post URL.')
+        setLoading(false)
+      }, 0)
+      return () => window.clearTimeout(id)
+    }
     let cancelled = false
     ;(async () => {
       setLoading(true)
       setError('')
-      const res = await safeFetch<ApiResponse>(`/api/post/${postId}`)
+      const res = await safeFetch<ApiResponse>(apiPath)
       if (cancelled) return
       if (res.error) {
         setError(res.error)
@@ -132,10 +152,20 @@ export default function PublicPostView({
       setLoading(false)
     })()
     return () => { cancelled = true }
-  }, [postId])
+  }, [apiPath])
 
   async function handleShare() {
-    const url = `${window.location.origin}/#/post/${postId}`
+    // Build the shareable URL — prefer the pretty username/slug form
+    const postAuthor = data?.post?.author
+    const postSlug = data?.post?.slug
+    let url: string
+    if (postAuthor?.username && postSlug) {
+      url = `${window.location.origin}/#/post/${encodeURIComponent(postAuthor.username)}/${encodeURIComponent(postSlug)}`
+    } else if (postId) {
+      url = `${window.location.origin}/#/post/${postId}`
+    } else {
+      url = window.location.href
+    }
     const title = post?.title || 'Earnova post'
     try {
       if (navigator.share) {
@@ -231,7 +261,7 @@ export default function PublicPostView({
         <div className="absolute inset-0 mesh-bg opacity-20 pointer-events-none" aria-hidden />
         <FloatingOrbs count={1} colors={['evergreen']} className="opacity-15" />
 
-        <article className="relative z-10 container mx-auto px-4 py-8 md:py-12 max-w-3xl">
+        <article className="relative z-10 container mx-auto px-4 py-8 md:py-12 max-w-3xl overflow-x-hidden">
           {/* Back link */}
           <FadeIn>
             <Button

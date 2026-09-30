@@ -36,9 +36,9 @@ export type View =
   | { name: 'public-profile'; username: string }
   | { name: 'posts' }
   | { name: 'post-editor'; postId?: string }
-  | { name: 'public-post'; postId: string }
+  | { name: 'public-post'; postId?: string; username?: string; slug?: string }
 
-export type CurrentUser = { id: string; email: string; name: string | null; role: string }
+export type CurrentUser = { id: string; email: string; name: string | null; username: string | null; role: string; emailVerified?: boolean }
 
 export default function Home() {
   const [view, setView] = useState<View>({ name: 'landing' })
@@ -72,14 +72,23 @@ export default function Home() {
       const hash = typeof window !== 'undefined' ? window.location.hash : ''
       const pageMatch = hash.match(/^#\/p\/(.+)$/)
       const profileMatch = hash.match(/^#\/profile\/(.+)$/)
-      const postMatch = hash.match(/^#\/post\/(.+)$/)
+      // Support BOTH new format #/post/[username]/[slug] AND legacy #/post/[id]
+      const postByUserMatch = hash.match(/^#\/post\/([^/]+)\/(.+)$/)
+      const postByIdMatch = hash.match(/^#\/post\/([^/]+)$/)
 
       if (pageMatch) {
         setView({ name: 'public', slug: decodeURIComponent(pageMatch[1]) })
       } else if (profileMatch) {
         setView({ name: 'public-profile', username: decodeURIComponent(profileMatch[1]) })
-      } else if (postMatch) {
-        setView({ name: 'public-post', postId: decodeURIComponent(postMatch[1]) })
+      } else if (postByUserMatch) {
+        setView({
+          name: 'public-post',
+          username: decodeURIComponent(postByUserMatch[1]),
+          slug: decodeURIComponent(postByUserMatch[2]),
+        })
+      } else if (postByIdMatch) {
+        // Legacy format: #/post/[cuid] — still works, just less pretty
+        setView({ name: 'public-post', postId: decodeURIComponent(postByIdMatch[1]) })
       } else if (u) {
         // Logged in, no public hash — restore from sessionStorage
         try {
@@ -118,13 +127,20 @@ export default function Home() {
       }
 
       // ── Update/clear the URL hash ──────────────────────────────────────
-      // Public views get a shareable hash (#/p/slug, #/profile/username, #/post/id).
-      // Authenticated views (dashboard, posts, builder, etc.) CLEAR the hash so
-      // a refresh doesn't redirect back to a previously-visited public page.
+      // Public views get a shareable hash. Posts use the pretty format
+      // #/post/[username]/[slug] when both are available (the post author's
+      // username + the post's slug). Falls back to #/post/[id] for legacy
+      // or when username/slug aren't set.
       let newHash = ''
       if (v.name === 'public') newHash = `#/p/${v.slug}`
       else if (v.name === 'public-profile') newHash = `#/profile/${v.username}`
-      else if (v.name === 'public-post') newHash = `#/post/${v.postId}`
+      else if (v.name === 'public-post') {
+        if (v.username && v.slug) {
+          newHash = `#/post/${v.username}/${v.slug}`
+        } else if (v.postId) {
+          newHash = `#/post/${v.postId}`
+        }
+      }
 
       const currentHash = window.location.hash
       if (newHash !== currentHash) {
@@ -149,10 +165,19 @@ export default function Home() {
       const h = window.location.hash
       const pageMatch = h.match(/^#\/p\/(.+)$/)
       const profileMatch = h.match(/^#\/profile\/(.+)$/)
-      const postMatch = h.match(/^#\/post\/(.+)$/)
+      const postByUserMatch = h.match(/^#\/post\/([^/]+)\/(.+)$/)
+      const postByIdMatch = h.match(/^#\/post\/([^/]+)$/)
       if (pageMatch) navigate({ name: 'public', slug: decodeURIComponent(pageMatch[1]) })
       if (profileMatch) navigate({ name: 'public-profile', username: decodeURIComponent(profileMatch[1]) })
-      if (postMatch) navigate({ name: 'public-post', postId: decodeURIComponent(postMatch[1]) })
+      if (postByUserMatch) {
+        navigate({
+          name: 'public-post',
+          username: decodeURIComponent(postByUserMatch[1]),
+          slug: decodeURIComponent(postByUserMatch[2]),
+        })
+      } else if (postByIdMatch) {
+        navigate({ name: 'public-post', postId: decodeURIComponent(postByIdMatch[1]) })
+      }
     }
     window.addEventListener('hashchange', handleHash)
     return () => window.removeEventListener('hashchange', handleHash)
@@ -226,7 +251,7 @@ export default function Home() {
               {view.name === 'signup' && <SignupView onAuth={onAuth} navigate={navigate} />}
               {view.name === 'public' && <PublicPageView slug={view.slug} navigate={navigate} />}
               {view.name === 'public-profile' && <PublicProfileView username={view.username} navigate={navigate} />}
-              {view.name === 'public-post' && <PublicPostView postId={view.postId} navigate={navigate} />}
+              {view.name === 'public-post' && <PublicPostView postId={view.postId} username={view.username} slug={view.slug} navigate={navigate} />}
             </PageTransition>
           </main>
           <Footer />

@@ -1184,3 +1184,55 @@
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
+
+/* Mobile overflow protection for rich text content — ensures long words,
+   URLs, code blocks, images, and tables never cause horizontal scroll */
+.prose-content {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  max-width: 100%;
+}
+.prose-content p,
+.prose-content li,
+.prose-content blockquote {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.prose-content pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.prose-content img {
+  max-width: 100%;
+  height: auto;
+}
+.prose-content table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.prose-content a {
+  word-break: break-all;
+}
+/* Rich text editor content — same protection */
+.rich-text-editor-content {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+.rich-text-editor-content pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.rich-text-editor-content img {
+  max-width: 100%;
+  height: auto;
+}
+.rich-text-editor-content table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}

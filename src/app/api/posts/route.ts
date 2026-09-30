@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
     include: {
       page: { select: { id: true, slug: true, title: true } },
       campaign: { select: { id: true, slug: true, title: true } },
+      author: { select: { id: true, name: true, username: true, image: true } },
     },
   })
 

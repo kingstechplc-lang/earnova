@@ -233,7 +233,7 @@ export function NotificationsBell({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-full mt-2 w-[min(92vw,22rem)] origin-top-right z-50 rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-elevated overflow-hidden"
+            className="fixed right-2 left-2 top-16 sm:absolute sm:left-auto sm:top-full sm:right-0 sm:w-[min(92vw,22rem)] origin-top-right z-50 rounded-xl border border-border bg-card/95 backdrop-blur-xl shadow-elevated overflow-hidden"
             role="dialog"
             aria-label="Notifications"
           >

@@ -350,41 +350,43 @@ export default function DashboardView({
                   p.moderationState === 'BANNED' || p.moderationState === 'SUSPENDED' ? 'bg-gradient-to-r from-cranberry to-berry' :
                   'bg-gradient-to-r from-muted-foreground/40 to-muted-foreground/20'
                 }`} />
-                <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4 min-w-0">
-                  <div className="min-w-0 flex-1 w-full sm:w-auto">
+                <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-4 min-w-0">
+                  <div className="min-w-0 flex-1 w-full">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h3 className="font-semibold text-lg truncate">{p.title}</h3>
+                      <h3 className="font-semibold text-base sm:text-lg truncate min-w-0">{p.title}</h3>
                       <ModBadge state={p.moderationState} />
                       {p.publishedAt ? (
-                        <Badge variant="outline" className="bg-evergreen/5 text-evergreen border-evergreen/30">
+                        <Badge variant="outline" className="bg-evergreen/5 text-evergreen border-evergreen/30 flex-shrink-0">
                           <span className="h-1.5 w-1.5 rounded-full bg-evergreen mr-1.5 animate-pulse" /> Published
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-muted-foreground/5 text-muted-foreground border-muted-foreground/30">
+                        <Badge variant="outline" className="bg-muted-foreground/5 text-muted-foreground border-muted-foreground/30 flex-shrink-0">
                           Draft
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground truncate font-mono break-all">
-                      /p/{p.slug} · {p._count.blocks} blocks · {p.campaign?.title || 'No campaign'}
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate font-mono min-w-0">
+                      <span className="break-all">/p/{p.slug}</span>
+                      <span className="hidden sm:inline"> · {p._count.blocks} blocks · {p.campaign?.title || 'No campaign'}</span>
+                      <span className="sm:hidden"> · {p._count.blocks} blocks</span>
                     </p>
                   </div>
-                  <div className="flex gap-2 flex-shrink-0 flex-wrap">
-                    <Button size="sm" variant="ghost" onClick={() => navigate({ name: 'analytics', pageId: p.id })} className="hover:bg-evergreen/5 hover:text-evergreen">
-                      <BarChart3 className="h-4 w-4 mr-1" /> Analytics
+                  <div className="flex gap-2 flex-shrink-0 flex-wrap w-full sm:w-auto">
+                    <Button size="sm" variant="ghost" onClick={() => navigate({ name: 'analytics', pageId: p.id })} className="hover:bg-evergreen/5 hover:text-evergreen text-xs sm:text-sm h-8 px-2 sm:px-3">
+                      <BarChart3 className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Analytics</span>
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => navigate({ name: 'builder', pageId: p.id })} className="border-evergreen/30 text-evergreen hover:bg-evergreen/5">
-                      <Edit3 className="h-4 w-4 mr-1" /> Edit
+                    <Button size="sm" variant="outline" onClick={() => navigate({ name: 'builder', pageId: p.id })} className="border-evergreen/30 text-evergreen hover:bg-evergreen/5 text-xs sm:text-sm h-8 px-2 sm:px-3">
+                      <Edit3 className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Edit</span>
                     </Button>
                     <Button
                       size="sm"
-                      className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden"
+                      className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden text-xs sm:text-sm h-8 px-2 sm:px-3"
                       onClick={() => {
                         window.location.hash = `/p/${p.slug}`
                         navigate({ name: 'public', slug: p.slug })
                       }}
                     >
-                      <Eye className="h-4 w-4 mr-1" /> View
+                      <Eye className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">View</span>
                     </Button>
                   </div>
                 </CardContent>

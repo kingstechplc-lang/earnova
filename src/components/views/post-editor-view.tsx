@@ -682,7 +682,12 @@ export default function PostEditorView({
           {/* View public (when PUBLISHED) */}
           {status === 'PUBLISHED' && currentPostId && (
             <Button
-              onClick={() => navigate({ name: 'public-post', postId: currentPostId })}
+              onClick={() => navigate({
+                name: 'public-post',
+                postId: currentPostId,
+                username: user.username || undefined,
+                slug: post?.slug,
+              })}
               variant="ghost"
               className="text-evergreen hover:bg-evergreen/5"
             >

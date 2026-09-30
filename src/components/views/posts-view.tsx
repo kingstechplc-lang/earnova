@@ -41,6 +41,7 @@ type Post = {
   updatedAt: string
   page: { id: string; slug: string; title: string } | null
   campaign: { id: string; slug: string; title: string } | null
+  author: { id: string; name: string | null; username: string | null; image: string | null } | null
 }
 
 type ListResponse = { posts: Post[]; nextCursor: string | null }
@@ -460,7 +461,12 @@ function PostCard({ post, navigate }: { post: Post; navigate: (v: View) => void 
           {published ? (
             <Button
               size="sm"
-              onClick={() => navigate({ name: 'public-post', postId: post.id })}
+              onClick={() => navigate({
+                name: 'public-post',
+                postId: post.id,
+                username: post.author?.username || undefined,
+                slug: post.slug,
+              })}
               className="bg-evergreen text-cream hover:bg-evergreen-dark btn-glow overflow-hidden"
             >
               <Eye className="h-3.5 w-3.5 mr-1" /> View public
