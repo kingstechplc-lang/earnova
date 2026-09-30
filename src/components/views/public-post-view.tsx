@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,6 +13,9 @@ import { safeFetch } from '@/lib/safe-fetch'
 import { toast } from '@/hooks/use-toast'
 import { renderPostContent } from '@/lib/render-post-content'
 import { AdSlot } from '@/components/ad/ad-slot'
+import { EngagementBar } from '@/components/social/engagement-bar'
+import { CommentsSection } from '@/components/social/comments-section'
+import { useCurrentUser } from '@/components/social/use-current-user'
 import {
   Share2, ChevronLeft, AlertCircle, Eye, Heart, MessageCircle,
   Sparkles, Layers, Clock, Link as LinkIcon,
@@ -101,6 +104,16 @@ export default function PublicPostView({
   const [data, setData] = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  // Visitor auth — fetched via /api/auth/me so we know whether to render the
+  // engagement bar / comment box (logged in) or the "Log in to ..." CTAs.
+  // We don't pass a profileUserId — the post view doesn't have an "own
+  // profile" concept like the profile view does.
+  const { user: currentUser } = useCurrentUser()
+
+  // Ref to the comments section anchor, so the engagement bar's "Comments"
+  // button can smooth-scroll to it.
+  const commentsRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -407,6 +420,27 @@ export default function PublicPostView({
           ) : (
             <p className="text-muted-foreground italic">This post has no content.</p>
           )}
+
+          {/* Engagement bar — social actions (react / comment / save / share) */}
+          <EngagementBar
+            postId={post.id}
+            currentUser={currentUser}
+            commentCount={post.commentCount}
+            onScrollToComments={() => {
+              commentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }}
+            onShare={handleShare}
+            onLogin={() => navigate({ name: 'login' })}
+          />
+
+          {/* Comments section — threaded list + composer */}
+          <CommentsSection
+            postId={post.id}
+            currentUser={currentUser}
+            initialCommentCount={post.commentCount}
+            sectionRef={commentsRef}
+            onLogin={() => navigate({ name: 'login' })}
+          />
 
           {/* "View page this post belongs to" CTA */}
           {post.page && (

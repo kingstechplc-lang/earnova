@@ -8,9 +8,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { safeFetch } from '@/lib/safe-fetch'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { CountUp } from '@/components/animated/count-up'
+import { FollowButton } from '@/components/social/follow-button'
+import { FollowersDialog } from '@/components/social/followers-dialog'
+import { useCurrentUser } from '@/components/social/use-current-user'
 import {
   Share2, ExternalLink, ChevronLeft, MapPin, Globe2, Clock, Sparkles,
-  FileText, Eye, AlertCircle,
+  FileText, Eye, AlertCircle, Users, UserCheck,
 } from 'lucide-react'
 import type { View } from '@/app/page'
 
@@ -44,6 +47,18 @@ export default function PublicProfileView({ username, navigate }: { username: st
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Social state — fetched after profile loads.
+  const [following, setFollowing] = useState(false)
+  const [followersCount, setFollowersCount] = useState(0)
+  const [followingCount, setFollowingCount] = useState(0)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogTab, setDialogTab] = useState<'followers' | 'following'>('followers')
+
+  // Visitor auth — fetched via /api/auth/me on mount. isOwn is true when the
+  // visitor is looking at their own profile (in which case we hide the Follow
+  // button since you can't follow yourself).
+  const { user: currentUser, isOwn } = useCurrentUser(profile?.id)
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -60,6 +75,42 @@ export default function PublicProfileView({ username, navigate }: { username: st
     })()
     return () => { cancelled = true }
   }, [username])
+
+  // ── Fetch follow status + follower/following counts ──────────────────────
+  // The follow status (GET /api/follow/[username]) requires the visitor to be
+  // logged in — if not, we skip it. The counts endpoints are public.
+  // We fetch with limit=50 (the API max) to get an accurate count up to 50;
+  // if a nextCursor is returned, we display "50+" instead.
+  useEffect(() => {
+    if (!username) return
+    let cancelled = false
+    ;(async () => {
+      const [followRes, followersRes, followingRes] = await Promise.all([
+        // Follow status — only meaningful if logged in (the API returns 401
+        // otherwise, which we ignore).
+        currentUser
+          ? safeFetch<{ following: boolean }>(`/api/follow/${encodeURIComponent(username)}`)
+          : Promise.resolve({ data: null, error: null, status: 0 } as const),
+        safeFetch<{ followers?: { id: string }[]; nextCursor: string | null }>(`/api/followers/${encodeURIComponent(username)}?limit=50`),
+        safeFetch<{ following?: { id: string }[]; nextCursor: string | null }>(`/api/following/${encodeURIComponent(username)}?limit=50`),
+      ])
+      if (cancelled) return
+      if (!followRes.error && followRes.data) {
+        setFollowing(!!followRes.data.following)
+      }
+      if (!followersRes.error && followersRes.data) {
+        const list = followersRes.data.followers || []
+        const more = !!followersRes.data.nextCursor
+        setFollowersCount(more ? 50 : list.length)
+      }
+      if (!followingRes.error && followingRes.data) {
+        const list = followingRes.data.following || []
+        const more = !!followingRes.data.nextCursor
+        setFollowingCount(more ? 50 : list.length)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [username, currentUser])
 
   if (loading) {
     return (
@@ -163,22 +214,66 @@ export default function PublicProfileView({ username, navigate }: { username: st
                 <Badge className="bg-cream/15 text-cream border-cream/20 backdrop-blur-sm">
                   <FileText className="h-3 w-3 mr-1" /> <CountUp value={profile.stats.totalPages} duration={1000} /> pages
                 </Badge>
+                {/* Followers / Following — clickable, opens the dialog */}
+                {profile.username && (
+                  <>
+                    <button
+                      onClick={() => { setDialogTab('followers'); setDialogOpen(true) }}
+                      className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-cream/15 text-cream border border-cream/20 backdrop-blur-sm hover:bg-cream/25 transition-colors"
+                      title="View followers"
+                    >
+                      <Users className="h-3 w-3" />
+                      <span className="tabular-nums">
+                        {followersCount >= 50 ? '50+' : followersCount}
+                      </span>{' '}
+                      followers
+                    </button>
+                    <button
+                      onClick={() => { setDialogTab('following'); setDialogOpen(true) }}
+                      className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-cream/15 text-cream border border-cream/20 backdrop-blur-sm hover:bg-cream/25 transition-colors"
+                      title="View following"
+                    >
+                      <UserCheck className="h-3 w-3" />
+                      <span className="tabular-nums">
+                        {followingCount >= 50 ? '50+' : followingCount}
+                      </span>{' '}
+                      following
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Share */}
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                const url = `${window.location.origin}/#/profile/${profile.username}`
-                navigator.clipboard.writeText(url)
-                alert('Profile link copied')
-              }}
-              className="bg-cream/15 text-cream hover:bg-cream/25 border-cream/20 backdrop-blur-sm btn-glow overflow-hidden"
-            >
-              <Share2 className="h-4 w-4 mr-1.5" /> Share
-            </Button>
+            {/* Follow + Share actions */}
+            <div className="flex flex-col items-center md:items-end gap-2">
+              {!isOwn && profile.username && (
+                <FollowButton
+                  username={profile.username}
+                  initialFollowing={following}
+                  currentUser={currentUser}
+                  variant="hero"
+                  onLogin={() => navigate({ name: 'login' })}
+                  onFollowingChange={(f) => {
+                    setFollowing(f)
+                    // Keep follower count in sync (the visitor just became a
+                    // follower — or stopped being one).
+                    setFollowersCount(prev => Math.max(0, prev + (f ? 1 : -1)))
+                  }}
+                />
+              )}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  const url = `${window.location.origin}/#/profile/${profile.username}`
+                  navigator.clipboard.writeText(url)
+                  alert('Profile link copied')
+                }}
+                className="bg-cream/15 text-cream hover:bg-cream/25 border-cream/20 backdrop-blur-sm btn-glow overflow-hidden"
+              >
+                <Share2 className="h-4 w-4 mr-1.5" /> Share
+              </Button>
+            </div>
           </motion.div>
         </div>
       </div>
@@ -314,6 +409,27 @@ export default function PublicProfileView({ username, navigate }: { username: st
           </div>
         </div>
       </div>
+
+      {/* Followers / Following dialog — rendered at the bottom so it sits
+          above all body content via Radix portal. */}
+      {profile?.username && profile?.id && (
+        <FollowersDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          username={profile.username}
+          profileUserId={profile.id}
+          currentUser={currentUser}
+          initialFollowersCount={followersCount}
+          initialFollowingCount={followingCount}
+          defaultTab={dialogTab}
+          onNavigate={(otherUsername) => {
+            setDialogOpen(false)
+            window.location.hash = `/profile/${otherUsername}`
+            navigate({ name: 'public-profile', username: otherUsername })
+          }}
+          onLogin={() => navigate({ name: 'login' })}
+        />
+      )}
     </div>
   )
 }

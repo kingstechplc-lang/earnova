@@ -804,3 +804,72 @@ Stage Summary:
   * `bun run lint` — passes (0 errors, exit 0).
   * `bunx tsc --noEmit` — passes (0 errors, exit 0).
   * `bun run build` (with DATABASE_URL prefix) — succeeds: "✓ Compiled successfully in 16.9s", "✓ Generating static pages using 1 worker (31/31) in 1107.1ms".
+
+---
+Task ID: 18
+Agent: subagent (social UI builder)
+Task: Build Follow button + engagement bar + notification bell for Phase 4
+
+Work Log:
+- Created `src/lib/relative-time.ts` (~30 lines) — a tiny helper that formats ISO dates as relative-time labels ("just now", "5m ago", "3h ago", "2d ago", "Jan 4"). Used by the comments section + notifications bell so we don't repeat the same logic in two places.
+- Created `src/components/social/use-current-user.ts` (~50 lines) — a `useCurrentUser(profileUserId?)` client hook for public views. It calls `/api/auth/me` on mount and returns `{ user, loading, isOwn }`. `isOwn` is computed by comparing the visitor's id against `profileUserId` so the profile view can hide its own Follow button.
+- Created `src/components/social/follow-button.tsx` (~165 lines) — a reusable Follow/Unfollow button with two variants:
+  * `hero` — large gold pill, styled for the dark profile cover; animates the label + icon via AnimatePresence when the state flips.
+  * `list` — compact pill for follower/following rows.
+  Behavior:
+  * Logged-out visitor → renders a "Log in to follow" CTA (calls `onLogin`).
+  * Logged-in + own profile → caller hides the button (we return early in the parent).
+  * Logged-in otherwise → optimistic POST/DELETE on `/api/follow/[username]`, with revert + toast on failure. Calls `onFollowingChange` so the parent can keep its displayed follower count in sync.
+- Created `src/components/social/followers-dialog.tsx` (~265 lines) — a Radix-Dialog modal with two tabs (Followers / Following). Each tab fetches `/api/followers/[username]` or `/api/following/[username]` with cursor pagination (limit=20, "Load more" button). Each row is a user card (avatar + name + @username + bio) with a per-row FollowButton (only when the visitor is logged in and isn't the row user). The parent passes `defaultTab` so clicking the "following" badge opens the Following tab directly. Used the React "derived state" pattern (per https://react.dev/reference/react/useState#storing-information-from-previous-renders) to sync the local `tab` state with `defaultTab` in render rather than via useEffect — this avoids the `react-hooks/set-state-in-effect` lint error.
+- Created `src/components/social/engagement-bar.tsx` (~330 lines) — the social action row that sits below a public post's content:
+  * **Reactions** — a Like button that expands a 6-emoji picker (👍 ❤️ 😂 😮 😢 😠) on desktop hover (250ms delay) or mobile tap. Clicking a reaction POSTs to `/api/reactions/[postId]`; clicking the active reaction again removes it (DELETE). The aggregate count + the visitor's active reaction are fetched on mount. Optimistic UI on every click, with revert + toast on failure.
+  * **Comments** — a count label that smooth-scrolls to the comments section when clicked (via `onScrollToComments`).
+  * **Save** — bookmark icon, toggles via POST/DELETE `/api/saves/[postId]`. Fetches the saved state on mount when logged in. Optimistic UI.
+  * **Share** — delegates to the parent's `onShare` handler.
+  All four actions live in a single glass-card row with thin dividers. When logged out, the buttons open the login view; a small "Log in to react & save" hint sits below the bar.
+- Created `src/components/social/comments-section.tsx` (~440 lines) — threaded comments + composer for the public post view:
+  * "Comments (N)" heading with a gradient count badge.
+  * Composer (Textarea + Post button, ⌘/Ctrl+Enter to post) — or a "Log in to comment" CTA when logged out.
+  * Threaded list: top-level comments (date desc), each rendered by a recursive `CommentItem` that supports nested replies (date asc, indented via a left border that turns evergreen on hover).
+  * Each comment shows: author avatar (gradient circle with initial if no image) + name + @username + relative time + (edited) marker. If `isDeleted`, body becomes italic "[deleted]".
+  * Inline actions: Reply (opens an inline composer), Edit (author only — turns the body into a Textarea), Delete (author or admin — confirm dialog then soft-delete). Reply composer is also inline + animated.
+  * Cursor pagination ("Load more comments" button).
+  * Empty state: "No comments yet. Be the first to comment!".
+  All mutations go through safeFetch; the local `commentCount` is kept in sync (incremented on post, decremented on delete) without a refetch.
+- Created `src/components/social/notifications-bell.tsx` (~270 lines) — header dropdown for viewing + acknowledging notifications:
+  * Bell icon button with a gold/red count badge (animated via AnimatePresence when the count changes). Hidden entirely when `user` is null (logged out).
+  * Polls `/api/notifications/unread-count` every 60s (and immediately on mount); the badge shows `99+` when the count exceeds 99.
+  * On click, opens a dropdown (AnimatePresence) showing the latest 10 notifications from `/api/notifications?limit=10`. Each row shows: gold dot (if unread) + actor avatar (gradient circle fallback) + title + body (2-line clamp) + relative time.
+  * Clicking a notification marks it as read via `PATCH /api/notifications/[id]` (optimistic — flips `read` to true + decrements unread, reverts on failure) and then navigates: post entity → `public-post` view, user entity → `public-profile` view, via the parent's `onNavigateToPost` / `onNavigateToProfile` callbacks.
+  * "Mark all" button at the top — calls `PATCH /api/notifications` (no body) to mark all as read. Optimistic.
+  * Footer shows the visible notification count + the 60s polling note.
+  * Closes on outside click (window `mousedown` listener) + Escape (window `keydown` listener). The dropdown is anchored `right-0 top-full` so it works on both desktop and mobile widths.
+- Modified `src/components/views/public-profile-view.tsx` (357 → 435 lines, ~78 lines added):
+  * Imports `FollowButton`, `FollowersDialog`, `useCurrentUser`, plus `Users` + `UserCheck` icons.
+  * Added `following`, `followersCount`, `followingCount`, `dialogOpen`, `dialogTab` state; calls `useCurrentUser(profile?.id)` to detect when the visitor is viewing their own profile.
+  * Added a useEffect (after profile loads) that fetches in parallel: GET `/api/follow/[username]` (only if logged in) + GET `/api/followers/[username]?limit=50` + GET `/api/following/[username]?limit=50`. Counts cap at 50 ("50+" displayed if there's a nextCursor).
+  * Hero meta row now includes two clickable badges — "{N} followers" and "{N} following" — that open the FollowersDialog with the corresponding tab pre-selected.
+  * Replaced the lone "Share" button with a small vertical button group containing the Follow button (hidden when the visitor is viewing their own profile) above the Share button. The Follow button's `onFollowingChange` callback keeps the local `followersCount` in sync (+1 on follow, -1 on unfollow).
+  * Added the `<FollowersDialog />` at the bottom of the component (Radix portal renders it above all body content). `onNavigate` routes to another profile via hash + navigate().
+- Modified `src/components/views/public-post-view.tsx` (498 → 528 lines, ~30 lines added):
+  * Imports `EngagementBar`, `CommentsSection`, `useCurrentUser`, plus `useRef` from React.
+  * Added `currentUser` from `useCurrentUser()` and a `commentsRef` for smooth-scroll.
+  * Inserted the `<EngagementBar />` directly below the rendered content body (above the "View page this post belongs to" CTA, the BEFORE_FOOTER ad, and the share CTA). The bar's `onShare` reuses the existing `handleShare` method, `onScrollToComments` calls `commentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })`, and `onLogin` navigates to the login view.
+  * Inserted the `<CommentsSection />` directly below the engagement bar. Passes `postId`, `currentUser`, the initial `post.commentCount`, the `commentsRef`, and an `onLogin` callback.
+- Modified `src/components/layout/header.tsx` (197 → 213 lines, ~16 lines added):
+  * Imports `NotificationsBell` from `@/components/social/notifications-bell`.
+  * Desktop nav: added the `<NotificationsBell />` between the Admin nav item and the divider-before-Log-out. Wired up `onNavigateToPost` and `onNavigateToProfile` to set the URL hash + navigate (so clicking a notification deep-links to the right view).
+  * Mobile: added a new wrapper `<div className="md:hidden flex items-center gap-1">` next to the logo that contains the `<NotificationsBell />` (when logged in) + the hamburger button. The bell is now visible + clickable on mobile without needing to open the drawer (which would clip the dropdown via overflow-hidden). The dropdown anchors to `right-0 top-full` of the bell button so it stays inside the viewport on narrow screens.
+- API fix: moved `src/app/api/comments/[id]/route.ts` → `src/app/api/comments/[postId]/[id]/route.ts`. The original spec used `/api/comments/[id]` for PATCH/DELETE, but Next.js 16.1.3 rejects this as an ambiguous route (it can't tell `[id]` apart from `[postId]` when matching a URL like `/api/comments/abc`). Nesting `[id]` under `[postId]` disambiguates the URL space without changing any underlying logic — the handlers still look up the comment purely by `id`; `postId` is in the params for routing only. Updated `comments-section.tsx` PATCH/DELETE calls to use the new `/api/comments/[postId]/[id]` URL pattern.
+- Verification:
+  * `bun run lint` — passes (0 errors, exit 0).
+  * `bunx tsc --noEmit` — passes (0 errors, exit 0).
+  * `bun run build` (with DATABASE_URL prefix) — succeeds: "✓ Compiled successfully in 19.1s", "✓ Generating static pages using 1 worker (35/35) in 773.6ms". Route table shows `/api/comments/[postId]` + `/api/comments/[postId]/[id]` (no more ambiguous-route error).
+
+Stage Summary:
+- Three new social UI features wired into the public surface:
+  1. **Follow button** on public profiles — optimistic follow/unfollow with hero + list variants, plus a FollowersDialog with tabbed Followers/Following lists, per-row Follow buttons, and cursor pagination.
+  2. **Engagement bar** on public posts — a glass-card row with reactions (6-emoji picker via hover/tap), comments count (smooth-scrolls to thread), save (bookmark toggle), and share (reuses existing handler). Threaded comments section below with composer, edit/delete/reply inline actions, recursive nested replies, and "Load more" pagination.
+  3. **Notification bell** in the header — gold/red unread badge with 60s polling, dropdown showing latest 10 notifications with actor avatars + relative times, click-to-mark-as-read (optimistic) + click-to-navigate, "Mark all" button, outside-click + Escape to close. Wired up for both desktop (between nav items + Log out) and mobile (next to the hamburger).
+- All three features use `safeFetch`, are responsive (320px → desktop), match the existing glass-card + gradient visual language, and degrade gracefully when the visitor is logged out (login CTAs instead of action buttons).
+- Fixed an ambiguous-route build error introduced by the Phase 4 comment API (Next.js 16 rejects `/api/comments/[id]` vs `/api/comments/[postId]`); nested `[id]` under `[postId]` to disambiguate. No API behavior change.

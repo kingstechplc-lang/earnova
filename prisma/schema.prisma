@@ -47,6 +47,15 @@ model User {
   auditLogs       AuditLog[]
   socialLinks     SocialLink[]
   profileViews    ProfileView[]
+  // Social network (Phase 4)
+  following        Follow[]     @relation("FollowFollower")  // users I follow
+  followers        Follow[]     @relation("FollowFollowee")  // users following me
+  reactions        Reaction[]
+  comments         Comment[]
+  saves            Save[]
+  notifications    Notification[]            // notifications I receive
+  triggeredNotifications Notification[] @relation("NotificationActor")  // notifications I caused
+  notificationPreferences NotificationPreference[]
 
   @@index([role])
   @@index([emailVerified])
@@ -486,6 +495,9 @@ model Post {
   campaign        Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   moderationEvents ModerationEvent[]
   placements      AdPlacement[]
+  reactions       Reaction[]
+  comments        Comment[]
+  saves           Save[]
 
   @@unique([authorId, slug])   // post slug is unique per author (e.g. /@kingsley/my-first-post)
   @@index([authorId, status, publishedAt])  // feed query: author's published posts by date
@@ -493,6 +505,160 @@ model Post {
   @@index([pageId, status])                 // page's published posts
   @@index([campaignId, status])             // campaign posts
   @@index([moderationState])
+}
+
+// ─── SOCIAL NETWORK (Phase 4) ───────────────────────────────────────────────
+//
+// Per spec sections 11-15:
+//   - Follow system (unique constraint prevents duplicate follows)
+//   - Reactions (LIKE/LOVE/HAHA/WOW/SAD/ANGRY — user can pick one per post)
+//   - Comments (with threaded replies via parentId + soft delete)
+//   - Saves (bookmark posts for later)
+//   - Notifications (in-app + email preferences per type)
+//
+// Denormalized counters (followerCount, followingCount) are kept on User
+// for fast profile reads. The Post model already has likeCount, commentCount,
+// shareCount, saveCount (added in Phase 3).
+
+// ── Follow ────────────────────────────────────────────────────────────────
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String   // the user who follows
+  followeeId  String   // the user being followed
+  createdAt   DateTime @default(now())
+
+  follower    User @relation("FollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  followee    User @relation("FollowFollowee", fields: [followeeId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followeeId])  // prevents duplicate follows
+  @@index([followeeId])               // list followers of a user
+  @@index([followerId])               // list who a user is following
+}
+
+// ── Reaction ────────────────────────────────────────────────────────────────
+enum ReactionType {
+  LIKE    // ❤️ (default)
+  LOVE    // ❤️
+  HAHA    // 😂
+  WOW     // 😮
+  SAD     // 😢
+  ANGRY   // 😠
+}
+
+model Reaction {
+  id          String       @id @default(cuid())
+  userId      String
+  postId      String
+  type        ReactionType @default(LIKE)
+  createdAt   DateTime     @default(now())
+
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post        Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])  // one reaction per user per post (changing type updates this row)
+  @@index([postId, type])     // count reactions by type on a post
+}
+
+// ── Comment ────────────────────────────────────────────────────────────────
+// Comments support threaded replies via parentId (self-reference).
+// Soft-deleted comments (isDeleted=true) show as "[deleted]" but preserve
+// the thread structure (replies remain visible).
+model Comment {
+  id              String   @id @default(cuid())
+  postId          String
+  authorId        String
+  parentId        String?  // null = top-level comment; set = reply
+  content         String   // plain text (sanitized server-side, no HTML)
+  likeCount       Int      @default(0)
+  replyCount     Int      @default(0)
+  isEdited        Boolean  @default(false)
+  isDeleted       Boolean  @default(false)  // soft delete — preserves thread
+  moderationState ModerationState @default(PENDING)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  post            Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author          User    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent          Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies         Comment[] @relation("CommentReplies")
+
+  @@index([postId, createdAt])     // list comments on a post by date
+  @@index([parentId])              // list replies to a comment
+  @@index([authorId])              // list comments by a user
+  @@index([moderationState])
+}
+
+// ── Save (bookmark) ────────────────────────────────────────────────────────
+model Save {
+  id          String   @id @default(cuid())
+  userId      String
+  postId      String
+  createdAt   DateTime @default(now())
+
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post        Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])  // prevents duplicate saves
+  @@index([userId, createdAt])
+}
+
+// ── Notifications ───────────────────────────────────────────────────────────
+// Per spec section 15 — supports in-app + email.
+// NotificationDelivery tracks whether each channel (in-app, email) was sent.
+enum NotificationType {
+  NEW_FOLLOWER
+  NEW_REACTION
+  NEW_COMMENT
+  NEW_REPLY
+  NEW_SHARE
+  NEW_SAVE
+  NEW_POST_FROM_FOLLOWED
+  PAGE_PUBLISHED
+  CAMPAIGN
+  MODERATION_ACTION
+  AD_INTEGRATION_APPROVED
+  AD_INTEGRATION_REJECTED
+  SECURITY_ALERT
+  ACCOUNT_VERIFICATION
+  CREATOR_MILESTONE
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String           // recipient
+  type        NotificationType
+  actorId     String?          // who triggered it (null for system)
+  entityId    String?          // post id, comment id, user id, etc.
+  entityType  String?          // "post", "comment", "user", "campaign", etc.
+  title       String           // pre-rendered title (e.g. "Kingsley liked your post")
+  body        String?          // pre-rendered body (e.g. "Great article!")
+  read        Boolean          @default(false)
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actor       User? @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, read, createdAt])  // unread notifications for a user, by date
+  @@index([userId, type])
+  @@index([createdAt])
+}
+
+// Per-user notification preferences — which types they want in-app vs email.
+// Defaults: in-app=true, email=false (opt-in for email).
+model NotificationPreference {
+  id            String           @id @default(cuid())
+  userId        String
+  type          NotificationType
+  inAppEnabled  Boolean          @default(true)
+  emailEnabled  Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
 }
 
 model ContentBlock {

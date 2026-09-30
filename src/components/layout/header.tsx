@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Sparkles, LayoutDashboard, Wallet, Shield, LogOut, Menu, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { NotificationsBell } from '@/components/social/notifications-bell'
 import type { View, CurrentUser } from '@/app/page'
 
 /*
@@ -87,6 +88,20 @@ export default function Header({
               {(user.role === 'ADMIN' || user.role === 'MODERATOR') &&
                 navItem('Admin', <Shield className="h-4 w-4" />, { name: 'admin' }, view.name === 'admin')
               }
+              {/* Notification bell — between nav items and Log out. Polls
+                  /api/notifications/unread-count every 60s and shows a gold
+                  badge when there are unread items. */}
+              <NotificationsBell
+                user={user}
+                onNavigateToPost={(postId) => {
+                  window.location.hash = `/post/${postId}`
+                  navigate({ name: 'public-post', postId })
+                }}
+                onNavigateToProfile={(profileUsername) => {
+                  window.location.hash = `/profile/${profileUsername}`
+                  navigate({ name: 'public-profile', username: profileUsername })
+                }}
+              />
               <div className="w-px h-6 bg-border mx-1.5" />
               <Button
                 variant="outline"
@@ -122,24 +137,39 @@ export default function Header({
           )}
         </nav>
 
-        {/* Mobile menu button */}
-        <button
-          className="md:hidden p-2 rounded-md hover:bg-muted transition-colors"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Menu"
-        >
-          <AnimatePresence mode="wait">
-            {mobileOpen ? (
-              <motion.div key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }}>
-                <X className="h-5 w-5" />
-              </motion.div>
-            ) : (
-              <motion.div key="menu" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }}>
-                <Menu className="h-5 w-5" />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </button>
+        {/* Mobile menu button + (logged-in) notification bell */}
+        <div className="md:hidden flex items-center gap-1">
+          {user && (
+            <NotificationsBell
+              user={user}
+              onNavigateToPost={(postId) => {
+                window.location.hash = `/post/${postId}`
+                navigate({ name: 'public-post', postId })
+              }}
+              onNavigateToProfile={(profileUsername) => {
+                window.location.hash = `/profile/${profileUsername}`
+                navigate({ name: 'public-profile', username: profileUsername })
+              }}
+            />
+          )}
+          <button
+            className="p-2 rounded-md hover:bg-muted transition-colors"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Menu"
+          >
+            <AnimatePresence mode="wait">
+              {mobileOpen ? (
+                <motion.div key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }}>
+                  <X className="h-5 w-5" />
+                </motion.div>
+              ) : (
+                <motion.div key="menu" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }}>
+                  <Menu className="h-5 w-5" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </button>
+        </div>
       </div>
 
       {/* Mobile menu */}
