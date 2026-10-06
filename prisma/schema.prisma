@@ -969,7 +969,10 @@ enum SubscriptionStatus {
 // ─── ANALYTICS ───────────────────────────────────────────────────────────────
 
 model PageAnalytics {
-  // Aggregated per-page analytics, recomputed nightly (MVP: mock)
+  // Aggregated per-page analytics (legacy — kept for backward compat).
+  // Phase 6 adds the AnalyticsEvent model for real event ingestion.
+  // The GET /api/analytics/[pageId] route now queries AnalyticsEvent
+  // directly instead of reading this mock table.
   id              String   @id @default(cuid())
   pageId          String   @unique
   visitors7d      Int      @default(0)
@@ -984,6 +987,66 @@ model PageAnalytics {
   updatedAt       DateTime @updatedAt
 
   page            SpecialPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+}
+
+// ─── ANALYTICS EVENTS (Phase 6) ───────────────────────────────────────────────
+//
+// Per spec section 19 (TRAFFIC ANALYTICS):
+//   Replace simplistic/mock analytics with a proper analytics event architecture.
+//
+// Per spec section 60 (ANALYTICS SCALABILITY):
+//   Do NOT query millions of raw events for every dashboard request.
+//   Architecture: RAW EVENTS → AGGREGATION → HOURLY/DAILY SUMMARIES → DASHBOARD
+//
+// For MVP, we query raw events with SQL GROUP BY (fast enough at scale < 100K
+// events). Phase 13 (Performance) will add AnalyticsDaily aggregation for
+// high-volume tables.
+//
+// Privacy-conscious (spec section 80):
+//   - No PII stored (no email, no name, no IP address)
+//   - visitorId is a first-party anonymous ID (random cuid, not derived from PII)
+//   - countryCode is derived from GeoIP at the edge (Vercel provides this)
+//   - No tracking across sites
+
+enum AnalyticsEventType {
+  PAGE_VIEW
+  POST_VIEW
+  LINK_CLICK
+  SHARE
+  FOLLOW
+  REACTION
+  COMMENT
+  SAVE
+  AD_SLOT_VIEW
+  SESSION_START
+}
+
+model AnalyticsEvent {
+  id            String             @id @default(cuid())
+  type          AnalyticsEventType
+  // The resource being viewed/interacted with. Either pageId OR postId is set.
+  pageId        String?
+  postId        String?
+  // Anonymous visitor ID (first-party, random cuid stored in localStorage).
+  // NOT a user ID — we don't track logged-in identity in analytics.
+  // Used for unique visitor counting + returning visitor detection.
+  visitorId     String
+  // Session ID (same visitor, within 30 min of last activity).
+  sessionId     String
+  // Request metadata (privacy-conscious — no PII)
+  referrer      String?            // referring URL (or "direct" if none)
+  countryCode   String?            // 2-letter ISO code from GeoIP (e.g., "GH", "US")
+  deviceType    String?            // "mobile", "tablet", "desktop"
+  browser       String?            // "chrome", "firefox", "safari", "edge", "other"
+  // For campaign tracking (spec section 21): ?ref=whatsapp etc.
+  campaign      String?
+  createdAt     DateTime           @default(now())
+
+  @@index([pageId, type, createdAt])    // page analytics: views by date
+  @@index([postId, type, createdAt])    // post analytics: views by date
+  @@index([visitorId, createdAt])      // unique visitor counting
+  @@index([type, createdAt])            // global event counts
+  @@index([createdAt])                  // time-range queries
 }
 
 // ─── COMPLIANCE (Chapter 6) ──────────────────────────────────────────────────

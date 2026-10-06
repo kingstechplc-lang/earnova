@@ -65,6 +65,20 @@ export default function PublicPageView({
       }
       setData(res.data)
       setLoading(false)
+
+      // ── Fire analytics event (Phase 6) ──────────────────────────────
+      // Track the page view with the page ID + any campaign ref from the URL.
+      // Fire-and-forget — doesn't affect rendering.
+      if (res.data?.page?.id) {
+        try {
+          const { trackPageView } = await import('@/lib/analytics-client')
+          const urlParams = new URLSearchParams(window.location.search)
+          const campaign = urlParams.get('ref') || undefined
+          trackPageView(res.data.page.id, campaign)
+        } catch {
+          // Analytics is best-effort — don't break on tracking failure
+        }
+      }
     })()
     return () => { cancelled = true }
   }, [slug])

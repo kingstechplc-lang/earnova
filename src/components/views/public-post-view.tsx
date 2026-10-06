@@ -146,6 +146,19 @@ export default function PublicPostView({
         setError(res.error)
       } else if (res.data?.post) {
         setData(res.data)
+
+        // ── Fire analytics event (Phase 6) ──────────────────────────────
+        // Track the post view. Fire-and-forget — doesn't affect rendering.
+        if (res.data.post.id) {
+          try {
+            const { trackPostView } = await import('@/lib/analytics-client')
+            const urlParams = new URLSearchParams(window.location.search)
+            const campaign = urlParams.get('ref') || undefined
+            trackPostView(res.data.post.id, campaign)
+          } catch {
+            // Analytics is best-effort — don't break on tracking failure
+          }
+        }
       } else {
         setError('Post not found.')
       }
