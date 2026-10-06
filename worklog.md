@@ -1158,3 +1158,54 @@ Stage Summary:
 - Explore view presents a discovery bundle in 6 ordered sections (campaigns → trending → rising → new → pages → categories) with horizontal-snap scrollers for creator/post rows + grid layouts for pages/categories — avoids the "wall of cards" UX trap. Each section has its own empty state.
 - Search view debounces input (300ms), enforces a 2-char minimum, switches between type=all (3 sections capped at 6 cards each with "See all →" CTAs) and specific-type paginated lists with "Load more" buttons. URL hash syncs to the querystring so search results are shareable.
 - Feed view implements true infinite scroll via IntersectionObserver (400px rootMargin) + cursor pagination from /api/feed. Following tab gracefully degrades to a login CTA when logged out. Each of the 4 tabs has its own empty state with a contextual CTA (Explore creators, Create a post, etc.).
+
+---
+Task ID: 24
+Agent: frontend-styling-expert
+Task: Build beautiful animated general analytics view
+
+Work Log:
+- Read worklog Phase 6 (Analytics) + Tasks 12-15 design language (ambient mesh-bg + FloatingOrbs, glass-strong cards, gradient-text-evergreen titles, TiltCard stat cards, CountUp animated numbers, StaggerContainer reveals, brand palette evergreen/gold/berry/cranberry/sage).
+- Read existing analytics-view.tsx (per-page) for StatCard + BreakdownCard reference patterns, dashboard-view.tsx for ambient + TiltCard pattern, and the animated component APIs (CountUp active/duration, TiltCard intensity, FadeIn/StaggerContainer/StaggerItem y/stagger, FloatingOrbs count/colors).
+- Confirmed /api/analytics/overview response shape (overview object with totalVisitors7d/30d, totalPageViews7d/30d, totalPostViews30d, totalFollowers, totalEngagement30d, totalPages, totalPosts, topPages[], topPosts[], topCountries/topDevices/topSources as JSON strings).
+- File 1: src/components/views/general-analytics-view.tsx (NEW, 947 lines):
+  * Default export GeneralAnalyticsView({user, navigate}) — full premium analytics dashboard with ambient layer (mesh-bg opacity-40 + 2 evergreen/gold FloatingOrbs opacity-25), 'use client' directive, safeFetch from @/lib/safe-fetch.
+  * Header section: "Back to Dashboard" ghost button (ChevronLeft, evergreen hover) + hero card with evergreen→gold gradient wash + 2 FloatingOrbs + motion spring icon + "Analytics Overview" gradient-text-evergreen title + subtitle "Your performance across all pages and posts."
+  * Hero stats row (5 large TiltCard stat cards, grid-cols-2 sm:grid-cols-3 lg:grid-cols-5, staggered reveal):
+    - Total Visitors (30d) — Users icon, evergreen, sub "7d: X"
+    - Total Page Views (30d) — Eye icon, gold, sub "7d: X"
+    - Total Post Views (30d) — FileText icon, berry, sub "Last 30 days"
+    - Total Followers — Heart icon, cranberry, sub "Total audience"
+    - Total Engagement (30d) — TrendingUp icon, sage, sub "Likes + comments + shares"
+    Each card: 1.5px gradient bar at top, blurred accent orb animate-pulse, gradient-icon tile with spring scale-in, large serif CountUp number, label, sub-text. Hover lift + shadow-elevated + accent ring.
+  * Secondary stats row (3 smaller stat cards, grid-cols-1 sm:grid-cols-3): Total Pages (LayoutDashboard, evergreen), Total Posts (FileText, gold), Avg Engagement Rate (Activity, berry, computed as totalEngagement30d/totalPageViews30d*100% with % suffix via CountUp suffix prop).
+  * Top Performing Pages section: SectionHeader (slide-in from left with motion x:-20→0) + glass-strong Card with tri-color header strip (evergreen→gold→berry) + horizontal snap-scroll row of 264px-wide TopPageTile cards (snap-x snap-mandatory, overflow-x-auto). Each tile: rank badge (#1-5), page-type emoji (PAGE_TYPE_EMOJI map), title, /p/slug mono, view count with CountUp + Eye icon, ModBadge (pill-pending/approved/etc), "View page →" button → navigate({name:'public', slug}). Empty state: "No pages yet" with "Create your first page" CTA.
+  * Top Performing Posts section: SectionHeader + glass-strong Card with berry→gold→evergreen header strip + StaggerContainer list of TopPostRow items. Each row: rank badge + type badge, cover image (with onError hide + gradient placeholder with post-type emoji), title (line-clamp-2), excerpt (line-clamp-2), 5 engagement pills (views/likes/comments/shares/saves — each with icon + CountUp + brand-color theming), "View post →" button → navigate({name:'public-post', postId, slug}). Empty state: "No posts yet" with "Create your first post" CTA.
+  * Traffic Breakdown section: SectionHeader + StaggerContainer (3-col grid) of BreakdownCard: Top Countries (Globe2, evergreen, country flag emojis via COUNTRY_FLAGS + dynamic regional-indicator fallback for any 2-letter ISO code, country names), Devices (Smartphone, gold, DEVICE_LABELS + DeviceIcon — mobile=Smartphone, tablet=Tablet, desktop=Monitor), Top Sources (Link2, berry, raw domain labels). Each card: 1px accent bar, glass-card header with accent-bg icon tile, top-5 entries with horizontal animated bar charts (motion.div width:0→pct% via whileInView + spring transition, staggered delay i*0.08) + CountUp on counts + (pct%) suffix. Per-card empty state: "No data yet" with faded icon.
+  * Whole-view empty state (when totalPages === 0 && totalPosts === 0): large glass-strong card with tri-color strip, spring scale-in BarChart3 icon in evergreen tinted tile, "No analytics yet" gradient-text-evergreen title, descriptive copy, "Create Page" (evergreen filled btn-glow → dashboard) + "Create Post" (berry outline → post-editor) CTAs.
+  * Loading state: 5 skeleton cards (h-40) + 3 secondary (h-24) + 2 large (h-64) + 3 breakdown (h-48) shimmer-bg blocks matching the data layout.
+  * Error state: cranberry Alert with BarChart3 icon, "Couldn't load your analytics." message, error detail, "Try again" button.
+  * Accent system: unified ACCENTS map covering all 5 brand colors (evergreen/gold/berry/cranberry/sage) with bg/text/bar/wash/orb/ring/gradientIcon variants — extends the analytics-view.tsx 3-color map.
+  * Helper functions: computeEngagementRate (handles 0 division), countryFlag (dynamic regional indicator for any 2-letter code), DeviceIcon (icon switcher), ModBadge (mirrors dashboard pill styles).
+- File 2: src/app/page.tsx (MODIFIED):
+  * Imported GeneralAnalyticsView from '@/components/views/general-analytics-view'.
+  * Extended View union type with `{ name: 'general-analytics' }` variant.
+  * Added render branch: `{view.name === 'general-analytics' && user && <GeneralAnalyticsView user={user} navigate={navigate} />}` inside the sidebar (authenticated) PageTransition block.
+  * No hash routing needed for general-analytics — it's an internal authenticated view, so navigate() clears the URL hash (existing behavior).
+- File 3: src/components/layout/sidebar.tsx (MODIFIED):
+  * Imported BarChart3 from lucide-react.
+  * Inserted `{ label: 'Analytics', icon: BarChart3, target: { name: 'general-analytics' }, active: view.name === 'general-analytics' }` as the second nav item (right after Dashboard) in BOTH the desktop sidebar navItems array AND the mobile drawer navItems array.
+  * Dashboard active state kept grouping 'analytics' (per-page) so the dashboard pill stays highlighted when navigating into a specific page's analytics; the new general-analytics pill has its own active state.
+- Verification:
+  * `bun run lint` — passes (0 errors, 0 warnings, exit 0). Initial pass flagged an unused `@next/next/no-img-element` eslint-disable directive on the cover-image <img> tag (Next 15 doesn't require it for plain string src) — removed the comment, re-ran clean.
+  * `bunx tsc --noEmit` — passes (exit 0, no output).
+  * `DATABASE_URL=… bun run build` — succeeds: "✓ Compiled successfully in 18.4s", "✓ Generating static pages using 1 worker (40/40) in 753.1ms". The new /api/analytics/overview route + general-analytics-view both appear in the build output.
+
+Stage Summary:
+- Phase 6 general analytics is live: a new src/components/views/general-analytics-view.tsx (947 lines) showing user-wide stats across ALL pages + posts, distinct from the existing per-page analytics-view.tsx.
+- The view presents 4 ordered content sections (hero stats → secondary stats → top pages → top posts → traffic breakdown) with progressive reveal animations: StaggerContainer for grids, FadeIn for sections, motion.div with x:-20→0 for section headers, CountUp with easeOutExpo for all numbers, animated bar-chart widths (spring transition) for the breakdown cards, TiltCard 3D-tilt on hero stat cards, hover lift + shadow-elevated + accent ring on all interactive cards.
+- Mobile-first responsive: every grid uses grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 (hero stats), grid-cols-1 sm:grid-cols-3 (secondary), md:grid-cols-3 (breakdown), flex-wrap on every action row, horizontal snap-scroll for top pages, vertical stacked list for top posts (with sm:flex-row layout). All sections work on 320px viewports and scale to desktop.
+- Full brand palette in use: evergreen (visitors, pages, countries), gold (page views, posts, devices), berry (post views, engagement rate, sources), cranberry (followers), sage (engagement). Each accent has a unified ACCENTS map entry with bg/text/bar/wash/orb/ring/gradientIcon variants.
+- Empty states: per-section empty cards (Top Pages, Top Posts, each Breakdown card), plus a full-view "No analytics yet" CTA card with Create Page + Create Post buttons when the user has zero pages AND zero posts. Loading state mirrors the data layout with shimmer-bg skeletons. Error state has a cranberry Alert + "Try again" button.
+- All API calls go through safeFetch (no raw fetch). Defensively filters null/falsy items from topPages and topPosts arrays (in case the API returns nulls from the `.filter(Boolean)` type widening). Handles missing/null coverImage, excerpt, and missing topCountries/topDevices/topSources strings (JSON.parse wrapped in try/catch).
+- Sidebar nav updated: "Analytics" item appears second (between Dashboard and Explore) in both desktop + mobile drawer, with its own active pill state.

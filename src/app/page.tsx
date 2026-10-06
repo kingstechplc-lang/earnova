@@ -13,6 +13,7 @@ import MonetizationView from '@/components/views/monetization-view'
 import AdminView from '@/components/views/admin-view'
 import PublicPageView from '@/components/views/public-page-view'
 import AnalyticsView from '@/components/views/analytics-view'
+import GeneralAnalyticsView from '@/components/views/general-analytics-view'
 import ProfileSetupView from '@/components/views/profile-setup-view'
 import PublicProfileView from '@/components/views/public-profile-view'
 import PostsView from '@/components/views/posts-view'
@@ -33,6 +34,7 @@ export type View =
   | { name: 'builder'; pageId: string }
   | { name: 'monetization' }
   | { name: 'analytics'; pageId: string }
+  | { name: 'general-analytics' }
   | { name: 'admin' }
   | { name: 'public'; slug: string }
   | { name: 'profile-setup' }
@@ -267,6 +269,7 @@ export default function Home() {
                 {view.name === 'builder' && user && <BuilderView pageId={view.pageId} user={user} navigate={navigate} />}
                 {view.name === 'monetization' && user && <MonetizationView user={user} navigate={navigate} />}
                 {view.name === 'analytics' && user && <AnalyticsView pageId={view.pageId} user={user} navigate={navigate} />}
+                {view.name === 'general-analytics' && user && <GeneralAnalyticsView user={user} navigate={navigate} />}
                 {view.name === 'profile-setup' && user && <ProfileSetupView user={user} navigate={navigate} />}
                 {view.name === 'posts' && user && <PostsView user={user} navigate={navigate} />}
                 {view.name === 'post-editor' && user && <PostEditorView postId={view.postId} user={user} navigate={navigate} />}

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import {
   Sparkles, LayoutDashboard, Wallet, Shield, LogOut, Menu, X,
   ChevronLeft, ChevronRight, Eye, Globe2, Sparkles as SparklesIcon, FileText,
-  Compass, Rss,
+  Compass, Rss, BarChart3,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import type { View, CurrentUser } from '@/app/page'
@@ -31,6 +31,7 @@ export default function Sidebar({
 }) {
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, target: { name: 'dashboard' } as View, active: view.name === 'dashboard' || view.name === 'builder' || view.name === 'analytics' },
+    { label: 'Analytics', icon: BarChart3, target: { name: 'general-analytics' } as View, active: view.name === 'general-analytics' },
     { label: 'Explore', icon: Compass, target: { name: 'explore' } as View, active: view.name === 'explore' || view.name === 'search' },
     { label: 'Feed', icon: Rss, target: { name: 'feed' } as View, active: view.name === 'feed' },
     { label: 'Posts', icon: FileText, target: { name: 'posts' } as View, active: view.name === 'posts' || view.name === 'post-editor' },
@@ -214,6 +215,7 @@ function MobileDrawer({
 
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, target: { name: 'dashboard' } as View, active: view.name === 'dashboard' || view.name === 'builder' || view.name === 'analytics' },
+    { label: 'Analytics', icon: BarChart3, target: { name: 'general-analytics' } as View, active: view.name === 'general-analytics' },
     { label: 'Explore', icon: Compass, target: { name: 'explore' } as View, active: view.name === 'explore' || view.name === 'search' },
     { label: 'Feed', icon: Rss, target: { name: 'feed' } as View, active: view.name === 'feed' },
     { label: 'Posts', icon: FileText, target: { name: 'posts' } as View, active: view.name === 'posts' || view.name === 'post-editor' },
