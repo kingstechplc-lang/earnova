@@ -1209,3 +1209,67 @@ Stage Summary:
 - Empty states: per-section empty cards (Top Pages, Top Posts, each Breakdown card), plus a full-view "No analytics yet" CTA card with Create Page + Create Post buttons when the user has zero pages AND zero posts. Loading state mirrors the data layout with shimmer-bg skeletons. Error state has a cranberry Alert + "Try again" button.
 - All API calls go through safeFetch (no raw fetch). Defensively filters null/falsy items from topPages and topPosts arrays (in case the API returns nulls from the `.filter(Boolean)` type widening). Handles missing/null coverImage, excerpt, and missing topCountries/topDevices/topSources strings (JSON.parse wrapped in try/catch).
 - Sidebar nav updated: "Analytics" item appears second (between Dashboard and Explore) in both desktop + mobile drawer, with its own active pill state.
+
+---
+Task ID: 25
+Agent: frontend-styling-expert
+Task: Build beautiful animated Grow Center view (insights, milestones, recommendations)
+
+Work Log:
+- Read worklog Tasks 12-15 + 24 (design language: ambient mesh-bg + FloatingOrbs, glass-strong cards, gradient-text-evergreen titles, TiltCard stat cards, CountUp animated numbers, StaggerContainer reveals, brand palette evergreen/gold/berry/cranberry/sage, useConfetti for celebrations).
+- Read dashboard-view.tsx (ambient + stat card pattern), general-analytics-view.tsx (TiltCard + CountUp + glass-strong pattern + SectionHeader slide-in + ACCENTS map), confetti.tsx (useConfetti API: fire({x,y,count,spread}) + ConfettiLayer), motion.tsx (FadeIn, StaggerContainer, StaggerItem, PageTransition), tilt-card.tsx, count-up.tsx, safe-fetch.ts.
+- Confirmed /api/grow response shape: { insights: [{id,type,icon,title,body}], milestones: [{id,type,name,description,icon,color,threshold,achieved,achievedAt,claimed}], recommendations: [{id,icon,title,action}], stats: {totalPages, publishedPages, totalPosts, publishedPosts, followers, totalViews30d, profileViews30d, totalEngagement, profileCompletion, achievedMilestones, totalMilestones, newMilestones} }.
+- Confirmed /api/grow/milestones/[id]/claim POST endpoint returns { ok, milestone } on success, { ok, alreadyClaimed } on already-claimed.
+- Pre-existing bug in /api/grow/route.ts: used `profileId` on ProfileViewWhereInput — schema field is `profileOwnerId`. Fixed to `profileOwnerId` to unblock tsc + build (otherwise Prisma client rejects the where clause).
+- File 1: src/components/views/grow-view.tsx (NEW, 971 lines):
+  * Default export GrowView({user, navigate}) — 'use client' directive, safeFetch from @/lib/safe-fetch, full brand palette via ACCENTS map (evergreen/gold/berry/cranberry/sage — same shape as general-analytics-view's), useConfetti hook for milestone celebrations.
+  * Ambient layer: mesh-bg opacity-40 + 2 evergreen/gold FloatingOrbs opacity-25 + ConfettiLayer overlay (renders above everything when fired).
+  * Header section: "Back to Dashboard" ghost button (ChevronLeft, evergreen hover) → hero card with evergreen→gold gradient wash + 2 FloatingOrbs + spring icon (TrendingUp, motion spring scale 0→1 + rotate -90→0) + "Growth & milestones" eyebrow + "Grow Center" gradient-text-evergreen title + subtitle "Insights, milestones, and recommendations to grow your audience." + live stats Badges (achieved/total + "X new!" gold pulse if newMilestones > 0).
+  * Stats summary (4 TiltCard stat cards with CountUp, grid-cols-2 lg:grid-cols-4, staggered reveal):
+    - Profile Completion % (Target icon, evergreen, CountUp + "%" suffix)
+    - Achieved Milestones (Award icon, gold, customDisplay "X/Y" since it's a fraction)
+    - Total Followers (Users icon, berry)
+    - Total Views 30d (Eye icon, sage)
+    Each card: 1.5px gradient bar at top, blurred accent orb animate-pulse, gradient-icon tile with spring scale-in, large serif CountUp number, label, sub-text. Hover lift + shadow-elevated.
+  * Insights section: SectionHeader (slide-in from left, Lightbulb icon, evergreen) + grid (grid-cols-1 md:grid-cols-2 lg:grid-cols-3) of InsightCard. Each card: emoji icon in gradient circle (color-coded by type), title (bold), body (small), color-coded left border based on type:
+    - positive → evergreen (1.5px left border)
+    - neutral → gold
+    - action_needed → cranberry
+    Plus a small Badge with the type label. Empty state: "No insights yet" with copy explaining insights appear once you publish.
+  * Recommendations section: SectionHeader (Rocket icon, berry) + grid of RecommendationCard. Each card: emoji icon in subtle evergreen→gold ring tile, title, action text, evergreen "Action" button (btn-glow) that navigates to the relevant view via RECOMMENDATION_VIEW map (claim-username→profile-setup, create-page→dashboard, publish-post→post-editor, complete-profile→profile-setup, publish-page→dashboard, share-page→dashboard). Hover wash + arrow translate. Empty state: "🎉 You're all caught up!" gold card with springing celebration emoji.
+  * Milestones section: SectionHeader (Trophy icon, gold) + animated progress bar (motion.div width:0→pct% via whileInView + 1.2s ease, gold-glowing gradient track) showing X/total achieved + "X% complete" badge in glass-strong card with tri-color strip. Below: optional NewMilestoneCard celebration banner if stats.newMilestones > 0. Then StaggerContainer grid (grid-cols-1 sm:grid-cols-2 lg:grid-cols-3) of MilestoneCard.
+  * MilestoneCard renders 3 distinct states:
+    - Not achieved: grayscale + opacity-90 + Lock icon + milestoneProgressText helper returns "Reach N followers to unlock" / "Create 1 page to unlock" / "Complete your profile to unlock" etc. based on milestone.type.
+    - Achieved + unclaimed: TiltCard wrapper + animated pulsing gold-glow boxShadow (motion.div animate boxShadow 0→24px, 2s repeat reverse) + top color bar in milestone.color + radial wash + spring scale-in emoji icon with colored ring + accent shadow + Sparkles pulse + full-width "Claim reward" Button (evergreen, btn-glow, color-tinted box-shadow, Trophy icon, loading spinner during claim).
+    - Achieved + claimed: TiltCard wrapper + top color bar + radial wash + spring emoji icon + CheckmarkBadge (spring scale-in, colored circle with CheckCircle2 icon) + "Achieved" evergreen Badge.
+  * NewMilestoneCard: glass-strong card with gold border, animated dual radial gold glow (motion.div opacity pulse 0.4→1→0.4 repeat), gold top strip, large 16x16 emoji tile with gold ring + shadow-gold, "🎉 New milestone unlocked!" gold Badge with Trophy, "🎉 [Name]" gradient-text-evergreen serif heading, description, full-size gold gradient "Claim reward" button (btn-glow + shadow-gold).
+  * claimMilestone(id): POST /api/grow/milestones/[id]/claim via safeFetch → on success fires confetti ({x:0.5, y:0.25, count:180, spread:80}) and optimistically updates local state to mark milestone.claimed = true so the card flips from "Claim reward" → "Achieved" without a refetch. Locks the button with `claimingId` state to prevent double-claim. Shows "Claiming…" spinner during POST.
+  * Loading state: GrowSkeleton — 4 stat placeholders + insights/recommendations/milestones sections with shimmer-bg blocks matching data layout.
+  * Error state: cranberry Alert with TrendingUp icon, "Couldn't load your Grow Center." + error detail + "Try again" button (RefreshCw icon) that re-runs the fetch.
+  * Mobile-first responsive: every grid uses grid-cols-1/grid-cols-2 sm:grid-cols-2 lg:grid-cols-3/4, all action rows flex-wrap, all text truncate where appropriate. Works on 320px viewports and scales to desktop.
+- File 2: src/app/page.tsx (MODIFIED, 313 lines):
+  * Imported GrowView from '@/components/views/grow-view'.
+  * Extended View union type with `{ name: 'grow' }` variant (after the discovery views).
+  * Added render branch: `{view.name === 'grow' && user && <GrowView user={user} navigate={navigate} />}` inside the sidebar (authenticated) PageTransition block, right after general-analytics.
+  * No hash routing needed for grow — it's an internal authenticated view, so navigate() clears the URL hash (existing behavior).
+- File 3: src/components/layout/sidebar.tsx (MODIFIED, 352 lines):
+  * Imported TrendingUp from lucide-react (added to existing import block).
+  * Inserted `{ label: 'Grow', icon: TrendingUp, target: { name: 'grow' } as View, active: view.name === 'grow' }` as the third nav item (right after Analytics, between Analytics and Explore) in BOTH the desktop sidebar navItems array AND the mobile drawer navItems array.
+- File 4: src/app/api/grow/route.ts (FIXED):
+  * Line 87: changed `profileId: user.id` → `profileOwnerId: user.id` in the `db.profileView.count({ where: ... })` call. The schema field is `profileOwnerId`, not `profileId`. This was a pre-existing TypeScript error in the API route that blocked `bunx tsc --noEmit`.
+- Verification:
+  * `bun run lint` — passes (0 errors, 0 warnings, exit 0, no output).
+  * `bunx tsc --noEmit` — passes (exit 0, no output).
+  * `DATABASE_URL=… bun run build` — succeeds: "✓ Compiled successfully in 18.5s", "✓ Generating static pages using 1 worker (41/41) in 720.9ms". Both /api/grow and /api/grow/milestones/[id]/claim routes appear in the build output.
+
+Stage Summary:
+- Phase 7 Grow Center is live: a new src/components/views/grow-view.tsx (971 lines) presenting actionable insights, growth milestones, and tailored recommendations — a "Grow Center" rather than just a wall of numbers (per spec section 23).
+- The view presents 4 ordered content sections (stats summary → insights → recommendations → milestones) with progressive reveal animations: StaggerContainer for grids, FadeIn for sections, motion.div with x:-20→0 for section headers (matches analytics-view), CountUp with easeOutExpo for all numbers, animated progress bar (spring transition) for milestone completion, pulsing gold glow on unclaimed milestone cards, dual radial glow on the new-milestone celebration banner.
+- Confetti on claim: useConfetti hook fires a 180-particle burst from top-center (x:0.5, y:0.25, spread:80) when the user claims a milestone. Local state optimistically flips the milestone card from "Claim reward" → "Achieved" without refetching.
+- Milestone states are visually distinct: not-achieved (grayscale + Lock + threshold hint), achieved + unclaimed (TiltCard + animated pulsing gold glow + Claim button), achieved + claimed (TiltCard + CheckmarkBadge + "Achieved" Badge). New milestone celebration banner (gold-glowing) appears at the top of the milestones section when stats.newMilestones > 0.
+- Recommendations map ID → View target: claim-username→profile-setup, create-page→dashboard, publish-post→post-editor, complete-profile→profile-setup, publish-page→dashboard, share-page→dashboard. Each recommendation card has a clear evergreen CTA button with ArrowRight that nudges the user toward the next growth action.
+- Color-coded insight cards: positive→evergreen, neutral→gold, action_needed→cranberry (left border + Badge label). Empty states: per-section "No insights yet" + "You're all caught up! 🎉" for recommendations.
+- Mobile-first responsive: stats grid-cols-2 lg:grid-cols-4, insights/recommendations grid-cols-1 md:grid-cols-2 lg:grid-cols-3, milestones grid-cols-1 sm:grid-cols-2 lg:grid-cols-3, all action rows flex-wrap, all text truncate where appropriate.
+- Sidebar nav updated: "Grow" item appears third (between Analytics and Explore) in both desktop + mobile drawer, with its own active pill state. Uses the TrendingUp icon (consistent with the Analytics dashboard's engagement accent).
+- All API calls go through safeFetch (no raw fetch). claimMilestone handles network errors gracefully — if the POST fails, the milestone card stays in the unclaimed state with no UI regression.
+

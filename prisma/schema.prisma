@@ -56,6 +56,7 @@ model User {
   notifications    Notification[]            // notifications I receive
   triggeredNotifications Notification[] @relation("NotificationActor")  // notifications I caused
   notificationPreferences NotificationPreference[]
+  milestones        UserMilestone[]
 
   @@index([role])
   @@index([emailVerified])
@@ -1047,6 +1048,62 @@ model AnalyticsEvent {
   @@index([visitorId, createdAt])      // unique visitor counting
   @@index([type, createdAt])            // global event counts
   @@index([createdAt])                  // time-range queries
+}
+
+// ─── GROW CENTER (Phase 7) ──────────────────────────────────────────────────
+//
+// Per spec section 23 (ACTIONABLE INSIGHTS) + section 25 (CREATOR GROWTH):
+//   - Insights are computed server-side from real analytics data
+//   - Milestones are non-financial achievements (NOT ad clicks/impressions)
+//   - Recommendations are actionable suggestions for creator growth
+//
+// Milestones are predefined (seeded) — e.g., "First Page", "100 Visitors".
+// UserMilestone tracks which milestones each user has earned + when.
+
+enum MilestoneType {
+  PROFILE_COMPLETE
+  FIRST_PAGE
+  FIRST_POST
+  FIRST_FOLLOWER
+  TEN_FOLLOWERS
+  HUNDRED_FOLLOWERS
+  HUNDRED_VISITORS
+  THOUSAND_VISITORS
+  FIRST_SHARE
+  FIRST_REACTION
+  FIRST_COMMENT
+  CONSISTENT_CREATOR
+  FEATURED_CREATOR
+  CAMPAIGN_PARTICIPANT
+}
+
+model Milestone {
+  id          String        @id @default(cuid())
+  type        MilestoneType @unique
+  name        String                   // display name
+  description String                   // what the user did to earn it
+  icon        String                   // emoji or icon name
+  color       String                   // hex color for UI accent
+  threshold   Int          @default(0) // numeric threshold (e.g., 100 for HUNDRED_VISITORS)
+  createdAt   DateTime      @default(now())
+
+  users       UserMilestone[]
+}
+
+model UserMilestone {
+  id          String   @id @default(cuid())
+  userId      String
+  milestoneId String
+  achievedAt  DateTime @default(now())
+  // Whether the user has "claimed" this milestone (seen the celebration)
+  claimed     Boolean  @default(false)
+  claimedAt   DateTime?
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, milestoneId])  // prevents duplicate milestone awards
+  @@index([userId, claimed])
 }
 
 // ─── COMPLIANCE (Chapter 6) ──────────────────────────────────────────────────
