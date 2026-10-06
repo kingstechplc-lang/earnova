@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ChevronLeft, Activity, BarChart3, RefreshCw, Info, Users, Eye, Globe2, Smartphone,
+  ChevronLeft, Activity, BarChart3, RefreshCw, Info, Users, Eye, Globe2, Smartphone, FileText,
 } from 'lucide-react'
 import { CountUp } from '@/components/animated/count-up'
 import { FadeIn, StaggerContainer, StaggerItem } from '@/components/animated/motion'
@@ -19,6 +19,7 @@ type Analytics = {
   pageViews7d: number; pageViews30d: number
   uniqueVisitors30d: number; returningVisitors30d: number
   topCountries: string; topDevices: string; topSources: string
+  topPosts?: Array<{ postId: string; views: number }>
 }
 
 type TrustScore = {
@@ -129,12 +130,31 @@ export default function AnalyticsView({
       </FadeIn>
 
       {/* Stats cards with CountUp */}
-      <StaggerContainer className="grid gap-4 mb-6 md:grid-cols-2 lg:grid-cols-4">
+      <StaggerContainer className="grid gap-4 mb-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         <StatCard icon={<Users className="h-5 w-5" />} value={analytics?.visitors7d ?? 0} label="Visitors (7d)" accent="evergreen" delay={0} />
         <StatCard icon={<Users className="h-5 w-5" />} value={analytics?.visitors30d ?? 0} label="Visitors (30d)" accent="gold" delay={0.05} />
         <StatCard icon={<Eye className="h-5 w-5" />} value={analytics?.pageViews7d ?? 0} label="Page views (7d)" accent="berry" delay={0.1} />
         <StatCard icon={<Eye className="h-5 w-5" />} value={analytics?.pageViews30d ?? 0} label="Page views (30d)" accent="evergreen" delay={0.15} />
+        <StatCard icon={<RefreshCw className="h-5 w-5" />} value={analytics?.returningVisitors30d ?? 0} label="Returning (30d)" accent="gold" delay={0.2} />
       </StaggerContainer>
+
+      {/* No-data empty state (per spec section 108 — meaningful empty states) */}
+      {analytics && analytics.pageViews30d === 0 && (
+        <FadeIn delay={0.1}>
+          <Card className="mb-6 border-dashed border-evergreen/30 bg-card/60 backdrop-blur-sm">
+            <CardContent className="py-8 text-center">
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-evergreen/10 mb-3">
+                <BarChart3 className="h-6 w-6 text-evergreen" />
+              </div>
+              <p className="font-medium text-foreground mb-1">No analytics yet</p>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Publish your page + share it with your audience. Analytics will appear here
+                as visitors start viewing your content.
+              </p>
+            </CardContent>
+          </Card>
+        </FadeIn>
+      )}
 
       {/* Breakdowns */}
       <StaggerContainer className="grid gap-4 mb-6 md:grid-cols-2">
@@ -274,6 +294,41 @@ export default function AnalyticsView({
           </CardContent>
         </Card>
       </FadeIn>
+
+      {/* Content Performance — top posts by views (Phase 6) */}
+      {analytics?.topPosts && analytics.topPosts.length > 0 && (
+        <FadeIn delay={0.3}>
+          <Card className="mt-6 overflow-hidden shadow-festive glass-strong">
+            <div className="h-1.5 w-full bg-gradient-to-r from-berry via-gold to-evergreen" />
+            <CardHeader>
+              <CardTitle className="font-serif text-xl flex items-center gap-2">
+                <FileText className="h-5 w-5 text-berry" />
+                Content Performance
+              </CardTitle>
+              <CardDescription>Top posts by views (last 30 days)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {analytics.topPosts.map((post, idx) => (
+                  <div
+                    key={post.postId}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-card/60 backdrop-blur-sm border border-border/40 hover:border-evergreen/30 transition-colors"
+                  >
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-evergreen/15 to-gold/10 text-evergreen text-xs font-bold flex-shrink-0">
+                      {idx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">Post ID: {post.postId}</p>
+                      <p className="text-xs text-muted-foreground">{post.views} {post.views === 1 ? 'view' : 'views'}</p>
+                    </div>
+                    <Eye className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </FadeIn>
+      )}
       </div>
     </div>
   )
