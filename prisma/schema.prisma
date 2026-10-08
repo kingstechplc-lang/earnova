@@ -375,11 +375,13 @@ model SpecialPage {
   moderationState ModerationState @default(PENDING)
   consentRequired Boolean  @default(true)
   publishedAt     DateTime?
+  themeId         String?   // optional Theme applied to this page
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   campaign        Campaign? @relation(fields: [campaignId], references: [id])
+  theme           Theme?    @relation(fields: [themeId], references: [id], onDelete: SetNull)
   blocks          ContentBlock[]
   placements      AdPlacement[]
   trustScores     TrustScore[]
@@ -1258,6 +1260,70 @@ model VerificationRequest {
 
   @@index([status, createdAt])
   @@index([userId])
+}
+
+// ─── CREATOR EXPERIENCE (Phase 10) ──────────────────────────────────────────
+//
+// Per spec section 40 (CREATOR THEMES) + section 71 (EARNOVA STUDIO):
+//   - Professional theme system: colors, typography, background, cards
+//   - Templates: Minimal, Creator, Business, Portfolio, Music, Gaming,
+//     Photography, Celebration, Christmas, Professional
+//   - Earnova Studio: greeting cards, social cards, birthday wishes,
+//     Christmas wishes, quotes, posters, announcements, quizzes, polls,
+//     countdowns, invitations
+//
+// Themes are predefined (seeded) with CSS variable overrides. Each page
+// can optionally have a theme applied — if none, it uses the default
+// platform theme.
+
+enum ThemeCategory {
+  MINIMAL
+  CREATOR
+  BUSINESS
+  PORTFOLIO
+  MUSIC
+  GAMING
+  PHOTOGRAPHY
+  CELEBRATION
+  CHRISTMAS
+  PROFESSIONAL
+}
+
+model Theme {
+  id          String        @id @default(cuid())
+  slug        String        @unique  // "christmas-wonder", "ocean-breeze", etc.
+  name        String                 // display name
+  description String?
+  category    ThemeCategory
+  icon        String                 // emoji
+  // CSS variable overrides as JSON — applied to the page's root element
+  // e.g., {"--evergreen":"#1a5276","--gold":"#f39c12","--background":"#fefefe"}
+  cssVars     String                 // JSON
+  // Preview gradient for the theme picker
+  previewGradient String             // CSS gradient string
+  isPremium   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+
+  pages       SpecialPage[]
+}
+
+// Templates are predefined page structures (content blocks + page type +
+// theme) that users can use as a starting point.
+model PageTemplate {
+  id          String        @id @default(cuid())
+  slug        String        @unique  // "personal-starter", "christmas-card", etc.
+  name        String                 // display name
+  description String?
+  category    ThemeCategory
+  icon        String                 // emoji
+  pageType    PageType                // the page type to create
+  // Default content blocks as JSON array — used when creating a page from template
+  blocks      String                 // JSON: [{type, data, order}]
+  themeSlug   String?                // optional theme to apply
+  isPremium   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+
+  @@index([category])
 }
 
 // ─── COMPLIANCE (Chapter 6) ──────────────────────────────────────────────────

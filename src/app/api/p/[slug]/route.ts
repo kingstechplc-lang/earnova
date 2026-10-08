@@ -13,6 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       blocks: { orderBy: { order: 'asc' } },
       campaign: true,
       owner: { select: { name: true, image: true, bio: true } },
+      theme: true,
       placements: {
         include: {
           integration: { include: { adNetwork: true } },
@@ -186,6 +187,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       owner: page.owner,
       moderationState: page.moderationState,
       blocks: page.blocks.map(b => ({ ...b, data: JSON.parse(b.data) })),
+      theme: page.theme ? {
+        ...page.theme,
+        cssVars: page.theme.cssVars ? JSON.parse(page.theme.cssVars) : {},
+      } : null,
     },
     placements: visibilityFiltered,
     policy: {

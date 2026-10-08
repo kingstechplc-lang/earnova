@@ -13,9 +13,10 @@ import { CountUp } from '@/components/animated/count-up'
 import { StaggerContainer, StaggerItem, FadeIn } from '@/components/animated/motion'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { safeFetch } from '@/lib/safe-fetch'
+import { toast } from '@/hooks/use-toast'
 import { TiltCard } from '@/components/animated/tilt-card'
 import {
-  Plus, Eye, Edit3, BarChart3, Wallet, FileText, Sparkles, TrendingUp, Mail, X,
+  Plus, Eye, Edit3, BarChart3, Wallet, FileText, Sparkles, TrendingUp, Mail, X, LayoutTemplate,
 } from 'lucide-react'
 import type { View, CurrentUser } from '@/app/page'
 
@@ -24,6 +25,18 @@ type Page = {
   pageType: string; moderationState: string; publishedAt: string | null
   campaign: { id: string; title: string } | null
   _count: { blocks: number }
+}
+
+type Template = {
+  id: string; slug: string; name: string; description: string | null
+  category: string; icon: string; pageType: string
+  blocks: Array<{ type: string; data: any; order: number }>
+  themeSlug: string | null
+  isPremium: boolean
+}
+
+type Theme = {
+  id: string; slug: string; name: string
 }
 
 const PAGE_TYPES: Array<[string, string, string]> = [
@@ -47,28 +60,35 @@ export default function DashboardView({
 }) {
   const [pages, setPages] = useState<Page[]>([])
   const [campaigns, setCampaigns] = useState<Array<{ id: string; title: string }>>([])
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [themes, setThemes] = useState<Theme[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newType, setNewType] = useState('PERSONAL')
   const [newCampaignId, setNewCampaignId] = useState('')
+  const [newTemplateSlug, setNewTemplateSlug] = useState('') // '' = start from scratch
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       setLoading(true)
       setLoadError(null)
-      const [pagesRes, campaignsRes] = await Promise.all([
+      const [pagesRes, campaignsRes, templatesRes, themesRes] = await Promise.all([
         safeFetch<{ pages?: Page[] }>('/api/pages'),
         safeFetch<{ campaigns?: Array<{ id: string; title: string }> }>('/api/campaigns'),
+        safeFetch<{ templates?: Template[] }>('/api/templates'),
+        safeFetch<{ themes?: Theme[] }>('/api/themes'),
       ])
       if (cancelled) return
       // Surface the first error, but still set whatever we got
-      const firstError = pagesRes.error || campaignsRes.error
+      const firstError = pagesRes.error || campaignsRes.error || templatesRes.error || themesRes.error
       if (firstError) setLoadError(firstError)
       setPages(pagesRes.data?.pages || [])
       setCampaigns((campaignsRes.data?.campaigns || []).map((cmp: any) => ({ id: cmp.id, title: cmp.title })))
+      setTemplates(templatesRes.data?.templates || [])
+      setThemes(themesRes.data?.themes || [])
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -77,21 +97,58 @@ export default function DashboardView({
   async function createPage() {
     if (!newTitle.trim()) return
     setCreating(true)
+    const selectedTemplate = newTemplateSlug
+      ? templates.find(t => t.slug === newTemplateSlug)
+      : null
+
+    // If a template is selected, use the template's pageType (so the page
+    // gets the right semantic type). Otherwise the user's selected type wins.
+    const pageType = selectedTemplate ? selectedTemplate.pageType : newType
     const res = await safeFetch<{ page: { id: string } }>('/api/pages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: newTitle,
-        pageType: newType,
+        pageType,
         campaignId: newCampaignId && newCampaignId !== '__none__' ? newCampaignId : undefined,
       }),
     })
-    setCreating(false)
-    if (res.data?.page?.id) {
-      navigate({ name: 'builder', pageId: res.data.page.id })
-    } else if (res.error) {
-      setLoadError(res.error)
+    if (!res.data?.page?.id) {
+      setCreating(false)
+      if (res.error) setLoadError(res.error)
+      return
     }
+    const pageId = res.data.page.id
+
+    // If a template was selected, populate blocks + apply the template's theme
+    if (selectedTemplate) {
+      // 1. Pre-fill content blocks
+      for (const block of selectedTemplate.blocks || []) {
+        await safeFetch(`/api/page-builder/${pageId}/blocks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: block.type, data: block.data ?? {} }),
+        })
+      }
+      // 2. Apply the template's theme (look up theme id by slug)
+      if (selectedTemplate.themeSlug) {
+        const theme = themes.find(t => t.slug === selectedTemplate.themeSlug)
+        if (theme) {
+          await safeFetch(`/api/pages/${pageId}/theme`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ themeId: theme.id }),
+          })
+        }
+      }
+      toast({
+        title: `${selectedTemplate.icon} ${selectedTemplate.name} template applied`,
+        description: 'We pre-filled your page with starter content + theme. Tweak it in the builder.',
+      })
+    }
+
+    setCreating(false)
+    navigate({ name: 'builder', pageId })
   }
 
   const publishedCount = pages.filter(p => p.publishedAt).length
@@ -255,7 +312,7 @@ export default function DashboardView({
               </div>
               <div>
                 <Label className="text-xs uppercase tracking-wide text-muted-foreground">Page type</Label>
-                <Select value={newType} onValueChange={setNewType}>
+                <Select value={newType} onValueChange={setNewType} disabled={!!newTemplateSlug}>
                   <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {PAGE_TYPES.map(([v, l, emoji]) => (
@@ -296,6 +353,53 @@ export default function DashboardView({
                 </Button>
               </div>
             </div>
+
+            {/* Template selector — optional pre-fill from a PageTemplate.
+                When a template is picked, the page-type select is disabled
+                because the template's pageType wins. */}
+            {templates.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-border/40">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                  <LayoutTemplate className="h-3.5 w-3.5 text-gold-dark" />
+                  Start from a template <span className="text-muted-foreground/70 normal-case tracking-normal">(optional)</span>
+                </Label>
+                <Select
+                  value={newTemplateSlug || '__none__'}
+                  onValueChange={v => setNewTemplateSlug(v === '__none__' ? '' : v)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Start from scratch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Start from scratch —</SelectItem>
+                    {templates.map(t => (
+                      <SelectItem key={t.id} value={t.slug}>
+                        <span className="mr-2">{t.icon}</span>
+                        <span className="font-medium">{t.name}</span>
+                        {t.isPremium && (
+                          <Badge variant="outline" className="ml-2 text-[10px] py-0 px-1.5 border-gold/40 text-gold-dark bg-gold/5">
+                            PRO
+                          </Badge>
+                        )}
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          · {t.blocks.length} blocks
+                          {t.themeSlug ? ' · themed' : ''}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {newTemplateSlug && (() => {
+                  const t = templates.find(x => x.slug === newTemplateSlug)
+                  return t?.description ? (
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      <span className="mr-1">{t.icon}</span>
+                      {t.description}
+                    </p>
+                  ) : null
+                })()}
+              </div>
+            )}
           </CardContent>
         </Card>
       </FadeIn>

@@ -1315,3 +1315,104 @@ Stage Summary:
 - All API calls go through safeFetch (no raw fetch). Block/mute toggles use optimistic state updates with toast revert on failure. The ReportDialog handles logged-out visitors by showing a "Log in to report" CTA card with the parent's onLoginRedirect callback. Verification rejection emits a notification to the user with the admin's review notes as the body so they know what to fix.
 - Audit logging: every admin terminal action (resolve/dismiss/escalate report, approve/reject verification) writes an entry to the AuditLog table via `auditLog({ actorId, action, resource, previousState, newState, reason })`. Failures are caught and logged but never block the response.
 - Mobile-first responsive: every admin + end-user surface uses `grid-cols-1 md:grid-cols-2` or `flex flex-wrap` patterns, truncates long text with `truncate`/`line-clamp-3`, and works on 320px viewports up to desktop. Dropdown menus use Radix's built-in `align="end"` so they don't overflow on mobile.
+
+---
+Task ID: 27
+Agent: frontend-styling-expert (Phase 10 Creator Experience)
+Task: Build ThemePicker + EarnovaStudio view + wire themes into the page builder + public page view.
+
+Work Log:
+- Read worklog.md (Tasks 1-26) for design language context — ambient mesh-bg + FloatingOrbs, glass-strong cards, gradient-text-evergreen titles, TiltCard 3D-tilt, CountUp animated numbers, StaggerContainer reveals, brand palette (evergreen/gold/berry/cranberry/sage), useConfetti for celebrations, GradientDialogHeader for dialog headers.
+- Read existing patterns: builder-view (toolbar + Card layouts + safeFetch), public-page-view (article rendering + AdSlot placement), dashboard-view (create-page form + 4-col grid), sidebar.tsx (navItems arrays — desktop + mobile drawer), page.tsx (View union type + hash routing + render branches), theme API route (returns cssVars parsed JSON), templates API route (returns blocks parsed JSON), /api/pages/[id]/theme PATCH route, /api/pages/[id] GET route, gradient-dialog-header (6 variants), confetti.tsx (useConfetti hook returns fire + ConfettiLayer), safe-fetch (SafeFetchResult shape), use-toast (toast() function).
+- File 1: src/components/builder/theme-picker.tsx (NEW, ~370 lines):
+  * 'use client' directive, exports ThemePicker + default.
+  * Props: `{ pageId, currentThemeId, onApplied, open, onOpenChange }`. Parent owns the dialog open state so the toolbar button can close it.
+  * Lazy fetches /api/themes when the dialog opens (no network calls while closed).
+  * Glass-strong DialogContent (max-w-3xl, max-h-92vh) with festive GradientDialogHeader ("Choose a theme").
+  * Grid: grid-cols-2 md:grid-cols-3 lg:grid-cols-4 with AnimatePresence + motion.div per card. Spring scale-in stagger (idx * 0.04 delay, stiffness 260, damping 18).
+  * Each ThemeCard:
+    - Background = theme.previewGradient (CSS gradient string from API) with `background-image` inline style.
+    - Subtle dark gradient overlay (from-black/70 via-black/20 to-black/10) for legibility.
+    - Theme icon (emoji) in a glass circle (bg-white/20 backdrop-blur-md ring-2 ring-white/30).
+    - Theme name (font-serif text-cream) + category label (uppercase text-cream/80).
+    - Description (line-clamp-2 text-cream/85).
+    - "Apply theme" button at bottom — flips to "Applied" with gold bg + check icon when active.
+    - Premium badge (Crown icon, gold pill) top-right when isPremium.
+    - Gold check + animated glow border (box-shadow with 3-layer gold halo) for the currently-applied theme.
+  * Hover: y -4 + scale 1.03 (motion whileHover), gradient scales 110% (group-hover:scale-110 on the bg layer), Create button bg intensifies to gold.
+  * Confetti: useConfetti fired with 60 particles, spread 70, centered at (0.5, 0.35) on successful apply.
+  * Toast on apply (positive) + on error (destructive). Toast on remove.
+  * Footer: "Reset to default" button (ghost, cranberry on hover) + contextual hint about active theme.
+  * Loading state: 8-cell shimmer-bg skeleton grid matching the real layout.
+  * Error state: cranberry X icon + error message + Close button.
+  * Empty state: Palette icon + "No themes available yet" message.
+- File 2: src/components/views/earnova-studio-view.tsx (NEW, ~360 lines):
+  * 'use client' directive, default export EarnovaStudioView({ user, navigate }).
+  * 12 creation tiles per spec §71: Greeting Card 🎴, Social Card 🎉, Birthday Wish 🎂, Christmas Wish 🎄, Quote 💬, Poster 📰, Announcement 📢, Quiz 🧠, Poll 📊, Countdown ⏰, Invitation 💌, Event Page 📅.
+  * Each tile maps to a pageType + suggestedTitle so clicking "Create →" POSTs /api/pages with the right type + routes to the builder.
+  * Header: gradient-text-evergreen "Earnova Studio" with hero card (evergreen→background→gold wash + 2 FloatingOrbs + Sparkles) + Wand2 icon in evergreen gradient tile + 2 outline Badges (12 templates / Free for creators).
+  * Grid: grid-cols-2 md:grid-cols-3 lg:grid-cols-4 with StaggerContainer (stagger 0.05) + StaggerItem (y 20).
+  * Each StudioCard: TiltCard 3D-tilt wrapper (intensity 6, glow) + rotating brand gradient backgrounds via ACCENTS map (evergreen/gold/berry/cranberry/sage cycle).
+    - Card body: dark gradient overlay (from-black/60 via-black/20 to-black/5) for legibility + floating accent orb that scales 125% on hover + top accent bar (gradient).
+    - Glass-circle icon (bg-white/20 backdrop-blur-md ring-2 ring-white/30 text-2xl) spring scale-in (whileInView once).
+    - Title (font-serif text-cream) + description (line-clamp-3 text-cream/85).
+    - "Create →" pill at bottom — slides icon on hover, turns gold + evergreen-dark text on hover.
+  * Click → POST /api/pages (with the right pageType) → toast + 60-particle confetti → navigate to builder with the new pageId.
+  * Creating state: disabled cursor-wait + spinner + "Creating…" pill.
+  * Footer CTA card with tri-color strip: "More formats coming soon" + Start-from-scratch outline button.
+  * Error toast via use-toast on create failure.
+- File 3: src/components/views/builder-view.tsx (MODIFIED):
+  * Imported ThemePicker + Palette icon.
+  * Extended local Page type with `theme?: Theme | null`.
+  * Added themePickerOpen state.
+  * Root container: `style={page?.theme?.cssVars ? (page.theme.cssVars as React.CSSProperties) : undefined}` — applies the theme's CSS custom properties (--evergreen, --gold, etc.) to the builder so the editor itself reflects the theme. This matches the public-page-view treatment.
+  * New "Theme" outline button in the toolbar (between "Saving…" indicator and "Preview"): gold border + Palette icon + small theme preview swatch (12px circle using previewGradient as background-image) + theme name on sm+ screens. Clicking opens ThemePicker dialog.
+  * Toolbar now uses flex-wrap so it stacks cleanly on mobile.
+  * ThemePicker rendered at the end with onApplied callback that:
+    - Sets local page.theme to null when removing.
+    - On apply: optimistically updates theme.id/name + refetches the page in the background so cssVars + previewGradient are correctly populated (the optimistic placeholder uses the previous theme's cssVars to avoid a flash of unstyled content).
+- File 4: src/components/views/public-page-view.tsx (MODIFIED):
+  * Extended PublicPage type with `theme?: { id, slug, name, icon, previewGradient, cssVars } | null`.
+  * Extracted `themeCssVars = (page.theme?.cssVars || {}) as React.CSSProperties`.
+  * Root `<div className="min-h-screen" style={themeCssVars}>` — propagates the theme's CSS custom properties to all descendants so the page's brand colors (hero, badges, buttons, text accents) reflect the applied theme.
+- File 5: src/app/page.tsx (MODIFIED):
+  * Imported EarnovaStudioView.
+  * Extended View union type with `{ name: 'studio' }`.
+  * Render branch: `{view.name === 'studio' && user && <EarnovaStudioView user={user} navigate={navigate} />}` inside the sidebar (authenticated) PageTransition block.
+  * No hash routing — internal authenticated view, same as grow/monetization/profile-setup.
+- File 6: src/components/layout/sidebar.tsx (MODIFIED):
+  * Imported Wand2 from lucide-react.
+  * Inserted `{ label: 'Studio', icon: Wand2, target: { name: 'studio' } as View, active: view.name === 'studio' }` right after the "Grow" item in BOTH the desktop sidebar navItems array AND the mobile drawer navItems array.
+  * Sidebar nav order: Dashboard → Analytics → Grow → Studio → Explore → Feed → Posts → Profile → Monetization → [Admin].
+- File 7: src/components/views/dashboard-view.tsx (MODIFIED):
+  * Imported LayoutTemplate icon + toast from use-toast.
+  * Added Template + Theme types. Added templates + themes state. Added newTemplateSlug state (default '' = start from scratch).
+  * Initial fetch now also pulls /api/templates + /api/themes in parallel with /api/pages + /api/campaigns (4-way Promise.all). Partial failures still surface the first error.
+  * createPage() flow when a template is selected:
+    1. Look up the template by slug.
+    2. Use the template's pageType when POSTing /api/pages (the user's selected pageType is ignored + the Page Type select is disabled when a template is chosen).
+    3. Iterate the template's blocks and POST each to /api/page-builder/[pageId]/blocks (the POST endpoint auto-increments `order`, so blocks land in the right order).
+    4. If the template has a themeSlug, look up the theme by slug in the themes array (fetched in step 1) and PATCH /api/pages/[pageId]/theme with the themeId.
+    5. Toast success: "{icon} {name} template applied — We pre-filled your page with starter content + theme."
+    6. Navigate to the builder with the new pageId.
+  * Template selector UI: appears below the existing create-page form (separator border-top) only if templates.length > 0. LayoutTemplate icon + "Start from a template (optional)" label + Select dropdown listing templates with emoji + name + PRO badge (if isPremium) + "{N} blocks · themed" suffix.
+  * When a template is selected, a contextual description appears below the Select with the template's icon + description.
+- File 8: src/app/api/pages/[id]/route.ts (MODIFIED — required so the builder can render the theme's cssVars on first load):
+  * GET route now includes `theme: true` in the Prisma include.
+  * Response shape: `{ page: { ...pageData, theme: theme ? { ...theme, cssVars: JSON.parse(theme.cssVars) } : null } }` — same pattern as /api/p/[slug].
+  * PATCH + DELETE routes unchanged.
+- Verification:
+  * `bun run lint` — passes (exit 0, no output).
+  * `bunx tsc --noEmit` — passes (exit 0, no output).
+  * `DATABASE_URL=… bun run build` — succeeds: "✓ Compiled successfully in 20.0s", "✓ Generating static pages using 1 worker (49/49) in 806.4ms".
+
+Stage Summary:
+- Phase 10 Creator Experience is live end-to-end:
+  1. **ThemePicker** — beautiful glass-strong dialog with festive gradient header, staggered spring scale-in cards, preview-gradient backgrounds, gold check + animated glow border for the applied theme, confetti (60 particles) on apply, "Reset to default" footer button.
+  2. **EarnovaStudio** — creative-toolkit hub (12 formats: greeting card, social card, birthday wish, christmas wish, quote, poster, announcement, quiz, poll, countdown, invitation, event page). TiltCard 3D-tilt + rotating brand gradients + spring stagger reveal + 60-particle confetti on creation + routes to builder with new pageId.
+  3. **Builder wiring** — Theme button in the toolbar opens ThemePicker; theme's cssVars apply to the builder root so the editor reflects the theme in real time; optimistic update + background refetch keeps the preview swatch + name accurate.
+  4. **Public-page wiring** — page.theme.cssVars apply to the root `<div className="min-h-screen" style={themeCssVars}>` so visitors see themed brand colors throughout the article.
+  5. **Sidebar nav** — Studio (Wand2 icon) sits between Grow and Profile in both desktop + mobile drawer.
+  6. **Template selection** — dashboard's create-page form gains an optional template Select dropdown that pre-fills blocks + applies the template's theme; the user's pageType select is disabled when a template is chosen.
+- 2 new view/component files (~730 total lines) + 5 modified files. All 'use client' components use safeFetch + useConfetti + match the established design language (ambient mesh-bg + FloatingOrbs, glass-strong cards, gradient-text-evergreen titles, TiltCard, CountUp, StaggerContainer reveals, mobile-first responsive, error/empty/loading states).
+- API: GET /api/pages/[id] now returns `theme` with parsed cssVars (was previously omitted), unblocking the builder from rendering themed brand colors on first load.

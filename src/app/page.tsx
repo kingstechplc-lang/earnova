@@ -23,6 +23,7 @@ import ExploreView from '@/components/views/explore-view'
 import SearchView from '@/components/views/search-view'
 import FeedView from '@/components/views/feed-view'
 import GrowView from '@/components/views/grow-view'
+import EarnovaStudioView from '@/components/views/earnova-studio-view'
 import Header from '@/components/layout/header'
 import Footer from '@/components/layout/footer'
 import Sidebar from '@/components/layout/sidebar'
@@ -47,6 +48,7 @@ export type View =
   | { name: 'search'; query?: string }
   | { name: 'feed'; tab?: string }
   | { name: 'grow' }
+  | { name: 'studio' }
 
 export type CurrentUser = { id: string; email: string; name: string | null; username: string | null; role: string; emailVerified?: boolean }
 
@@ -273,6 +275,7 @@ export default function Home() {
                 {view.name === 'analytics' && user && <AnalyticsView pageId={view.pageId} user={user} navigate={navigate} />}
                 {view.name === 'general-analytics' && user && <GeneralAnalyticsView user={user} navigate={navigate} />}
                 {view.name === 'grow' && user && <GrowView user={user} navigate={navigate} />}
+                {view.name === 'studio' && user && <EarnovaStudioView user={user} navigate={navigate} />}
                 {view.name === 'profile-setup' && user && <ProfileSetupView user={user} navigate={navigate} />}
                 {view.name === 'posts' && user && <PostsView user={user} navigate={navigate} />}
                 {view.name === 'post-editor' && user && <PostEditorView postId={view.postId} user={user} navigate={navigate} />}

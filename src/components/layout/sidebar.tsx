@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import {
   Sparkles, LayoutDashboard, Wallet, Shield, LogOut, Menu, X,
   ChevronLeft, ChevronRight, Eye, Globe2, Sparkles as SparklesIcon, FileText,
-  Compass, Rss, BarChart3, TrendingUp,
+  Compass, Rss, BarChart3, TrendingUp, Wand2,
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import type { View, CurrentUser } from '@/app/page'
@@ -33,6 +33,7 @@ export default function Sidebar({
     { label: 'Dashboard', icon: LayoutDashboard, target: { name: 'dashboard' } as View, active: view.name === 'dashboard' || view.name === 'builder' || view.name === 'analytics' },
     { label: 'Analytics', icon: BarChart3, target: { name: 'general-analytics' } as View, active: view.name === 'general-analytics' },
     { label: 'Grow', icon: TrendingUp, target: { name: 'grow' } as View, active: view.name === 'grow' },
+    { label: 'Studio', icon: Wand2, target: { name: 'studio' } as View, active: view.name === 'studio' },
     { label: 'Explore', icon: Compass, target: { name: 'explore' } as View, active: view.name === 'explore' || view.name === 'search' },
     { label: 'Feed', icon: Rss, target: { name: 'feed' } as View, active: view.name === 'feed' },
     { label: 'Posts', icon: FileText, target: { name: 'posts' } as View, active: view.name === 'posts' || view.name === 'post-editor' },
@@ -218,6 +219,7 @@ function MobileDrawer({
     { label: 'Dashboard', icon: LayoutDashboard, target: { name: 'dashboard' } as View, active: view.name === 'dashboard' || view.name === 'builder' || view.name === 'analytics' },
     { label: 'Analytics', icon: BarChart3, target: { name: 'general-analytics' } as View, active: view.name === 'general-analytics' },
     { label: 'Grow', icon: TrendingUp, target: { name: 'grow' } as View, active: view.name === 'grow' },
+    { label: 'Studio', icon: Wand2, target: { name: 'studio' } as View, active: view.name === 'studio' },
     { label: 'Explore', icon: Compass, target: { name: 'explore' } as View, active: view.name === 'explore' || view.name === 'search' },
     { label: 'Feed', icon: Rss, target: { name: 'feed' } as View, active: view.name === 'feed' },
     { label: 'Posts', icon: FileText, target: { name: 'posts' } as View, active: view.name === 'posts' || view.name === 'post-editor' },

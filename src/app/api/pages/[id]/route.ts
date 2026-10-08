@@ -9,10 +9,28 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const page = await db.specialPage.findFirst({
     where: { id, ownerId: user.id },
-    include: { blocks: { orderBy: { order: 'asc' } }, campaign: true, placements: true },
+    include: {
+      blocks: { orderBy: { order: 'asc' } },
+      campaign: true,
+      placements: true,
+      theme: true,
+    },
   })
   if (!page) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json({ page })
+  // Parse theme.cssVars (stored as JSON string) so the builder + public
+  // views can apply them directly as CSS custom properties.
+  const { theme, ...pageData } = page
+  return NextResponse.json({
+    page: {
+      ...pageData,
+      theme: theme
+        ? {
+            ...theme,
+            cssVars: theme.cssVars ? JSON.parse(theme.cssVars) : {},
+          }
+        : null,
+    },
+  })
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

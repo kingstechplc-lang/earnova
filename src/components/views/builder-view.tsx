@@ -16,11 +16,21 @@ import {
   arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Plus, GripVertical, Trash2, ChevronLeft, Eye } from 'lucide-react'
+import { Plus, GripVertical, Trash2, ChevronLeft, Eye, Palette } from 'lucide-react'
 import { safeFetch } from '@/lib/safe-fetch'
 import { useConfetti } from '@/components/animated/confetti'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
+import { ThemePicker } from '@/components/builder/theme-picker'
 import type { View, CurrentUser } from '@/app/page'
+
+type Theme = {
+  id: string
+  slug: string
+  name: string
+  icon: string
+  previewGradient: string
+  cssVars: Record<string, string>
+}
 
 type Block = {
   id: string; type: string; data: any; order: number
@@ -31,6 +41,7 @@ type Page = {
   pageType: string; moderationState: string; publishedAt: string | null
   campaign: { id: string; title: string } | null
   blocks: Block[]
+  theme?: Theme | null
 }
 
 const BLOCK_TYPES: Array<[string, string]> = [
@@ -53,6 +64,7 @@ export default function BuilderView({
   const [page, setPage] = useState<Page | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [themePickerOpen, setThemePickerOpen] = useState(false)
   const { fire: fireConfetti, ConfettiLayer } = useConfetti()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -192,7 +204,10 @@ export default function BuilderView({
   )
 
   return (
-    <div className="relative min-h-screen">
+    <div
+      className="relative min-h-screen"
+      style={page?.theme?.cssVars ? (page.theme.cssVars as React.CSSProperties) : undefined}
+    >
       {/* Ambient background layer — same treatment as dashboard so the builder
           feels continuous with the rest of the app rather than flat. */}
       <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" aria-hidden />
@@ -200,7 +215,7 @@ export default function BuilderView({
 
       <div className="relative z-10 view-fade container mx-auto px-4 py-6 max-w-4xl">
       {ConfettiLayer}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
         <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'dashboard' })}>
           <ChevronLeft className="h-4 w-4" /> Back
         </Button>
@@ -211,6 +226,28 @@ export default function BuilderView({
             Saving…
           </span>
         )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setThemePickerOpen(true)}
+          className="border-gold/30 text-gold-dark hover:bg-gold/5 bg-card/50 backdrop-blur-sm"
+          title="Change page theme"
+        >
+          <Palette className="h-4 w-4 mr-1" />
+          <span>Theme</span>
+          {page.theme && (
+            <>
+              <span
+                aria-hidden
+                className="ml-1 h-3 w-3 rounded-full ring-1 ring-cream/40"
+                style={{ backgroundImage: page.theme.previewGradient }}
+              />
+              <span className="hidden sm:inline ml-1 text-xs text-muted-foreground">
+                {page.theme.icon} {page.theme.name}
+              </span>
+            </>
+          )}
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -323,6 +360,32 @@ export default function BuilderView({
         )}
       </div>
       </div>
+
+      {/* Theme picker dialog */}
+      <ThemePicker
+        pageId={pageId}
+        currentThemeId={page.theme?.id ?? null}
+        onApplied={(themeId) => {
+          // Optimistically update local state so the toolbar swatch + the
+          // ambient CSS vars update instantly. We refetch the full page
+          // in the background so cssVars are correctly populated.
+          if (themeId === null) {
+            setPage(prev => prev ? { ...prev, theme: null } : prev)
+          } else {
+            // Optimistic: show a placeholder until the refetch completes.
+            setPage(prev => prev ? {
+              ...prev,
+              theme: prev.theme && prev.theme.id === themeId
+                ? prev.theme
+                : { id: themeId, slug: '', name: 'Applied', icon: '🎨', previewGradient: '', cssVars: prev.theme?.cssVars || {} },
+            } : prev)
+            // Refetch to get the full theme record (with cssVars + previewGradient)
+            load()
+          }
+        }}
+        open={themePickerOpen}
+        onOpenChange={setThemePickerOpen}
+      />
     </div>
   )
 }

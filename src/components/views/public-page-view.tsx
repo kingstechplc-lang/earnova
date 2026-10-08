@@ -20,6 +20,14 @@ type PublicPage = {
   owner: { name: string | null; image: string | null; bio: string | null }
   moderationState: string
   blocks: Array<{ id: string; type: string; data: any; order: number }>
+  theme?: {
+    id: string
+    slug: string
+    name: string
+    icon: string
+    previewGradient: string
+    cssVars: Record<string, string>
+  } | null
 }
 
 type Placement = {
@@ -134,8 +142,15 @@ export default function PublicPageView({
   const placementBySlot = (slot: string) => placements.find(p => p.slot === slot)
   const hasAds = placements.length > 0 && !policy.globalKillSwitch
 
+  // ── Theme CSS variables ────────────────────────────────────────────────
+  // When a page has a theme applied, propagate its cssVars to the root
+  // container so all descendants pick up the overridden brand colors
+  // (e.g., --evergreen, --gold, --background). The values come pre-parsed
+  // from /api/p/[slug].
+  const themeCssVars = (page.theme?.cssVars || {}) as React.CSSProperties
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" style={themeCssVars}>
       {/* ── Parallax Hero ── */}
       <div className="relative overflow-hidden border-b border-border/60">
         <motion.div style={{ y: heroY, opacity: heroOpacity }} className="absolute inset-0">
