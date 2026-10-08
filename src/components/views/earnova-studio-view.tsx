@@ -269,8 +269,12 @@ export default function EarnovaStudioView({
      Editor mode — full-screen canvas
      ────────────────────────────────────────────────────────────────────── */
   if (editing) {
+    // Editor mode: full-screen overlay that covers everything (including the
+    // Footer which is rendered by page.tsx after <main>). Using fixed inset-0
+    // ensures the canvas editor takes the full viewport without the Footer
+    // appearing below it or causing scroll issues.
     return (
-      <div className="relative">
+      <div className="fixed inset-0 z-30 bg-background">
         {ConfettiLayer}
         <CanvasEditor
           project={editing}
@@ -285,7 +289,7 @@ export default function EarnovaStudioView({
      Hub mode
      ────────────────────────────────────────────────────────────────────── */
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen overflow-x-hidden">
       <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" aria-hidden />
       <FloatingOrbs count={3} colors={['evergreen', 'gold', 'berry']} className="opacity-25" />
       {ConfettiLayer}
