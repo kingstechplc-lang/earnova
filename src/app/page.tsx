@@ -57,6 +57,7 @@ export default function Home() {
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [hideFooter, setHideFooter] = useState(false)
 
   // ── Single source of truth for initial view ─────────────────────────────
   // Combines auth check + hash routing + sessionStorage restore into ONE
@@ -144,6 +145,8 @@ export default function Home() {
 
   const navigate = useCallback((v: View) => {
     setView(v)
+    // Reset footer visibility when leaving studio
+    if (v.name !== 'studio') setHideFooter(false)
     if (typeof window !== 'undefined') {
       // Persist to sessionStorage so a refresh restores this view
       try {
@@ -275,7 +278,7 @@ export default function Home() {
                 {view.name === 'analytics' && user && <AnalyticsView pageId={view.pageId} user={user} navigate={navigate} />}
                 {view.name === 'general-analytics' && user && <GeneralAnalyticsView user={user} navigate={navigate} />}
                 {view.name === 'grow' && user && <GrowView user={user} navigate={navigate} />}
-                {view.name === 'studio' && user && <EarnovaStudioView user={user} navigate={navigate} />}
+                {view.name === 'studio' && user && <EarnovaStudioView user={user} navigate={navigate} onHideFooter={setHideFooter} />}
                 {view.name === 'profile-setup' && user && <ProfileSetupView user={user} navigate={navigate} />}
                 {view.name === 'posts' && user && <PostsView user={user} navigate={navigate} />}
                 {view.name === 'post-editor' && user && <PostEditorView postId={view.postId} user={user} navigate={navigate} />}
@@ -288,7 +291,8 @@ export default function Home() {
                 {view.name === 'feed' && <FeedView navigate={navigate} user={user} initialTab={view.tab} />}
               </PageTransition>
             </main>
-            <Footer />
+            {/* Footer hidden when studio is in canvas editor mode (controlled via state) */}
+            {!(view.name === 'studio' && hideFooter) && <Footer />}
           </div>
         </div>
       ) : (

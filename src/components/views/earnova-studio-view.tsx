@@ -154,10 +154,11 @@ function canvasFromTemplate(templateId: string): CanvasData | null {
    EarnovaStudioView
    ────────────────────────────────────────────────────────────────────────── */
 export default function EarnovaStudioView({
-  user, navigate,
+  user, navigate, onHideFooter,
 }: {
   user: CurrentUser
   navigate: (v: View) => void
+  onHideFooter?: (hidden: boolean) => void
 }) {
   const [projects, setProjects] = useState<StudioProject[]>([])
   const [loading, setLoading] = useState(true)
@@ -181,6 +182,11 @@ export default function EarnovaStudioView({
     })()
     return () => { cancelled = true }
   }, [])
+
+  /* ── Sync footer visibility with editor mode ─────────────────────────── */
+  useEffect(() => {
+    onHideFooter?.(!!editing)
+  }, [editing, onHideFooter])
 
   /* ── Create a new canvas project from a tile / template / blank ──────── */
   const createProject = useCallback(async (
@@ -269,14 +275,11 @@ export default function EarnovaStudioView({
      Editor mode — full-screen canvas
      ────────────────────────────────────────────────────────────────────── */
   if (editing) {
-    // Editor mode: fills the remaining viewport height after the mobile top bar
-    // (h-14 = 3.5rem on mobile). On desktop, there's no top bar, so we use
-    // h-screen + a negative margin to account for the sidebar not adding height.
-    //
-    // overflow-hidden prevents the Footer (rendered after <main> in page.tsx)
-    // from being visible while the canvas editor is open.
+    // Editor mode: fills the available viewport height.
+    // The Footer is hidden by page.tsx (via onHideFooter callback) while
+    // editing, so we can use the full viewport height without overflow tricks.
     return (
-      <div className="relative h-[calc(100vh-3.5rem)] md:h-screen overflow-hidden bg-background md:-mt-0">
+      <div className="relative h-[calc(100vh-3.5rem)] md:h-screen bg-background">
         {ConfettiLayer}
         <CanvasEditor
           project={editing}
