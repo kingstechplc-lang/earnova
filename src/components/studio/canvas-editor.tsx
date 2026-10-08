@@ -698,7 +698,7 @@ export function CanvasEditor({
      Layout
      ────────────────────────────────────────────────────────────────────── */
   return (
-    <div className="relative flex h-screen flex-col bg-muted/30">
+    <div className="relative flex h-full flex-col bg-muted/30">
       {/* ── Top bar ────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 border-b border-evergreen/15 bg-background px-3 py-2">
         <Button variant="ghost" size="sm" onClick={onBack} className="text-evergreen hover:bg-evergreen/5">
