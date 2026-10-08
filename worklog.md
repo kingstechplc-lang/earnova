@@ -1416,3 +1416,72 @@ Stage Summary:
   6. **Template selection** — dashboard's create-page form gains an optional template Select dropdown that pre-fills blocks + applies the template's theme; the user's pageType select is disabled when a template is chosen.
 - 2 new view/component files (~730 total lines) + 5 modified files. All 'use client' components use safeFetch + useConfetti + match the established design language (ambient mesh-bg + FloatingOrbs, glass-strong cards, gradient-text-evergreen titles, TiltCard, CountUp, StaggerContainer reveals, mobile-first responsive, error/empty/loading states).
 - API: GET /api/pages/[id] now returns `theme` with parsed cssVars (was previously omitted), unblocking the builder from rendering themed brand colors on first load.
+
+---
+Task ID: 28
+Agent: general-purpose (Phase 11 Earnova Studio — real visual editors)
+Task: Redesign the Earnova Studio to produce REAL visual outputs (not just text fields). Each studio type gets its own visual editor with live preview. Support AI content generation.
+
+Work Log:
+- Read worklog.md (Tasks 1-27) for design language context + Phase 10 Earnova Studio state. The Phase 10 studio hub was text-only (POST /api/pages → route to builder). This task rebuilds it as a full visual editor on top of the already-existing StudioProject data model + API routes (/api/studio/projects + /api/studio/ai/generate).
+- Read existing context: earnova-studio-view.tsx (current ~345-line tile grid), confetti.tsx (useConfetti hook → { fire, ConfettiLayer }), motion.tsx (FadeIn / StaggerContainer / StaggerItem / PageTransition), tilt-card.tsx (TiltCard 3D-tilt), floating-orbs.tsx, sparkles.tsx, safe-fetch.ts (SafeFetchResult shape), /api/studio/projects (GET list / POST create), /api/studio/projects/[id] (GET / PATCH / DELETE), /api/studio/ai/generate (POST → { data, suggestedTitle, provider, isStub }), src/lib/ai/index.ts (StubAIProvider that returns template content per project type), prisma/schema.prisma (StudioProjectType enum with all 12 values), src/app/page.tsx (View union + navigate), UI primitives (Button, Card, Input, Textarea, Label, Switch, Badge, Tabs).
+- File 1: src/components/studio/project-preview.tsx (NEW, ~823 lines) — reusable ProjectPreview component that renders the actual visual output for any StudioProjectType:
+  * Exports: ProjectPreview (named + default), GRADIENT_PRESETS (15 named gradients mapped to CSS), resolveGradient(key) helper.
+  * Each project type has its own renderer:
+    - GreetingCardPreview (also used for SOCIAL_CARD, BIRTHDAY_WISH, CHRISTMAS_WISH): gradient background + decorative blurred accent orbs + recipient greeting + message + accent underline bar. Supports layouts: centered, left-align, split (with side panel), fullbleed. Font-size aware (small/medium/large/xlarge).
+    - QuotePreview: large quote with curly-quote glyph + author attribution + gradient background.
+    - CountdownPreview: live ticking countdown using useCountdown() hook (1s interval) with grid of glass-strong unit cells (days/hours/minutes/seconds) — each toggled via showDays/Hours/Minutes/Seconds. Style variants drive different backgrounds (gradient/minimal/dark/neon/festive). "It's here!" celebration state when target reached.
+    - QuizPreview: fully interactive — pick an option per question, "Reveal answer" button highlights correct (evergreen) + wrong-selected (destructive) + shows explanation. Reset button to try again.
+    - PollPreview: fully interactive — tap to vote, animated gradient bar grows to show percentage. allowMultiple mode keeps all chosen options; single-select replaces previous vote.
+    - PosterPreview (also ANNOUNCEMENT): layout-aware (centered/top-heavy/bottom-heavy) with accent bar + title + subtitle + description on gradient.
+    - InvitationPreview (also EVENT_PAGE): elegant card with Mail icon, subtitle strip, title, date/time/location rows with icons, description, and RSVP button (animated scale-in, gold accent).
+  * Compact mode: simplified thumbnails used by project cards (line-clamp, smaller text, no full controls).
+  * All renderers: motion animations on entry, decorative blur orbs, drop shadows for legibility. Mobile-first responsive.
+  * Used the React "adjust state during render" pattern in useCountdown + PollPreview to avoid the `react-hooks/set-state-in-effect` lint rule (sync tracked state when props change without a synchronous setState in useEffect).
+- File 2: src/components/studio/studio-project-editor.tsx (NEW, ~1228 lines) — the main editor component:
+  * Exports: StudioProjectEditor (named + default), StudioProject type.
+  * Props: { initialProject: StudioProject | null, onBack, onSaved }.
+  * Two modes:
+    1. Type picker (when initialProject is null): 12 beautiful tiles with TiltCard 3D-tilt + rotating brand gradients + spring stagger reveal. Click → POST /api/studio/projects with default data → set as project → confetti (60 particles).
+    2. Editor mode: split-pane layout — left = type-specific form, right = sticky live ProjectPreview that updates in real-time as the user types. Mobile-first: panes stack (preview on top, form below) on small screens.
+  * AI Generate section at the top of editor mode: prompt textarea + collapsible "Add context" row (recipient / occasion / tone inputs) + gold-gradient "Generate with AI" button with sparkle icon + loading spinner. On generate: POST /api/studio/ai/generate → fill the form + set aiGenerated/aiPrompt + 40-particle confetti + toast. Shows a "stub" badge so users know it's template content for now.
+  * Type-specific forms (each renders in the left pane via TypeSpecificForm router):
+    - GreetingForm: recipient, message, GradientPicker (15 presets), ChoicePicker for layout, ChoicePicker for font size, ColorPicker for text color, ColorPicker for accent color.
+    - QuoteForm: quote text, author, GradientPicker, style picker, font size, text color.
+    - CountdownForm: title, subtitle, datetime-local input (with proper timezone conversion), style picker, ToggleRow grid for showDays/Hours/Minutes/Seconds.
+    - QuizForm: title, description, question list with add/remove/reorder (ArrowUp/ArrowDown), each question has a textarea + 4 option inputs (tap to mark correct with green check) + explanation input.
+    - PollForm: question textarea, option list with add/remove (min 2, max 8), allowMultiple toggle.
+    - PosterForm: title, subtitle, description, GradientPicker, layout picker, style picker, accent + text colors.
+    - InvitationForm: title, subtitle, datetime-local, location, description, GradientPicker, style picker, accent + text colors, RSVP toggle.
+  * Shared primitives: Field (label + icon + hint), ColorPicker (native color input + hex input + 8 preset swatches), GradientPicker (15 named gradient tiles), ChoicePicker (button group), ToggleRow (Switch row).
+  * EditorHeader: inline-editable project title (font-serif) + type icon badge + "AI" badge if aiGenerated + "Published" badge.
+  * Save + Save & Publish buttons at the bottom — both PATCH /api/studio/projects/[id]. Publish fires 150-particle confetti + "Published!" toast. Save fires "Saved" toast.
+- File 3: src/components/views/earnova-studio-view.tsx (REWRITE, ~621 lines) — the studio hub view:
+  * Two modes:
+    1. Hub mode (no project selected): "Your projects" section + "Create new" section.
+    2. Editor mode: renders <StudioProjectEditor> with the selected project, floating orbs ambient layer, confetti layer.
+  * Hub mode:
+    - Hero header: gradient-text-evergreen "Earnova Studio" + Wand2 icon tile + 2 outline Badges (12 formats / AI-powered) + FloatingOrbs + Sparkles particles. Same design language as before.
+    - "Your projects" section: shimmer-bg skeleton loaders during fetch; empty state with dashed border + "No projects yet" CTA; otherwise a StaggerContainer grid of ProjectCards (3-col on desktop). Each ProjectCard: top tri-color strip, emoji icon tile, project title, type label, updated date, "AI" badge (if aiGenerated), "Live"/"Draft" status badge, Edit + Delete buttons.
+    - "Create new" section: 12 StudioTile components (same design as Phase 10 — TiltCard 3D-tilt + rotating brand gradients + spring stagger reveal). Click → POST /api/studio/projects with default data → switch to editor mode + 60-particle confetti.
+    - Footer: AI generation explainer card with code-styled `src/lib/ai/index.ts` reference.
+  * Fetched the projects list inside useEffect with `cancelled` guard (avoids the `react-hooks/set-state-in-effect` lint rule by deferring all setState calls into the async callback).
+  * Delete: optimistic removal with revert on failure (safeFetch error → restore previous list + destructive toast).
+  * onSaved callback: keeps the projects list in sync when the editor saves (PATCH → upsert into list).
+- File 4 (PRE-EXISTING BUG FIX): src/lib/ai/index.ts line 176 — fixed a string parse error: `'Your limitation—it's only your imagination.'` had an unescaped ASCII apostrophe that ended the string literal early, causing eslint to fail with "Parsing error: ',' expected". Replaced the ASCII apostrophe with a Unicode curly apostrophe (') so the string stays intact. This was an untracked file (per git status) and was the only lint failure unrelated to my new code.
+
+Verification:
+- `bun run lint` — passes (exit 0, no output). After initial pass, fixed 3 issues:
+  1. `react-hooks/set-state-in-effect` in project-preview.tsx useCountdown (setRemaining synchronously in useEffect) → switched to "adjust state during render" pattern (track target, setRemaining during render if target changed).
+  2. `react-hooks/set-state-in-effect` in earnova-studio-view.tsx (fetchProjects called setLoading(true) synchronously in effect) → inlined the fetch in useEffect with cancelled guard + deferred all setState to the async callback.
+  3. `Parsing error: ',' expected` in src/lib/ai/index.ts line 176 (pre-existing bug — ASCII apostrophe in single-quoted string).
+- `bunx tsc --noEmit` — passes (exit 0, no output).
+- `DATABASE_URL=… bun run build` — succeeds: "✓ Compiled successfully in 19.9s", "✓ Generating static pages using 1 worker (51/51) in 759.9ms". All 3 studio API routes appear in the build output (/api/studio/ai/generate, /api/studio/projects, /api/studio/projects/[id]).
+
+Stage Summary:
+- Phase 11 Earnova Studio is live end-to-end with REAL visual outputs (not just text fields):
+  1. **ProjectPreview** — 7 type-specific renderers (greeting, quote, countdown, quiz, poll, poster, invitation) + aliases for the related types (social/birthday/christmas → greeting; announcement → poster; event_page → invitation). 15 named gradient presets. Live ticking countdown. Interactive quiz (pick + reveal + explanation). Interactive poll (vote + animated bar chart + multi-select mode). Compact thumbnails for project cards.
+  2. **StudioProjectEditor** — split-pane editor (form left, live preview right, sticky). Type picker with 12 TiltCard tiles. AI Generate section with prompt + collapsible context (recipient/occasion/tone) + gold-gradient Generate button. Type-specific forms with shared primitives (Field, ColorPicker, GradientPicker, ChoicePicker, ToggleRow). Inline-editable title. Save draft + Save & Publish (with 150-particle confetti on publish).
+  3. **EarnovaStudioView** (rewrite) — hub mode shows "Your projects" (skeletons/empty/grid of ProjectCards) + "Create new" (12 tiles). Editor mode wraps StudioProjectEditor with FloatingOrbs + mesh-bg ambient. Optimistic delete + revert. Confetti on create + save.
+- 3 new component files (~2,672 lines total) + 1 bug fix in the pre-existing AI stub provider. All 'use client' components use safeFetch + useConfetti + match the established design language (ambient mesh-bg + FloatingOrbs, glass-strong cards, gradient-text-evergreen titles, TiltCard, StaggerContainer reveals, mobile-first responsive, error/empty/loading states).
+- API contracts unchanged — the editor + view consume the existing /api/studio/projects + /api/studio/ai/generate endpoints without modification. The AI provider is a stub (returns template content per type + prompt keywords) and can be swapped for real providers via src/lib/ai/index.ts without any UI changes.

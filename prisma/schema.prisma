@@ -57,6 +57,7 @@ model User {
   triggeredNotifications Notification[] @relation("NotificationActor")  // notifications I caused
   notificationPreferences NotificationPreference[]
   milestones        UserMilestone[]
+  studioProjects    StudioProject[]
   // Trust & Safety (Phase 9)
   reportsFiled     Report[]              @relation("ReportReporter")
   reportsResolved  Report[]              @relation("ReportResolver")
@@ -388,6 +389,7 @@ model SpecialPage {
   moderationEvents ModerationEvent[]
   posts           Post[]
   analytics       PageAnalytics?
+  studioProjects  StudioProject[]
 
   @@index([ownerId])
   @@index([campaignId])
@@ -1324,6 +1326,69 @@ model PageTemplate {
   createdAt   DateTime      @default(now())
 
   @@index([category])
+}
+
+// ─── STUDIO PROJECTS (Phase 10+) ───────────────────────────────────────────
+//
+// Studio projects are real visual outputs created by users — greeting cards,
+// quizzes, polls, countdowns, quotes, posters, etc.
+//
+// Each project has structured data (JSON) specific to its type. The studio
+// editor renders a live preview based on this data. Projects can be:
+//   - Embedded into a Special Page as a content block
+//   - Shared directly via a dedicated URL
+//   - Exported as images (future)
+//
+// AI Integration (spec section 71):
+//   The `aiGenerated` flag tracks whether content was AI-assisted.
+//   The `aiPrompt` field stores the prompt used (for audit + re-generation).
+//   Future AI providers plug into src/lib/ai/ to generate/suggest content.
+
+enum StudioProjectType {
+  GREETING_CARD
+  SOCIAL_CARD
+  BIRTHDAY_WISH
+  CHRISTMAS_WISH
+  QUOTE
+  POSTER
+  ANNOUNCEMENT
+  QUIZ
+  POLL
+  COUNTDOWN
+  INVITATION
+  EVENT_PAGE
+}
+
+model StudioProject {
+  id          String             @id @default(cuid())
+  ownerId     String
+  type        StudioProjectType
+  title       String                          // user-given title for the project
+  // Structured content data — JSON specific to the project type.
+  // Examples:
+  //   GREETING_CARD: { recipient, message, backgroundImage, layout, style }
+  //   COUNTDOWN: { targetDate, title, subtitle, style }
+  //   QUIZ: { questions: [{ question, options[], correctIndex, explanation }] }
+  //   POLL: { question, options: [{ text, votes }], style }
+  //   QUOTE: { text, author, style, backgroundImage }
+  //   POSTER: { title, subtitle, backgroundImage, layout, style }
+  data        String                         // JSON
+  // Optional: link to a Special Page this project is embedded in
+  pageId      String?
+  // AI integration fields
+  aiGenerated Boolean             @default(false)
+  aiPrompt    String?                          // the prompt that generated this content (if AI)
+  // Status
+  isPublished Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  owner       User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  page        SpecialPage?        @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, type])
+  @@index([type, isPublished])
+  @@index([pageId])
 }
 
 // ─── COMPLIANCE (Chapter 6) ──────────────────────────────────────────────────
