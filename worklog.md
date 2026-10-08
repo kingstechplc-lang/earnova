@@ -1536,3 +1536,95 @@ Stage Summary:
 - Editor features: drag/move (mouse + touch), 4-corner resize, top-handle rotate (with 15° shift-snap), 50-entry undo/redo (Ctrl+Z/Y), delete-key + arrow-nudge (Shift = 10px), Ctrl+D duplicate, zoom 0.1×-2× (fit on mount, fit-to-viewport button, 100% reset), 10px grid snap toggle, layer reorder (drag in layers panel), per-element lock/visibility toggles, full type-specific property editors, PNG export at 2× pixel ratio, JSON export.
 - Mobile-responsive: 3-panel desktop layout collapses to a Tabbed bottom-sheet UI (Add/Props/Layers tabs) + floating quick-add buttons (text/shape/sticker/image) when not on the Add tab.
 - Old `src/components/studio/studio-project-editor.tsx` is no longer imported anywhere (left in place as reference; can be deleted in a follow-up).
+
+---
+Task ID: 30
+Agent: general-purpose sub-agent
+Task: Fix studio canvas-editor panel scrolling (each panel must scroll independently, top bar must be static) and add Canva-level tooling + Earnova-special features (more shapes, text effects, image filters, alignment guides, brand kit, ad-aware presets, share-to-page).
+
+Work Log:
+- Read worklog.md (Task 29 built the original Studio). Re-read all 5 studio component files + earnova-studio-view.tsx + schema.prisma + /api/pages + /api/page-builder/[pageId]/blocks routes to understand existing structure + data flow.
+- **canvas-types.ts** (rewrite):
+  - Extended `ShapeType` to include `star`, `heart`, `arrow`, `hexagon`, `pentagon` (in addition to rect/circle/triangle/line).
+  - Added `SHAPES` entries for the 5 new shapes with emoji icons + labels.
+  - Added `SHAPE_CLIP_PATHS: Record<ShapeType, string | null>` containing polygon clip-paths for star/heart/arrow/hexagon/pentagon (heart uses a 10-vertex polygon approximation since CSS `path()` doesn't scale with element size).
+  - Extended `CanvasElement` with new fields: `flipH`, `flipV` (transform flips); text effects `textStrokeWidth`, `textStrokeColor`, `textGradient`, `textTransform`; image filters `imgBrightness`, `imgContrast`, `imgSaturation`, `imgBlur`, `imgGrayscale`, `imgSepia`, `imgInvert`, `imgHueRotate`.
+  - Added 8 new canvas presets: `ad-300x250` (Adsterra medium rectangle), `ad-320x50` (Adsterra mobile banner), `ad-728x90` (Adsterra leaderboard), `ig-reel` (Instagram Reel 1080×1920), `pinterest` (Pinterest Pin 1000×1500), `linkedin` (LinkedIn Post 1200×627), `fb-cover` (Facebook Cover 820×312), `yt-channel` (YouTube Channel Art 2560×1440).
+  - Added `COLOR_PALETTES` export: 8 curated Earnova palettes (evergreen-gold-berry, festive-christmas, ocean-deep, royal-purple, sunset-bloom, forest-sage, midnight-gold, pastel-soft).
+  - Added `TEXT_GRADIENTS` (8 gradient presets for gradient text fill).
+  - Added `IMAGE_FILTER_PRESETS` (none/warm/cool/vintage/bw/dramatic) as CSS filter strings.
+  - Added `DEFAULT_IMAGE_FILTERS` constant + `buildImageFilter(el)` helper that turns an element's filter props into a single CSS `filter:` string.
+  - Updated `createImageElement` to seed default filter values; updated `createTextElement` to default `textStrokeWidth=0`, `textStrokeColor='#000000'`, `textTransform='none'`.
+  - Added `ad-banner-promo` template (Adsterra 728×90 leaderboard sample layout).
+
+- **canvas-editor.tsx** (major edits):
+  - Removed unused `ScrollArea` import; added `cn` from `@/lib/utils` (used by TopbarBtn). Imported new lucide icons (Copy, ClipboardPaste, Trash2, FlipHorizontal2, FlipVertical2, BringToFront, SendToBack, ArrowUp, ArrowDown, AlignHorizontalJustify*, AlignVerticalJustify*, Keyboard, X).
+  - Imported `buildImageFilter`, `SHAPE_CLIP_PATHS` from canvas-types (removed unused `COLOR_PALETTES` + `SHAPES`).
+  - Added new optional prop `onShareToPage?: (projectId, title) => void` — surfaces a "Share to Page" button in the top bar (parent view wires it to a dialog).
+  - Added state: `clipboardRef` (for copy/paste), `showShortcuts` (toggle for shortcuts hint), `alignmentGuides: { v, h }` (which red guide lines to show during drag).
+  - Added callbacks: `duplicateElement(id)`, `copyElement(id)`, `pasteElement()`, `flipElement(id, 'h'|'v')`, `alignElement(id, alignment)` (center-h, center-v, left, right, top, bottom), `applyPalette(colors)` (sets canvas background to a gradient from the palette's first two colors).
+  - Updated global `mousemove` handler: when dragging an element, if its center is within 12px of canvas center (horizontal OR vertical), snap to exact center + raise the corresponding alignment guide. Both axes can be active simultaneously. Guides cleared on mouseup.
+  - Updated keyboard handler: added Ctrl+C (copy), Ctrl+V (paste), Ctrl+Shift+H (flip horizontal). Refactored Ctrl+D to call `duplicateElement()`.
+  - **Layout fixes** (the core fix):
+    - Top bar div: added `flex-shrink-0` (prevents compression) + `flex-wrap` (so action buttons wrap on narrow viewports instead of overflowing).
+    - Mobile tabs div: added `flex-shrink-0`.
+    - Main 3-panel container div: added `overflow-hidden` (prevents the parent from scrolling; each panel scrolls independently).
+    - Left aside: added `overflow-y-auto` (replaced internal `ScrollArea` of canvas-toolbar — the toolbar now uses a sticky header + plain content flow).
+    - Right aside: replaced `ScrollArea` + fixed-height LayersPanel with a single `overflow-y-auto` column containing PropertiesPanel (flex-1) + LayersPanel (flex-shrink-0, border-t).
+    - Mobile right panel: changed `overflow-auto` → `overflow-y-auto` (cleaner — we never want horizontal scroll there).
+  - **Top bar action buttons** (shown when an unlocked element is selected): grouped in a bordered pill container — Duplicate, Copy, Flip H, Flip V | Bring Forward, Send Backward, Bring to Front, Send to Back | Align Left, Center H, Align Right, Align Top, Center V, Align Bottom | Delete. Implemented as a `TopbarBtn` helper component (defined at the bottom of the file) with active/danger state styling.
+  - Added "Share to Page" button (visible on `lg+` screens when `onShareToPage` is provided).
+  - Added keyboard-shortcuts toggle button + floating shortcuts hint card (bottom-right) listing 11 shortcuts.
+  - **Alignment guides overlay**: red dashed lines drawn inside the canvas (absolute-positioned divs with `z-[1000]`, `borderLeft/borderTop: 1px dashed #dc2626`, soft red box-shadow glow) shown when the corresponding axis is snapped during drag.
+  - **CanvasElementView**: combined `rotate(${rotation}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})` transform so flips compose with rotation cleanly.
+  - **renderInner** updates:
+    - TEXT: when `textGradient` is set, applies `backgroundImage: gradient`, `WebkitBackgroundClip: 'text'`, `backgroundClip: 'text'`, `WebkitTextFillColor: 'transparent'` so the gradient becomes the text fill. Applies `WebkitTextStroke: "{width}px {color}"` when `textStrokeWidth > 0`. Applies `textTransform`.
+    - SHAPE: handles all 9 shape types. Triangle + the 5 new shapes use `SHAPE_CLIP_PATHS[shape]` via `clipPath`. Falls back to `borderColor` for fill when `fill` is transparent (so shapes are visible by default).
+    - IMAGE: applies `filter: buildImageFilter(el)` (chains brightness/contrast/saturation/blur/grayscale/sepia/invert/hue-rotate).
+
+- **canvas-toolbar.tsx** (full rewrite):
+  - Removed internal `ScrollArea` (the parent aside now owns scrolling — per the task brief).
+  - Brand strip is now `sticky top-0 z-10` with `backdrop-blur` so it stays pinned while the rest of the toolbar scrolls.
+  - Shape grid changed from 4-col to 3-col (to accommodate the 9 shapes with readable labels).
+  - Added `shapeIcons` entries for star/heart/arrow/hexagon/pentagon using matching lucide icons (Star, Heart, ArrowRight, Hexagon, Pentagon).
+  - Added new "Brand Kit" section showing all 8 `COLOR_PALETTES` as color-strip swatches — clicking a palette calls `props.onApplyPalette(colors)`.
+  - New optional prop `onApplyPalette?: (colors: string[]) => void`.
+
+- **properties-panel.tsx** (edits):
+  - Imported `TEXT_GRADIENTS`, `IMAGE_FILTER_PRESETS`, `DEFAULT_IMAGE_FILTERS`. Imported new lucide icons (Star, Heart, ArrowRight, Hexagon, Pentagon, FlipHorizontal2, FlipVertical2).
+  - Added new "Flip" section after Opacity slider (Horizontal / Vertical buttons with active state).
+  - **TextProps** — added "Text effects" section: 4-button text-transform grid (none/uppercase/lowercase/capitalize), stroke width + stroke color row, and a 4-col gradient picker grid ("None" + 8 gradient swatches from `TEXT_GRADIENTS`).
+  - **ShapeProps** — extended `shapeIcons` map to cover all 9 shape types.
+  - **ImageProps** — added full "Image filters" section: 6 preset buttons (None/Warm/Cool/Vintage/B&W/Dramatic, with active state via `isPresetActive`), 7 sliders (brightness, contrast, saturation, blur, grayscale, sepia, hue-rotate), and a "Reset filters" button.
+  - Added two helper functions at the bottom: `applyPreset(css)` (parses the preset CSS string into element patch values) and `isPresetActive(el, css)` (compares current element filter values against a preset).
+  - Updated `ElementIcon` (used by LayersPanel + panel header) to render the 5 new shape icons.
+
+- **layers-panel.tsx** (small edit): extended the `elementName` map to include star/heart/arrow/hexagon/pentagon labels.
+
+- **earnova-studio-view.tsx** (edits):
+  - Added `ShareToPageDialog` component at the bottom of the file: dialog lists the user's Special Pages (fetched via `/api/pages`), lets them pick one, then POSTs an IMAGE content block to `/api/page-builder/[pageId]/blocks` with `{ studioProjectId, title, kind: 'studio-project' }` in the data field (so the public-page renderer can later resolve it to a live canvas embed). Dialog remounts via `key={shareTarget?.projectId}` so the page selection resets cleanly between projects (avoids the React 19 "no setState in effect" lint rule).
+  - Added state in the main view: `shareTarget`, `sharePages`, `shareLoading`, `sharePosting`.
+  - Added `openShareDialog(projectId, title)` callback (fetches pages, opens dialog) + `confirmShareToPage(pageId)` (POSTs the block).
+  - Passed `onShareToPage={openShareDialog}` to `<CanvasEditor>` + rendered `<ShareToPageDialog>` alongside it.
+
+Verification:
+- `bunx tsc --noEmit` — passes (exit 0, no output).
+- `bun run lint` — passes (exit 0, no output). Initially failed with `react-hooks/set-state-in-effect` on the ShareToPageDialog's useEffect; fixed by switching to a `key`-prop remount pattern.
+- `DATABASE_URL=… bun run build` — succeeds. Exit 0, 51/51 static pages generated, Prisma client regenerated.
+
+Stage Summary:
+- Two-goal task fully delivered:
+  1. **Panel scrolling fixed**: Top bar is `flex-shrink-0` (never compressed/scrolls). Mobile tabs also `flex-shrink-0`. Main 3-panel container is `flex flex-1 min-h-0 overflow-hidden`. Left aside + right aside + canvas viewport each scroll independently (`overflow-y-auto` / `overflow-auto`). Internal `ScrollArea` components removed from both toolbars — the asides handle scrolling natively, which is simpler and avoids nested-scroll-container quirks.
+  2. **Canva-level tooling added**:
+     - 5 new shapes (star/heart/arrow/hexagon/pentagon) rendered via `clip-path` polygons — also surfaced in toolbar, properties shape picker, layers panel, and ElementIcon.
+     - Text effects: text stroke (width + color via `-webkit-text-stroke`), gradient text (8 gradient presets via `background-clip: text`), text transform (none/uppercase/lowercase/capitalize).
+     - Image filters: 7 individual sliders (brightness, contrast, saturation, blur, grayscale, sepia, hue-rotate) + 6 one-click presets (none/warm/cool/vintage/b&w/dramatic) + reset button.
+     - Top-bar action group (visible when an element is selected): duplicate, copy, flip H, flip V, bring forward/backward/to-front/to-back, align left/center-h/right/top/center-v/bottom, delete.
+     - Alignment guides: red dashed lines + 12px snap-to-center when dragging near canvas center (vertical + horizontal independently).
+     - Keyboard shortcuts: Ctrl+C/V/D, Ctrl+Shift+H, Del, Arrows (Shift = 10×), Shift+drag (snap rotate 15°). Toggleable floating shortcuts hint card.
+  3. **Earnova-special features**:
+     - Brand Kit section in the toolbar with 8 curated Earnova color palettes; clicking applies the palette's first two colors as the canvas background gradient.
+     - Ad-aware canvas presets: Adsterra 300×250, 320×50, 728×90 — these match real ad slot sizes so users can design creatives that fit their ad placements exactly. Plus 5 more social formats (Instagram Reel, Pinterest Pin, LinkedIn Post, Facebook Cover, YouTube Channel Art).
+     - Ad Banner Promo template (728×90 leaderboard sample).
+     - "Share to Page" button in the top bar + dialog that embeds the studio project as an IMAGE content block carrying `studioProjectId` + `kind: 'studio-project'` metadata — ready for the public-page renderer to resolve as a live canvas embed.
+- All edits preserve existing functionality (drag/resize/rotate, undo/redo, history stack, PNG/JSON export, mobile tab UI, project save/publish).

@@ -3,17 +3,20 @@
 // CanvasToolbar — left sidebar.
 //
 // Sections (top to bottom):
-//   1. Add elements  — Text, Shape dropdown, Sticker popover, Image dialog
-//   2. Templates     — gallery of CANVAS_TEMPLATES (load replaces canvas)
-//   3. Canvas        — preset selector + background gradient picker
-//   4. Export        — PNG (html-to-image) + JSON download
-//   5. History/Zoom  — undo, redo, zoom-in, zoom-out, fit, 100%
+//   1. Add elements  — Text, Shape grid, Sticker popover, Image dialog
+//   2. Brand Kit     — Earnova brand colors + curated palettes
+//   3. Templates     — gallery of CANVAS_TEMPLATES (load replaces canvas)
+//   4. Canvas        — preset selector (incl. ad-aware sizes) + background gradient picker
+//   5. Export        — PNG (html-to-image) + JSON download
+//   6. History/Zoom  — undo, redo, zoom-in, zoom-out, fit, 100%
+//
+// The parent aside owns scrolling — this component renders as a normal
+// flex column with its content flowing naturally.
 //
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -22,14 +25,16 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import {
-  BACKGROUND_GRADIENTS, CANVAS_PRESETS, CANVAS_TEMPLATES, SHAPES,
+  BACKGROUND_GRADIENTS, CANVAS_PRESETS, CANVAS_TEMPLATES,
+  COLOR_PALETTES, SHAPES,
   type ShapeType,
 } from './canvas-types'
 import { EmojiPicker } from './emoji-picker'
 import {
   Type, Square, Circle, Triangle, Minus, Smile, Image as ImageIcon,
   Download, FileJson, Undo2, Redo2, ZoomIn, ZoomOut, Maximize,
-  LayoutTemplate, Plus, Sparkles,
+  LayoutTemplate, Plus, Sparkles, Star, Heart, ArrowRight,
+  Hexagon, Pentagon, Palette, Crown,
 } from 'lucide-react'
 
 type Props = {
@@ -54,13 +59,22 @@ type Props = {
   activePresetId: string | null
   activeBackground: string
   unsavedChanges: boolean
+  // Brand Kit: applies the first 2 colors of the palette as the canvas
+  // background gradient (other colors are surfaced for use via the
+  // color swatches in the properties panel).
+  onApplyPalette?: (colors: string[]) => void
 }
 
 const shapeIcons: Record<ShapeType, React.ReactNode> = {
-  rect: <Square className="h-3.5 w-3.5" />,
-  circle: <Circle className="h-3.5 w-3.5" />,
+  rect:     <Square className="h-3.5 w-3.5" />,
+  circle:   <Circle className="h-3.5 w-3.5" />,
   triangle: <Triangle className="h-3.5 w-3.5" />,
-  line: <Minus className="h-3.5 w-3.5" />,
+  line:     <Minus className="h-3.5 w-3.5" />,
+  star:     <Star className="h-3.5 w-3.5" />,
+  heart:    <Heart className="h-3.5 w-3.5" />,
+  arrow:    <ArrowRight className="h-3.5 w-3.5" />,
+  hexagon:  <Hexagon className="h-3.5 w-3.5" />,
+  pentagon: <Pentagon className="h-3.5 w-3.5" />,
 }
 
 export function CanvasToolbar(props: Props) {
@@ -75,9 +89,9 @@ export function CanvasToolbar(props: Props) {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Brand / title strip */}
-      <div className="border-b border-evergreen/15 bg-gradient-to-br from-evergreen/5 to-gold/5 px-4 py-3">
+    <div className="flex flex-col">
+      {/* Brand / title strip (sticky at top of the scroll container) */}
+      <div className="sticky top-0 z-10 border-b border-evergreen/15 bg-gradient-to-br from-evergreen/5 to-gold/5 px-4 py-3 backdrop-blur">
         <div className="flex items-center gap-2">
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-evergreen to-evergreen-dark text-cream shadow-sm">
             <Sparkles className="h-4 w-4" />
@@ -91,193 +105,221 @@ export function CanvasToolbar(props: Props) {
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
-        <div className="space-y-5 p-3">
-          {/* Add elements */}
-          <ToolbarSection title="Add element" icon={<Plus className="h-3 w-3" />}>
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full justify-start border-evergreen/30 text-evergreen hover:bg-evergreen/5"
-              onClick={props.onAddText}
-            >
-              <Type className="h-3.5 w-3.5" /> Text
-            </Button>
+      <div className="space-y-5 p-3">
+        {/* Add elements */}
+        <ToolbarSection title="Add element" icon={<Plus className="h-3 w-3" />}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full justify-start border-evergreen/30 text-evergreen hover:bg-evergreen/5"
+            onClick={props.onAddText}
+          >
+            <Type className="h-3.5 w-3.5" /> Text
+          </Button>
 
-            <div className="grid grid-cols-4 gap-1">
-              {SHAPES.map(s => (
-                <Button
-                  key={s.type}
-                  size="sm"
-                  variant="outline"
-                  className="h-9 flex-col gap-0.5 px-1 text-[9px] border-evergreen/30 text-evergreen hover:bg-evergreen/5"
-                  onClick={() => props.onAddShape(s.type)}
-                  title={`Add ${s.label}`}
-                >
-                  {shapeIcons[s.type]}
-                  <span>{s.label}</span>
-                </Button>
-              ))}
-            </div>
-
-            <EmojiPicker onPick={props.onAddSticker} triggerLabel="Sticker" />
-
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full justify-start border-evergreen/30 text-evergreen hover:bg-evergreen/5"
-              onClick={() => setImageDialogOpen(true)}
-            >
-              <ImageIcon className="h-3.5 w-3.5" /> Image (URL)
-            </Button>
-          </ToolbarSection>
-
-          {/* Templates */}
-          <ToolbarSection title="Templates" icon={<LayoutTemplate className="h-3 w-3" />}>
-            <div className="grid grid-cols-2 gap-1.5">
-              {CANVAS_TEMPLATES.map(tpl => (
-                <button
-                  key={tpl.id}
-                  type="button"
-                  onClick={() => props.onLoadTemplate(tpl.id)}
-                  className="group relative overflow-hidden rounded-md border border-border p-2 text-left transition-all hover:-translate-y-0.5 hover:border-evergreen/40 hover:shadow-sm"
-                  title={tpl.description}
-                >
-                  <div
-                    className="absolute inset-0 opacity-90"
-                    style={{
-                      background: BACKGROUND_GRADIENTS[tpl.background] || BACKGROUND_GRADIENTS['evergreen-gold'],
-                    }}
-                    aria-hidden
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" aria-hidden />
-                  <div className="relative">
-                    <div className="text-base">{tpl.icon}</div>
-                    <p className="mt-1 text-[10px] font-semibold text-white drop-shadow-sm line-clamp-1">
-                      {tpl.name}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </ToolbarSection>
-
-          {/* Canvas settings */}
-          <ToolbarSection title="Canvas" icon={<Sparkles className="h-3 w-3" />}>
-            <Field label="Size preset">
-              <Select
-                value={props.activePresetId || 'custom'}
-                onValueChange={props.onSetPreset}
+          <div className="grid grid-cols-3 gap-1">
+            {SHAPES.map(s => (
+              <Button
+                key={s.type}
+                size="sm"
+                variant="outline"
+                className="h-9 flex-col gap-0.5 px-1 text-[9px] border-evergreen/30 text-evergreen hover:bg-evergreen/5"
+                onClick={() => props.onAddShape(s.type)}
+                title={`Add ${s.label}`}
               >
-                <SelectTrigger className="h-8 w-full text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CANVAS_PRESETS.map(p => (
-                    <SelectItem key={p.id} value={p.id} className="text-xs">
-                      <span className="mr-1">{p.icon}</span> {p.name}
-                      <span className="ml-1 text-muted-foreground">
-                        {p.width}×{p.height}
-                      </span>
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="custom" className="text-xs">
-                    Custom size
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
+                {shapeIcons[s.type]}
+                <span>{s.label}</span>
+              </Button>
+            ))}
+          </div>
 
-            <Field label="Background">
-              <div className="grid grid-cols-4 gap-1.5">
-                {Object.entries(BACKGROUND_GRADIENTS).map(([key, css]) => {
-                  const isActive = props.activeBackground === key
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => props.onSetBackground(key)}
-                      className={cn(
-                        'h-7 rounded-md border transition-all',
-                        isActive
-                          ? 'border-evergreen ring-2 ring-evergreen/40'
-                          : 'border-border hover:scale-110',
-                      )}
-                      style={{ background: css }}
-                      aria-label={key}
-                      title={key}
+          <EmojiPicker onPick={props.onAddSticker} triggerLabel="Sticker" />
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full justify-start border-evergreen/30 text-evergreen hover:bg-evergreen/5"
+            onClick={() => setImageDialogOpen(true)}
+          >
+            <ImageIcon className="h-3.5 w-3.5" /> Image (URL)
+          </Button>
+        </ToolbarSection>
+
+        {/* Brand Kit + Earnova palettes */}
+        <ToolbarSection title="Brand Kit" icon={<Crown className="h-3 w-3" />}>
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            Curated Earnova color palettes — apply them to your canvas in one click.
+          </p>
+          <div className="space-y-1.5">
+            {COLOR_PALETTES.map(palette => (
+              <button
+                key={palette.id}
+                type="button"
+                onClick={() => props.onApplyPalette?.(palette.colors)}
+                className="group w-full rounded-md border border-border p-2 text-left transition-all hover:border-evergreen/40 hover:bg-evergreen/5"
+                title={palette.description}
+              >
+                <div className="flex items-center gap-1">
+                  {palette.colors.map((c, i) => (
+                    <span
+                      key={i}
+                      className="h-5 flex-1 rounded-sm border border-black/10"
+                      style={{ background: c }}
+                      aria-hidden
                     />
-                  )
-                })}
-              </div>
-            </Field>
-          </ToolbarSection>
+                  ))}
+                </div>
+                <p className="mt-1 text-[10px] font-medium leading-tight">{palette.name}</p>
+              </button>
+            ))}
+          </div>
+        </ToolbarSection>
 
-          {/* Export */}
-          <ToolbarSection title="Export" icon={<Download className="h-3 w-3" />}>
+        {/* Templates */}
+        <ToolbarSection title="Templates" icon={<LayoutTemplate className="h-3 w-3" />}>
+          <div className="grid grid-cols-2 gap-1.5">
+            {CANVAS_TEMPLATES.map(tpl => (
+              <button
+                key={tpl.id}
+                type="button"
+                onClick={() => props.onLoadTemplate(tpl.id)}
+                className="group relative overflow-hidden rounded-md border border-border p-2 text-left transition-all hover:-translate-y-0.5 hover:border-evergreen/40 hover:shadow-sm"
+                title={tpl.description}
+              >
+                <div
+                  className="absolute inset-0 opacity-90"
+                  style={{
+                    background: BACKGROUND_GRADIENTS[tpl.background] || BACKGROUND_GRADIENTS['evergreen-gold'],
+                  }}
+                  aria-hidden
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" aria-hidden />
+                <div className="relative">
+                  <div className="text-base">{tpl.icon}</div>
+                  <p className="mt-1 text-[10px] font-semibold text-white drop-shadow-sm line-clamp-1">
+                    {tpl.name}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </ToolbarSection>
+
+        {/* Canvas settings */}
+        <ToolbarSection title="Canvas" icon={<Sparkles className="h-3 w-3" />}>
+          <Field label="Size preset">
+            <Select
+              value={props.activePresetId || 'custom'}
+              onValueChange={props.onSetPreset}
+            >
+              <SelectTrigger className="h-8 w-full text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CANVAS_PRESETS.map(p => (
+                  <SelectItem key={p.id} value={p.id} className="text-xs">
+                    <span className="mr-1">{p.icon}</span> {p.name}
+                    <span className="ml-1 text-muted-foreground">
+                      {p.width}×{p.height}
+                    </span>
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom" className="text-xs">
+                  Custom size
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field label="Background">
+            <div className="grid grid-cols-4 gap-1.5">
+              {Object.entries(BACKGROUND_GRADIENTS).map(([key, css]) => {
+                const isActive = props.activeBackground === key
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => props.onSetBackground(key)}
+                    className={cn(
+                      'h-7 rounded-md border transition-all',
+                      isActive
+                        ? 'border-evergreen ring-2 ring-evergreen/40'
+                        : 'border-border hover:scale-110',
+                    )}
+                    style={{ background: css }}
+                    aria-label={key}
+                    title={key}
+                  />
+                )
+              })}
+            </div>
+          </Field>
+        </ToolbarSection>
+
+        {/* Export */}
+        <ToolbarSection title="Export" icon={<Download className="h-3 w-3" />}>
+          <Button
+            size="sm"
+            className="w-full bg-gradient-to-r from-evergreen to-evergreen-dark text-cream hover:shadow-festive"
+            onClick={props.onExportPng}
+          >
+            <Download className="h-3.5 w-3.5" /> Download PNG
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full border-evergreen/30 text-evergreen hover:bg-evergreen/5"
+            onClick={props.onExportJson}
+          >
+            <FileJson className="h-3.5 w-3.5" /> Download JSON
+          </Button>
+        </ToolbarSection>
+
+        {/* History */}
+        <ToolbarSection title="History & zoom" icon={<Undo2 className="h-3 w-3" />}>
+          <div className="grid grid-cols-2 gap-1.5">
             <Button
               size="sm"
-              className="w-full bg-gradient-to-r from-evergreen to-evergreen-dark text-cream hover:shadow-festive"
-              onClick={props.onExportPng}
+              variant="outline"
+              className="h-8 border-evergreen/30 text-evergreen hover:bg-evergreen/5 disabled:opacity-40"
+              onClick={props.onUndo}
+              disabled={!props.canUndo}
             >
-              <Download className="h-3.5 w-3.5" /> Download PNG
+              <Undo2 className="h-3.5 w-3.5" /> Undo
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="w-full border-evergreen/30 text-evergreen hover:bg-evergreen/5"
-              onClick={props.onExportJson}
+              className="h-8 border-evergreen/30 text-evergreen hover:bg-evergreen/5 disabled:opacity-40"
+              onClick={props.onRedo}
+              disabled={!props.canRedo}
             >
-              <FileJson className="h-3.5 w-3.5" /> Download JSON
+              <Redo2 className="h-3.5 w-3.5" /> Redo
             </Button>
-          </ToolbarSection>
+          </div>
 
-          {/* History */}
-          <ToolbarSection title="History & zoom" icon={<Undo2 className="h-3 w-3" />}>
-            <div className="grid grid-cols-2 gap-1.5">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 border-evergreen/30 text-evergreen hover:bg-evergreen/5 disabled:opacity-40"
-                onClick={props.onUndo}
-                disabled={!props.canUndo}
-              >
-                <Undo2 className="h-3.5 w-3.5" /> Undo
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 border-evergreen/30 text-evergreen hover:bg-evergreen/5 disabled:opacity-40"
-                onClick={props.onRedo}
-                disabled={!props.canRedo}
-              >
-                <Redo2 className="h-3.5 w-3.5" /> Redo
-              </Button>
+          <div className="grid grid-cols-4 gap-1">
+            <Button size="sm" variant="outline" className="h-8 px-1" onClick={props.onZoomOut} title="Zoom out">
+              <ZoomOut className="h-3.5 w-3.5" />
+            </Button>
+            <div className="col-span-2 flex h-8 items-center justify-center rounded-md border border-border bg-muted/30 px-1 text-[10px] font-mono">
+              {Math.round(props.zoom * 100)}%
             </div>
+            <Button size="sm" variant="outline" className="h-8 px-1" onClick={props.onZoomIn} title="Zoom in">
+              <ZoomIn className="h-3.5 w-3.5" />
+            </Button>
+          </div>
 
-            <div className="grid grid-cols-4 gap-1">
-              <Button size="sm" variant="outline" className="h-8 px-1" onClick={props.onZoomOut} title="Zoom out">
-                <ZoomOut className="h-3.5 w-3.5" />
-              </Button>
-              <div className="col-span-2 flex h-8 items-center justify-center rounded-md border border-border bg-muted/30 px-1 text-[10px] font-mono">
-                {Math.round(props.zoom * 100)}%
-              </div>
-              <Button size="sm" variant="outline" className="h-8 px-1" onClick={props.onZoomIn} title="Zoom in">
-                <ZoomIn className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5">
-              <Button size="sm" variant="outline" className="h-8 border-evergreen/30 text-evergreen hover:bg-evergreen/5" onClick={props.onZoomReset} title="Reset to 100%">
-                100%
-              </Button>
-              <Button size="sm" variant="outline" className="h-8 border-evergreen/30 text-evergreen hover:bg-evergreen/5" onClick={props.onZoomFit} title="Fit to viewport">
-                <Maximize className="h-3.5 w-3.5" /> Fit
-              </Button>
-            </div>
-          </ToolbarSection>
-        </div>
-      </ScrollArea>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Button size="sm" variant="outline" className="h-8 border-evergreen/30 text-evergreen hover:bg-evergreen/5" onClick={props.onZoomReset} title="Reset to 100%">
+              100%
+            </Button>
+            <Button size="sm" variant="outline" className="h-8 border-evergreen/30 text-evergreen hover:bg-evergreen/5" onClick={props.onZoomFit} title="Fit to viewport">
+              <Maximize className="h-3.5 w-3.5" /> Fit
+            </Button>
+          </div>
+        </ToolbarSection>
+      </div>
 
       {/* Image URL dialog */}
       <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>

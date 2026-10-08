@@ -22,13 +22,15 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { safeFetch } from '@/lib/safe-fetch'
 import { toast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 import {
   CANVAS_PRESETS, CANVAS_TEMPLATES, BACKGROUND_GRADIENTS,
+  SHAPE_CLIP_PATHS,
   createDefaultCanvas, createTextElement, createShapeElement,
   createStickerElement, createImageElement,
+  buildImageFilter,
   type CanvasData, type CanvasElement, type ShapeType,
 } from './canvas-types'
 import { CanvasToolbar } from './canvas-toolbar'
@@ -43,6 +45,12 @@ import {
   ChevronLeft, Save, Loader2, Globe, Sparkles, Grid3x3,
   Plus, Type as TypeIcon, Square, Smile, Image as ImageIcon,
   PanelLeft, PanelRight,
+  Copy, ClipboardPaste, Trash2, FlipHorizontal2, FlipVertical2,
+  BringToFront, SendToBack, ArrowUp, ArrowDown,
+  AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter,
+  AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd,
+  AlignVerticalJustifyStart, AlignVerticalJustifyEnd,
+  Keyboard, X,
 } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -100,11 +108,12 @@ const MAX_HISTORY = 50
    CanvasEditor
    ────────────────────────────────────────────────────────────────────────── */
 export function CanvasEditor({
-  project, onBack, onSaved,
+  project, onBack, onSaved, onShareToPage,
 }: {
   project: StudioProject
   onBack: () => void
   onSaved?: (p: StudioProject) => void
+  onShareToPage?: (projectId: string, title: string) => void
 }) {
   /* ── Canvas data state (initialised from project.data.canvas or default) ─ */
   const initialCanvas = useMemo<CanvasData>(() => {
@@ -124,6 +133,11 @@ export function CanvasEditor({
   const [dirty, setDirty] = useState(false)
   const [title, setTitle] = useState(project.title)
   const [mobilePanel, setMobilePanel] = useState<'add' | 'props' | 'layers'>('add')
+
+  /* ── Clipboard + alignment guides + shortcuts hint ─────────────────────── */
+  const clipboardRef = useRef<CanvasElement | null>(null)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [alignmentGuides, setAlignmentGuides] = useState<{ v: boolean; h: boolean }>({ v: false, h: false })
 
   /* ── History (undo/redo) ──────────────────────────────────────────────── */
   const [history, setHistory] = useState<CanvasData[]>([initialCanvas])
@@ -322,6 +336,60 @@ export function CanvasEditor({
   }, [pushHistory])
 
   /* ──────────────────────────────────────────────────────────────────────
+     Element actions — duplicate / copy / paste / flip / align
+     ────────────────────────────────────────────────────────────────────── */
+  const duplicateElement = useCallback((id: string) => {
+    const el = canvasDataRef.current.elements.find(x => x.id === id)
+    if (!el) return
+    const clone: CanvasElement = {
+      ...el,
+      id: 'el-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6),
+      x: el.x + 20,
+      y: el.y + 20,
+    }
+    addElement(clone)
+  }, [addElement])
+
+  const copyElement = useCallback((id: string) => {
+    const el = canvasDataRef.current.elements.find(x => x.id === id)
+    if (!el) return
+    clipboardRef.current = { ...el }
+    toast({ title: 'Copied', description: 'Press Ctrl+V to paste' })
+  }, [])
+
+  const pasteElement = useCallback(() => {
+    const clip = clipboardRef.current
+    if (!clip) return
+    const clone: CanvasElement = {
+      ...clip,
+      id: 'el-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6),
+      x: clip.x + 24,
+      y: clip.y + 24,
+    }
+    addElement(clone)
+  }, [addElement])
+
+  const flipElement = useCallback((id: string, axis: 'h' | 'v') => {
+    if (axis === 'h') updateElement(id, { flipH: !canvasDataRef.current.elements.find(x => x.id === id)?.flipH })
+    else updateElement(id, { flipV: !canvasDataRef.current.elements.find(x => x.id === id)?.flipV })
+  }, [updateElement])
+
+  const alignElement = useCallback((id: string, alignment: 'center-h' | 'center-v' | 'left' | 'right' | 'top' | 'bottom') => {
+    const el = canvasDataRef.current.elements.find(x => x.id === id)
+    if (!el) return
+    const cw = canvasDataRef.current.canvas.width
+    const ch = canvasDataRef.current.canvas.height
+    const patch: Partial<CanvasElement> = {}
+    if (alignment === 'center-h') { patch.x = (cw - el.width) / 2 }
+    else if (alignment === 'center-v') { patch.y = (ch - el.height) / 2 }
+    else if (alignment === 'left')   { patch.x = 0 }
+    else if (alignment === 'right')  { patch.x = cw - el.width }
+    else if (alignment === 'top')    { patch.y = 0 }
+    else if (alignment === 'bottom') { patch.y = ch - el.height }
+    updateElement(id, patch)
+  }, [updateElement])
+
+  /* ──────────────────────────────────────────────────────────────────────
      Add element factories
      ────────────────────────────────────────────────────────────────────── */
   const addText = useCallback(() => {
@@ -387,6 +455,27 @@ export function CanvasEditor({
     updateCanvas({
       background: key,
       backgroundType: css && css.startsWith('#') ? 'solid' : 'gradient',
+    })
+  }, [updateCanvas])
+
+  /* ──────────────────────────────────────────────────────────────────────
+     Apply an Earnova color palette — picks the first two colors as a
+     gradient for the canvas background and stashes the rest in the
+     canvasData for the Brand Kit to surface. Saves a custom gradient
+     using the palette's hex colors directly (no lookup needed).
+     ────────────────────────────────────────────────────────────────────── */
+  const applyPalette = useCallback((colors: string[]) => {
+    if (!colors || colors.length < 2) return
+    const grad = `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1]} 100%)`
+    // Update the canvas background by storing the full CSS gradient string
+    // directly (BACKGROUND_GRADIENTS lookup falls back to the raw value).
+    updateCanvas({
+      background: grad,
+      backgroundType: 'gradient',
+    })
+    toast({
+      title: 'Palette applied',
+      description: `${colors.length} colors updated your canvas background.`,
     })
   }, [updateCanvas])
 
@@ -497,8 +586,29 @@ export function CanvasEditor({
         const newX = drag.origX + dx
         const newY = drag.origY + dy
         // Snap to grid if enabled (10px grid).
-        const sx = showGrid ? Math.round(newX / 10) * 10 : newX
-        const sy = showGrid ? Math.round(newY / 10) * 10 : newY
+        let sx = showGrid ? Math.round(newX / 10) * 10 : newX
+        let sy = showGrid ? Math.round(newY / 10) * 10 : newY
+        // ── Snap-to-center: if the element's center is near the canvas
+        //    center (within 12px), snap to the exact center and show
+        //    alignment guide lines. ─────────────────────────────────────
+        const draggedEl = canvasDataRef.current.elements.find(x => x.id === drag.id)
+        if (draggedEl) {
+          const cw = canvasDataRef.current.canvas.width
+          const ch = canvasDataRef.current.canvas.height
+          const elCx = sx + draggedEl.width / 2
+          const elCy = sy + draggedEl.height / 2
+          const tol = 12
+          let vGuide = false, hGuide = false
+          if (Math.abs(elCx - cw / 2) < tol) {
+            sx = (cw - draggedEl.width) / 2
+            vGuide = true
+          }
+          if (Math.abs(elCy - ch / 2) < tol) {
+            sy = (ch - draggedEl.height) / 2
+            hGuide = true
+          }
+          setAlignmentGuides(prev => (prev.v !== vGuide || prev.h !== hGuide ? { v: vGuide, h: hGuide } : prev))
+        }
         updateElementLive(drag.id, { x: sx, y: sy })
       } else if (drag.kind === 'resize') {
         const dx = (point.clientX - drag.startX) / zoom
@@ -540,6 +650,8 @@ export function CanvasEditor({
         // Commit final state to history (using ref to avoid stale closure).
         pushHistory(canvasDataRef.current)
         dragRef.current = null
+        // Clear alignment guides once the drag ends.
+        setAlignmentGuides({ v: false, h: false })
       }
     }
     window.addEventListener('mousemove', move)
@@ -574,16 +686,25 @@ export function CanvasEditor({
       // Duplicate.
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && selectedId) {
         e.preventDefault()
-        const el = canvasData.elements.find(x => x.id === selectedId)
-        if (el) {
-          const clone: CanvasElement = {
-            ...el,
-            id: 'el-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6),
-            x: el.x + 20,
-            y: el.y + 20,
-          }
-          addElement(clone)
-        }
+        duplicateElement(selectedId)
+        return
+      }
+      // Copy.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && selectedId) {
+        e.preventDefault()
+        copyElement(selectedId)
+        return
+      }
+      // Paste (works whether or not something is selected).
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        e.preventDefault()
+        pasteElement()
+        return
+      }
+      // Flip horizontal (Ctrl+Shift+H) / vertical (Ctrl+Shift+V) — Ctrl+V is paste so use Shift.
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'h' && selectedId) {
+        e.preventDefault()
+        flipElement(selectedId, 'h')
         return
       }
       if (!selectedId) return
@@ -608,7 +729,7 @@ export function CanvasEditor({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedId, canvasData.elements, undo, redo, removeElement, updateElement, addElement])
+  }, [selectedId, canvasData.elements, undo, redo, removeElement, updateElement, addElement, duplicateElement, copyElement, pasteElement, flipElement])
 
   /* ──────────────────────────────────────────────────────────────────────
      Save / publish
@@ -699,8 +820,8 @@ export function CanvasEditor({
      ────────────────────────────────────────────────────────────────────── */
   return (
     <div className="relative flex h-full flex-col bg-muted/30">
-      {/* ── Top bar ────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 border-b border-evergreen/15 bg-background px-3 py-2">
+      {/* ── Top bar (STATIC — does not scroll) ──────────────────────────── */}
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-evergreen/15 bg-background px-3 py-2">
         <Button variant="ghost" size="sm" onClick={onBack} className="text-evergreen hover:bg-evergreen/5">
           <ChevronLeft className="h-4 w-4" /> Exit
         </Button>
@@ -708,25 +829,99 @@ export function CanvasEditor({
         <Input
           value={title}
           onChange={e => { setTitle(e.target.value); setDirty(true) }}
-          className="h-8 w-48 border-transparent bg-transparent px-2 text-sm font-semibold hover:border-input focus-visible:border-input"
+          className="h-8 w-32 border-transparent bg-transparent px-2 text-sm font-semibold hover:border-input focus-visible:border-input md:w-48"
           placeholder="Untitled"
         />
         {dirty && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-gold/10 px-2 py-0.5 text-[10px] text-gold-dark">
+          <span className="hidden items-center gap-1 rounded-full bg-gold/10 px-2 py-0.5 text-[10px] text-gold-dark md:inline-flex">
             <Sparkles className="h-2.5 w-2.5" /> Unsaved
           </span>
         )}
         {project.isPublished && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-evergreen/10 px-2 py-0.5 text-[10px] text-evergreen">
+          <span className="hidden items-center gap-1 rounded-full bg-evergreen/10 px-2 py-0.5 text-[10px] text-evergreen md:inline-flex">
             <Globe className="h-2.5 w-2.5" /> Live
           </span>
         )}
 
+        {/* ── Element action buttons (shown when an element is selected) ── */}
+        {selectedElement && !selectedElement.locked && (
+          <div className="flex items-center gap-0.5 rounded-md border border-border bg-muted/30 p-0.5">
+            <TopbarBtn title="Duplicate (Ctrl+D)" onClick={() => duplicateElement(selectedElement.id)}>
+              <Copy className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Copy (Ctrl+C)" onClick={() => copyElement(selectedElement.id)}>
+              <ClipboardPaste className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Flip horizontal (Ctrl+Shift+H)" onClick={() => flipElement(selectedElement.id, 'h')} active={!!selectedElement.flipH}>
+              <FlipHorizontal2 className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Flip vertical" onClick={() => flipElement(selectedElement.id, 'v')} active={!!selectedElement.flipV}>
+              <FlipVertical2 className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <div className="mx-0.5 h-4 w-px bg-border" />
+            <TopbarBtn title="Bring forward" onClick={() => layerAction(selectedElement.id, 'forward')}>
+              <ArrowUp className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Send backward" onClick={() => layerAction(selectedElement.id, 'backward')}>
+              <ArrowDown className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Bring to front" onClick={() => layerAction(selectedElement.id, 'front')}>
+              <BringToFront className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Send to back" onClick={() => layerAction(selectedElement.id, 'back')}>
+              <SendToBack className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <div className="mx-0.5 h-4 w-px bg-border" />
+            <TopbarBtn title="Align left to canvas" onClick={() => alignElement(selectedElement.id, 'left')}>
+              <AlignHorizontalJustifyStart className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Center horizontally" onClick={() => alignElement(selectedElement.id, 'center-h')}>
+              <AlignHorizontalJustifyCenter className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Align right to canvas" onClick={() => alignElement(selectedElement.id, 'right')}>
+              <AlignHorizontalJustifyEnd className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Align top to canvas" onClick={() => alignElement(selectedElement.id, 'top')}>
+              <AlignVerticalJustifyStart className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Center vertically" onClick={() => alignElement(selectedElement.id, 'center-v')}>
+              <AlignVerticalJustifyCenter className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <TopbarBtn title="Align bottom to canvas" onClick={() => alignElement(selectedElement.id, 'bottom')}>
+              <AlignVerticalJustifyEnd className="h-3.5 w-3.5" />
+            </TopbarBtn>
+            <div className="mx-0.5 h-4 w-px bg-border" />
+            <TopbarBtn title="Delete (Del)" onClick={() => removeElement(selectedElement.id)} danger>
+              <Trash2 className="h-3.5 w-3.5" />
+            </TopbarBtn>
+          </div>
+        )}
+
         <div className="ml-auto flex items-center gap-1.5">
+          {onShareToPage && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="hidden border-berry/30 text-berry hover:bg-berry/5 lg:inline-flex"
+              onClick={() => onShareToPage(project.id, title)}
+              title="Embed this project in your Special Page as a content block"
+            >
+              <Plus className="h-3.5 w-3.5" /> Share to Page
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
-            className="hidden md:inline-flex text-muted-foreground hover:bg-evergreen/5 hover:text-evergreen"
+            className="hidden text-muted-foreground hover:bg-evergreen/5 hover:text-evergreen md:inline-flex"
+            onClick={() => setShowShortcuts(s => !s)}
+            title="Show keyboard shortcuts"
+          >
+            <Keyboard className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="hidden text-muted-foreground hover:bg-evergreen/5 hover:text-evergreen md:inline-flex"
             onClick={() => setShowGrid(g => !g)}
             title="Toggle grid (snap to 10px)"
           >
@@ -754,8 +949,8 @@ export function CanvasEditor({
         </div>
       </div>
 
-      {/* ── Mobile tabs ───────────────────────────────────────────────── */}
-      <div className="border-b border-evergreen/15 bg-background px-3 py-2 md:hidden">
+      {/* ── Mobile tabs (STATIC — does not scroll) ──────────────────────── */}
+      <div className="flex-shrink-0 border-b border-evergreen/15 bg-background px-3 py-2 md:hidden">
         <Tabs value={mobilePanel} onValueChange={v => setMobilePanel(v as 'add' | 'props' | 'layers')}>
           <TabsList className="w-full">
             <TabsTrigger value="add" className="flex-1"><Plus className="h-3 w-3" /> Add</TabsTrigger>
@@ -765,10 +960,10 @@ export function CanvasEditor({
         </Tabs>
       </div>
 
-      {/* ── Main 3-panel ──────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0">
-        {/* Left toolbar — desktop */}
-        <aside className="hidden w-[280px] flex-shrink-0 border-r border-evergreen/15 bg-background md:flex md:flex-col">
+      {/* ── Main 3-panel — each panel scrolls INDEPENDENTLY ─────────────── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Left toolbar — desktop (overflow-y-auto handles scrolling) */}
+        <aside className="hidden w-[280px] flex-shrink-0 flex-col overflow-y-auto border-r border-evergreen/15 bg-background md:flex">
           <CanvasToolbar
             onAddText={addText}
             onAddShape={addShape}
@@ -791,12 +986,13 @@ export function CanvasEditor({
             activePresetId={activePresetId}
             activeBackground={canvasData.canvas.background}
             unsavedChanges={dirty}
+            onApplyPalette={(colors) => applyPalette(colors)}
           />
         </aside>
 
         {/* Mobile toolbar */}
         {mobilePanel === 'add' && (
-          <div className="flex-1 md:hidden">
+          <div className="flex-1 overflow-y-auto md:hidden">
             <CanvasToolbar
               onAddText={addText}
               onAddShape={addShape}
@@ -819,11 +1015,12 @@ export function CanvasEditor({
               activePresetId={activePresetId}
               activeBackground={canvasData.canvas.background}
               unsavedChanges={dirty}
+              onApplyPalette={(colors) => applyPalette(colors)}
             />
           </div>
         )}
 
-        {/* ── Center canvas viewport ──────────────────────────────────── */}
+        {/* ── Center canvas viewport ───────────────────────────────────── */}
         <main
           ref={viewportRef}
           className="relative flex-1 overflow-auto bg-[radial-gradient(circle,_rgba(15,76,58,0.05)_1px,_transparent_1px)] bg-[length:20px_20px]"
@@ -865,6 +1062,32 @@ export function CanvasEditor({
                   />
                 )}
 
+                {/* Alignment guide lines (red dashed) — drawn inside the canvas */}
+                {alignmentGuides.v && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute top-0 bottom-0 z-[1000]"
+                    style={{
+                      left: canvasData.canvas.width / 2 - 0.5,
+                      width: 1,
+                      borderLeft: '1px dashed #dc2626',
+                      boxShadow: '0 0 4px rgba(220,38,38,0.6)',
+                    }}
+                  />
+                )}
+                {alignmentGuides.h && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute left-0 right-0 z-[1000]"
+                    style={{
+                      top: canvasData.canvas.height / 2 - 0.5,
+                      height: 1,
+                      borderTop: '1px dashed #dc2626',
+                      boxShadow: '0 0 4px rgba(220,38,38,0.6)',
+                    }}
+                  />
+                )}
+
                 {/* Elements */}
                 {canvasData.elements
                   .slice()
@@ -887,21 +1110,20 @@ export function CanvasEditor({
           </div>
         </main>
 
-        {/* Right panel — desktop (Properties + Layers) */}
-        <aside className="hidden w-[300px] flex-shrink-0 flex-col border-l border-evergreen/15 bg-background md:flex">
-          <ScrollArea className="flex-1 border-b border-evergreen/15">
-            <div className="p-3">
-              <PropertiesPanel
-                selected={selectedElement}
-                canvas={canvasData.canvas}
-                onUpdateElement={updateElement}
-                onUpdateCanvas={updateCanvas}
-                onLayerAction={layerAction}
-                onDelete={removeElement}
-              />
-            </div>
-          </ScrollArea>
-          <div className="h-[260px] flex-shrink-0 p-3">
+        {/* Right panel — desktop (single overflow-y-auto column with both
+            PropertiesPanel + LayersPanel stacked). */}
+        <aside className="hidden w-[300px] flex-shrink-0 flex-col overflow-y-auto border-l border-evergreen/15 bg-background md:flex">
+          <div className="flex-1 p-3">
+            <PropertiesPanel
+              selected={selectedElement}
+              canvas={canvasData.canvas}
+              onUpdateElement={updateElement}
+              onUpdateCanvas={updateCanvas}
+              onLayerAction={layerAction}
+              onDelete={removeElement}
+            />
+          </div>
+          <div className="flex-shrink-0 border-t border-evergreen/15 p-3">
             <LayersPanel
               elements={canvasData.elements}
               selectedId={selectedId}
@@ -917,7 +1139,7 @@ export function CanvasEditor({
 
         {/* Mobile right panel */}
         {mobilePanel !== 'add' && (
-          <div className="flex-1 overflow-auto md:hidden">
+          <div className="flex-1 overflow-y-auto md:hidden">
             {mobilePanel === 'props' ? (
               <div className="p-3">
                 <PropertiesPanel
@@ -946,6 +1168,38 @@ export function CanvasEditor({
           </div>
         )}
       </div>
+
+      {/* Keyboard shortcuts hint (toggleable, floating) */}
+      {showShortcuts && (
+        <div className="fixed bottom-4 right-4 z-40 w-72 rounded-lg border border-evergreen/30 bg-background p-3 shadow-lg">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-evergreen">
+              Keyboard shortcuts
+            </h4>
+            <button
+              type="button"
+              onClick={() => setShowShortcuts(false)}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Close shortcuts"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <ul className="space-y-1 text-[11px] text-muted-foreground">
+            <li className="flex justify-between"><span>Undo</span><kbd className="font-mono">Ctrl+Z</kbd></li>
+            <li className="flex justify-between"><span>Redo</span><kbd className="font-mono">Ctrl+Y</kbd></li>
+            <li className="flex justify-between"><span>Duplicate</span><kbd className="font-mono">Ctrl+D</kbd></li>
+            <li className="flex justify-between"><span>Copy</span><kbd className="font-mono">Ctrl+C</kbd></li>
+            <li className="flex justify-between"><span>Paste</span><kbd className="font-mono">Ctrl+V</kbd></li>
+            <li className="flex justify-between"><span>Flip horizontal</span><kbd className="font-mono">Ctrl+Shift+H</kbd></li>
+            <li className="flex justify-between"><span>Delete</span><kbd className="font-mono">Del</kbd></li>
+            <li className="flex justify-between"><span>Nudge (1px)</span><kbd className="font-mono">Arrows</kbd></li>
+            <li className="flex justify-between"><span>Nudge (10px)</span><kbd className="font-mono">Shift+Arrows</kbd></li>
+            <li className="flex justify-between"><span>Snap rotate 15°</span><kbd className="font-mono">Shift+drag</kbd></li>
+            <li className="flex justify-between"><span>Deselect</span><kbd className="font-mono">Click empty</kbd></li>
+          </ul>
+        </div>
+      )}
 
       {/* Floating mobile add buttons (quick access) */}
       {mobilePanel !== 'add' && (
@@ -1012,6 +1266,10 @@ function CanvasElementView({
   // Build the inner DOM per element type.
   const inner = renderInner(el)
 
+  // Combine rotation + flip transforms. We apply flips via the scale()
+  // operation so the rotation handle still behaves intuitively.
+  const flipScale = `${el.flipH ? -1 : 1}, ${el.flipV ? -1 : 1}`
+
   return (
     <div
       onMouseDown={e => { onElementMouseDown(e, el) }}
@@ -1025,7 +1283,7 @@ function CanvasElementView({
         height: el.height,
         opacity: el.opacity,
         zIndex: el.zIndex,
-        transform: `rotate(${el.rotation}deg)`,
+        transform: `rotate(${el.rotation}deg) scale(${flipScale})`,
         cursor: el.locked ? 'default' : 'move',
         touchAction: 'none',
         userSelect: 'none',
@@ -1077,6 +1335,14 @@ function CanvasElementView({
    ────────────────────────────────────────────────────────────────────────── */
 function renderInner(el: CanvasElement): React.ReactNode {
   if (el.type === 'TEXT') {
+    // Gradient text: when textGradient is set we use background-clip:text so
+    // the gradient becomes the text fill color. We also make `color`
+    // transparent so the underlying text color doesn't bleed through.
+    const usingGradient = !!el.textGradient
+    const textStroke =
+      el.textStrokeWidth && el.textStrokeWidth > 0
+        ? `${el.textStrokeWidth}px ${el.textStrokeColor || '#000000'}`
+        : undefined
     return (
       <div
         className="flex h-full w-full"
@@ -1086,11 +1352,12 @@ function renderInner(el: CanvasElement): React.ReactNode {
           fontWeight: el.fontWeight as any,
           fontStyle: el.fontStyle as any,
           textDecoration: el.textDecoration,
-          color: el.color,
+          color: usingGradient ? 'transparent' : el.color,
           textAlign: el.textAlign,
           lineHeight: el.lineHeight,
           letterSpacing: el.letterSpacing,
           textShadow: el.textShadow,
+          textTransform: el.textTransform || 'none',
           backgroundColor: el.backgroundColor,
           padding: el.padding,
           borderRadius: el.borderRadius,
@@ -1103,7 +1370,15 @@ function renderInner(el: CanvasElement): React.ReactNode {
           wordBreak: 'break-word',
           whiteSpace: 'pre-wrap',
           boxShadow: el.boxShadow,
-        }}
+          // ── Text effects ────────────────────────────────────────────────
+          WebkitTextStroke: textStroke as any,
+          ...(usingGradient ? {
+            backgroundImage: el.textGradient,
+            WebkitBackgroundClip: 'text' as any,
+            backgroundClip: 'text' as any,
+            WebkitTextFillColor: 'transparent' as any,
+          } : {}),
+        } as React.CSSProperties}
       >
         {el.text || ''}
       </div>
@@ -1126,18 +1401,6 @@ function renderInner(el: CanvasElement): React.ReactNode {
         />
       )
     }
-    if (el.shape === 'triangle') {
-      return (
-        <div
-          className="h-full w-full"
-          style={{
-            background: fill,
-            clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
-            // For border, we'd need an SVG — fall back to a colored fill only.
-          }}
-        />
-      )
-    }
     if (el.shape === 'line') {
       return (
         <div
@@ -1148,7 +1411,22 @@ function renderInner(el: CanvasElement): React.ReactNode {
         />
       )
     }
-    // rect
+    // Shapes with a clip-path (triangle, star, heart, arrow, hexagon, pentagon).
+    const clipPath = el.shape ? SHAPE_CLIP_PATHS[el.shape] : null
+    if (clipPath) {
+      return (
+        <div
+          className="h-full w-full"
+          style={{
+            background: fill !== 'transparent' ? fill : el.borderColor,
+            clipPath,
+            // Note: CSS clip-path doesn't render borders — use a colored fill
+            // or an SVG outline for visible outlines.
+          }}
+        />
+      )
+    }
+    // rect (default)
     return (
       <div
         className="h-full w-full"
@@ -1183,6 +1461,7 @@ function renderInner(el: CanvasElement): React.ReactNode {
         style={{
           objectFit: el.objectFit,
           borderRadius: el.borderRadius,
+          filter: buildImageFilter(el),
         }}
       />
     )
@@ -1218,5 +1497,37 @@ function Handle({
         ...positions[pos],
       }}
     />
+  )
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   TopbarBtn — small icon button used in the top bar action group.
+   ────────────────────────────────────────────────────────────────────────── */
+function TopbarBtn({
+  title, onClick, active, danger, children,
+}: {
+  title: string
+  onClick: () => void
+  active?: boolean
+  danger?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      className={cn(
+        'flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors',
+        active
+          ? 'bg-evergreen/15 text-evergreen'
+          : 'hover:bg-evergreen/5 hover:text-evergreen',
+        danger && 'hover:bg-destructive/10 hover:text-destructive',
+      )}
+    >
+      {children}
+    </button>
   )
 }

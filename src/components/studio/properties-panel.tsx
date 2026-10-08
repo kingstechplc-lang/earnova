@@ -21,13 +21,15 @@ import {
 import { cn } from '@/lib/utils'
 import {
   BACKGROUND_GRADIENTS, CANVAS_PRESETS, FONT_FAMILIES, SHAPES,
+  TEXT_GRADIENTS, IMAGE_FILTER_PRESETS, DEFAULT_IMAGE_FILTERS,
   type CanvasElement, type CanvasData, type ShapeType,
 } from './canvas-types'
 import { EmojiGrid } from './emoji-picker'
 import {
   Trash2, BringToFront, SendToBack, ArrowUp, ArrowDown,
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight,
-  Square, Circle, Triangle, Minus,
+  Square, Circle, Triangle, Minus, Star, Heart, ArrowRight,
+  Hexagon, Pentagon, FlipHorizontal2, FlipVertical2,
 } from 'lucide-react'
 
 export type LayerAction = 'forward' | 'backward' | 'front' | 'back'
@@ -363,6 +365,31 @@ export function PropertiesPanel({
         onChange={v => update({ opacity: v / 100 })}
       />
 
+      {/* Flip transforms */}
+      <div>
+        <SectionTitle>Flip</SectionTitle>
+        <div className="grid grid-cols-2 gap-1">
+          <Button
+            size="sm"
+            variant={el.flipH ? 'default' : 'outline'}
+            className="h-8 text-[11px]"
+            onClick={() => update({ flipH: !el.flipH })}
+            title="Flip horizontal"
+          >
+            <FlipHorizontal2 className="h-3.5 w-3.5" /> Horizontal
+          </Button>
+          <Button
+            size="sm"
+            variant={el.flipV ? 'default' : 'outline'}
+            className="h-8 text-[11px]"
+            onClick={() => update({ flipV: !el.flipV })}
+            title="Flip vertical"
+          >
+            <FlipVertical2 className="h-3.5 w-3.5" /> Vertical
+          </Button>
+        </div>
+      </div>
+
       {/* Layer order */}
       <div>
         <SectionTitle>Layer</SectionTitle>
@@ -579,6 +606,108 @@ function TextProps({
           </Button>
         </div>
       </FieldRow>
+
+      {/* ── Text effects: transform, stroke, gradient ─────────────────── */}
+      <div>
+        <SectionTitle>Text effects</SectionTitle>
+
+        <FieldRow label="Text transform">
+          <div className="grid grid-cols-4 gap-1">
+            <Button
+              size="sm"
+              variant={(el.textTransform || 'none') === 'none' ? 'default' : 'outline'}
+              className="h-8 px-1 text-[10px]"
+              onClick={() => update({ textTransform: 'none' })}
+              title="None"
+            >
+              Aa
+            </Button>
+            <Button
+              size="sm"
+              variant={el.textTransform === 'uppercase' ? 'default' : 'outline'}
+              className="h-8 px-1 text-[10px] font-bold"
+              onClick={() => update({ textTransform: 'uppercase' })}
+              title="UPPERCASE"
+            >
+              AA
+            </Button>
+            <Button
+              size="sm"
+              variant={el.textTransform === 'lowercase' ? 'default' : 'outline'}
+              className="h-8 px-1 text-[10px]"
+              onClick={() => update({ textTransform: 'lowercase' })}
+              title="lowercase"
+            >
+              aa
+            </Button>
+            <Button
+              size="sm"
+              variant={el.textTransform === 'capitalize' ? 'default' : 'outline'}
+              className="h-8 px-1 text-[10px]"
+              onClick={() => update({ textTransform: 'capitalize' })}
+              title="Capitalize"
+            >
+              Ab
+            </Button>
+          </div>
+        </FieldRow>
+
+        <div className="grid grid-cols-2 gap-2">
+          <FieldRow label="Stroke width">
+            <NumberInput
+              value={el.textStrokeWidth || 0}
+              onChange={v => update({ textStrokeWidth: Math.max(0, Math.min(20, v)) })}
+              min={0}
+              max={20}
+              step={0.5}
+              suffix="px"
+            />
+          </FieldRow>
+          <FieldRow label="Stroke color">
+            <ColorField
+              value={el.textStrokeColor}
+              onChange={v => update({ textStrokeColor: v })}
+            />
+          </FieldRow>
+        </div>
+
+        <FieldRow label="Gradient text">
+          <div className="grid grid-cols-4 gap-1.5">
+            <button
+              type="button"
+              onClick={() => update({ textGradient: undefined })}
+              className={cn(
+                'h-7 rounded-md border text-[10px] flex items-center justify-center',
+                !el.textGradient
+                  ? 'border-evergreen ring-2 ring-evergreen/40'
+                  : 'border-border hover:border-evergreen/40',
+              )}
+              title="No gradient"
+            >
+              None
+            </button>
+            {Object.entries(TEXT_GRADIENTS).map(([key, css]) => {
+              const isActive = el.textGradient === css
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => update({ textGradient: css })}
+                  className={cn(
+                    'h-7 rounded-md border transition-all',
+                    isActive
+                      ? 'border-evergreen ring-2 ring-evergreen/40'
+                      : 'border-border hover:scale-105',
+                  )}
+                  style={{ background: css }}
+                  aria-label={`Gradient ${key}`}
+                  title={key}
+                />
+              )
+            })}
+          </div>
+        </FieldRow>
+      </div>
     </>
   )
 }
@@ -590,10 +719,15 @@ function ShapeProps({
   update: (patch: Partial<CanvasElement>) => void
 }) {
   const shapeIcons: Record<ShapeType, React.ReactNode> = {
-    rect: <Square className="h-3.5 w-3.5" />,
-    circle: <Circle className="h-3.5 w-3.5" />,
+    rect:     <Square className="h-3.5 w-3.5" />,
+    circle:   <Circle className="h-3.5 w-3.5" />,
     triangle: <Triangle className="h-3.5 w-3.5" />,
-    line: <Minus className="h-3.5 w-3.5" />,
+    line:     <Minus className="h-3.5 w-3.5" />,
+    star:     <Star className="h-3.5 w-3.5" />,
+    heart:    <Heart className="h-3.5 w-3.5" />,
+    arrow:    <ArrowRight className="h-3.5 w-3.5" />,
+    hexagon:  <Hexagon className="h-3.5 w-3.5" />,
+    pentagon: <Pentagon className="h-3.5 w-3.5" />,
   }
 
   return (
@@ -727,7 +861,153 @@ function ImageProps({
           suffix="px"
         />
       </FieldRow>
+
+      {/* ── Image filters (CSS filter chain) ────────────────────────────── */}
+      <div>
+        <SectionTitle>Image filters</SectionTitle>
+
+        <FieldRow label="Filter presets">
+          <div className="grid grid-cols-3 gap-1">
+            {Object.entries(IMAGE_FILTER_PRESETS).map(([key, css]) => {
+              // Compute a simple "is active" check by comparing each
+              // individual filter value's default-ness for this preset.
+              const isActive = isPresetActive(el, css)
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => update(applyPreset(css))}
+                  className={cn(
+                    'h-7 rounded-md border text-[10px] capitalize transition-all',
+                    isActive
+                      ? 'border-evergreen bg-evergreen/10 text-evergreen ring-1 ring-evergreen/30'
+                      : 'border-border hover:border-evergreen/40 hover:bg-evergreen/5',
+                  )}
+                  title={`${key} filter preset`}
+                >
+                  {key === 'bw' ? 'B&W' : key}
+                </button>
+              )
+            })}
+          </div>
+        </FieldRow>
+
+        <SliderRow
+          label="Brightness"
+          value={el.imgBrightness ?? 100}
+          min={0}
+          max={200}
+          step={1}
+          suffix="%"
+          onChange={v => update({ imgBrightness: v })}
+        />
+        <SliderRow
+          label="Contrast"
+          value={el.imgContrast ?? 100}
+          min={0}
+          max={200}
+          step={1}
+          suffix="%"
+          onChange={v => update({ imgContrast: v })}
+        />
+        <SliderRow
+          label="Saturation"
+          value={el.imgSaturation ?? 100}
+          min={0}
+          max={200}
+          step={1}
+          suffix="%"
+          onChange={v => update({ imgSaturation: v })}
+        />
+        <SliderRow
+          label="Blur"
+          value={el.imgBlur ?? 0}
+          min={0}
+          max={20}
+          step={0.5}
+          suffix="px"
+          onChange={v => update({ imgBlur: v })}
+        />
+        <SliderRow
+          label="Grayscale"
+          value={el.imgGrayscale ?? 0}
+          min={0}
+          max={100}
+          step={1}
+          suffix="%"
+          onChange={v => update({ imgGrayscale: v })}
+        />
+        <SliderRow
+          label="Sepia"
+          value={el.imgSepia ?? 0}
+          min={0}
+          max={100}
+          step={1}
+          suffix="%"
+          onChange={v => update({ imgSepia: v })}
+        />
+        <SliderRow
+          label="Hue rotate"
+          value={el.imgHueRotate ?? 0}
+          min={0}
+          max={360}
+          step={1}
+          suffix="°"
+          onChange={v => update({ imgHueRotate: v })}
+        />
+
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 w-full border-evergreen/30 text-evergreen hover:bg-evergreen/5"
+          onClick={() => update({ ...DEFAULT_IMAGE_FILTERS })}
+          title="Reset all filters"
+        >
+          Reset filters
+        </Button>
+      </div>
     </>
+  )
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Image filter preset helpers — parse the preset CSS string into element
+   patch values, and check whether the current element matches a preset.
+   ────────────────────────────────────────────────────────────────────────── */
+function applyPreset(css: string): Partial<CanvasElement> {
+  if (css === 'none') return { ...DEFAULT_IMAGE_FILTERS }
+  // Reset to defaults first, then layer on whatever the preset specifies.
+  const patch: Partial<CanvasElement> = { ...DEFAULT_IMAGE_FILTERS }
+  const brightness = css.match(/brightness\(([\d.]+)%\)/)
+  if (brightness) patch.imgBrightness = parseFloat(brightness[1])
+  const contrast = css.match(/contrast\(([\d.]+)%\)/)
+  if (contrast) patch.imgContrast = parseFloat(contrast[1])
+  const saturate = css.match(/saturate\(([\d.]+)%\)/)
+  if (saturate) patch.imgSaturation = parseFloat(saturate[1])
+  const blur = css.match(/blur\(([\d.]+)px\)/)
+  if (blur) patch.imgBlur = parseFloat(blur[1])
+  const grayscale = css.match(/grayscale\(([\d.]+)\)/)
+  if (grayscale) patch.imgGrayscale = parseFloat(grayscale[1]) * 100
+  const sepia = css.match(/sepia\(([\d.]+)\)/)
+  if (sepia) patch.imgSepia = parseFloat(sepia[1]) * 100
+  const invert = css.match(/invert\(([\d.]+)\)/)
+  if (invert) patch.imgInvert = parseFloat(invert[1]) * 100
+  const hue = css.match(/hue-rotate\(([\d.]+)deg\)/)
+  if (hue) patch.imgHueRotate = parseFloat(hue[1])
+  return patch
+}
+
+function isPresetActive(el: CanvasElement, css: string): boolean {
+  const p = applyPreset(css)
+  return (
+    (el.imgBrightness ?? 100) === (p.imgBrightness ?? 100) &&
+    (el.imgContrast ?? 100) === (p.imgContrast ?? 100) &&
+    (el.imgSaturation ?? 100) === (p.imgSaturation ?? 100) &&
+    (el.imgBlur ?? 0) === (p.imgBlur ?? 0) &&
+    (el.imgGrayscale ?? 0) === (p.imgGrayscale ?? 0) &&
+    (el.imgSepia ?? 0) === (p.imgSepia ?? 0) &&
+    (el.imgInvert ?? 0) === (p.imgInvert ?? 0) &&
+    (el.imgHueRotate ?? 0) === (p.imgHueRotate ?? 0)
   )
 }
 
@@ -780,6 +1060,11 @@ export function ElementIcon({
     if (shape === 'circle') return <Circle className="h-3.5 w-3.5" />
     if (shape === 'triangle') return <Triangle className="h-3.5 w-3.5" />
     if (shape === 'line') return <Minus className="h-3.5 w-3.5" />
+    if (shape === 'star') return <Star className="h-3.5 w-3.5" />
+    if (shape === 'heart') return <Heart className="h-3.5 w-3.5" />
+    if (shape === 'arrow') return <ArrowRight className="h-3.5 w-3.5" />
+    if (shape === 'hexagon') return <Hexagon className="h-3.5 w-3.5" />
+    if (shape === 'pentagon') return <Pentagon className="h-3.5 w-3.5" />
     return <Square className="h-3.5 w-3.5" />
   }
   return null

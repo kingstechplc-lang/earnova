@@ -43,6 +43,8 @@ function elementName(el: CanvasElement): string {
   if (el.type === 'SHAPE') {
     const map: Record<string, string> = {
       rect: 'Rectangle', circle: 'Circle', triangle: 'Triangle', line: 'Line',
+      star: 'Star', heart: 'Heart', arrow: 'Arrow', hexagon: 'Hexagon',
+      pentagon: 'Pentagon',
     }
     return map[el.shape || 'rect'] || 'Shape'
   }

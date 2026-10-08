@@ -271,6 +271,60 @@ export default function EarnovaStudioView({
     setEditing(p)
   }, [])
 
+  /* ── Share-to-page dialog state ────────────────────────────────────── */
+  // Opens a dialog listing the user's Special Pages so they can embed the
+  // currently-edited studio project as a content block on the chosen page.
+  const [shareTarget, setShareTarget] = useState<{
+    projectId: string
+    title: string
+  } | null>(null)
+  const [sharePages, setSharePages] = useState<Array<{ id: string; title: string; slug: string }>>([])
+  const [shareLoading, setShareLoading] = useState(false)
+  const [sharePosting, setSharePosting] = useState(false)
+
+  const openShareDialog = useCallback(async (projectId: string, projectTitle: string) => {
+    setShareTarget({ projectId, title: projectTitle })
+    setShareLoading(true)
+    const res = await safeFetch<{ pages: Array<{ id: string; title: string; slug: string }> }>('/api/pages')
+    setShareLoading(false)
+    if (res.error) {
+      toast({ title: 'Could not load your pages', description: res.error, variant: 'destructive' })
+      return
+    }
+    if (res.data?.pages) setSharePages(res.data.pages)
+  }, [])
+
+  const confirmShareToPage = useCallback(async (pageId: string) => {
+    if (!shareTarget) return
+    setSharePosting(true)
+    // Embed as an IMAGE block with a `studioProjectId` reference so the
+    // public-page renderer can look it up + render the live canvas.
+    const res = await safeFetch<{ block: { id: string } }>(`/api/page-builder/${pageId}/blocks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'IMAGE',
+        data: {
+          studioProjectId: shareTarget.projectId,
+          title: shareTarget.title,
+          // Mark this block so the public page renderer can render it as a
+          // studio project embed rather than a plain image.
+          kind: 'studio-project',
+        },
+      }),
+    })
+    setSharePosting(false)
+    if (res.error) {
+      toast({ title: 'Could not embed project', description: res.error, variant: 'destructive' })
+      return
+    }
+    toast({
+      title: 'Embedded!',
+      description: `"${shareTarget.title}" added to your page.`,
+    })
+    setShareTarget(null)
+  }, [shareTarget])
+
   /* ──────────────────────────────────────────────────────────────────────
      Editor mode — full-screen canvas
      ────────────────────────────────────────────────────────────────────── */
@@ -285,6 +339,17 @@ export default function EarnovaStudioView({
           project={editing}
           onBack={() => setEditing(null)}
           onSaved={onSaved}
+          onShareToPage={openShareDialog}
+        />
+        <ShareToPageDialog
+          key={shareTarget?.projectId || 'none'}
+          open={!!shareTarget}
+          onOpenChange={(v) => !v && setShareTarget(null)}
+          target={shareTarget}
+          pages={sharePages}
+          loading={shareLoading}
+          posting={sharePosting}
+          onConfirm={confirmShareToPage}
         />
       </div>
     )
@@ -816,5 +881,91 @@ function BlankCanvasForm({
         </Button>
       </DialogFooter>
     </>
+  )
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ShareToPageDialog — embed a studio project into one of the user's
+   Special Pages as an IMAGE content block carrying a studioProjectId ref.
+   ────────────────────────────────────────────────────────────────────────── */
+function ShareToPageDialog({
+  open, onOpenChange, target, pages, loading, posting, onConfirm,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  target: { projectId: string; title: string } | null
+  pages: Array<{ id: string; title: string; slug: string }>
+  loading: boolean
+  posting: boolean
+  onConfirm: (pageId: string) => void
+}) {
+  const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-lg flex items-center gap-2">
+            <Plus className="h-4 w-4 text-berry" /> Share to Special Page
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <p className="text-xs text-muted-foreground">
+            Embed <strong className="text-foreground">{target?.title}</strong> as a content block
+            on one of your Special Pages so visitors see your latest design.
+          </p>
+          {loading ? (
+            <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Loading your pages…
+            </div>
+          ) : pages.length === 0 ? (
+            <div className="rounded-md border border-dashed border-evergreen/20 bg-evergreen/5 p-4 text-center text-xs text-muted-foreground">
+              You don&apos;t have any Special Pages yet. Create one from the
+              Page Builder first.
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {pages.map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedPageId(p.id)}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-md border p-2 text-left transition-all',
+                    selectedPageId === p.id
+                      ? 'border-evergreen bg-evergreen/5 ring-1 ring-evergreen/30'
+                      : 'border-border hover:border-evergreen/40 hover:bg-evergreen/5',
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{p.title}</p>
+                    <p className="text-[10px] text-muted-foreground">/{p.slug}</p>
+                  </div>
+                  {selectedPageId === p.id && (
+                    <span className="ml-2 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-evergreen text-cream text-[10px]">
+                      ✓
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <DialogFooter className="gap-2">
+          <DialogClose asChild>
+            <Button variant="outline" size="sm">Cancel</Button>
+          </DialogClose>
+          <Button
+            size="sm"
+            disabled={!selectedPageId || posting}
+            onClick={() => selectedPageId && onConfirm(selectedPageId)}
+            className="bg-gradient-to-r from-berry to-berry/80 text-cream hover:shadow-festive"
+          >
+            {posting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+            Embed project
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

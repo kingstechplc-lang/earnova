@@ -6,7 +6,16 @@
 
 export type ElementType = 'TEXT' | 'SHAPE' | 'STICKER' | 'IMAGE'
 
-export type ShapeType = 'rect' | 'circle' | 'triangle' | 'line'
+export type ShapeType =
+  | 'rect'
+  | 'circle'
+  | 'triangle'
+  | 'line'
+  | 'star'
+  | 'heart'
+  | 'arrow'
+  | 'hexagon'
+  | 'pentagon'
 
 export type CanvasElement = {
   id: string
@@ -20,6 +29,9 @@ export type CanvasElement = {
   zIndex: number
   locked: boolean
   visible: boolean
+  // Transform flags
+  flipH?: boolean
+  flipV?: boolean
   // TEXT properties
   text?: string
   fontSize?: number
@@ -35,6 +47,11 @@ export type CanvasElement = {
   backgroundColor?: string
   padding?: number
   borderRadius?: number
+  // Text effects
+  textStrokeWidth?: number
+  textStrokeColor?: string
+  textGradient?: string // CSS gradient string (when set, text color is treated as a gradient fill)
+  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize'
   // SHAPE properties
   shape?: ShapeType
   fill?: string
@@ -45,6 +62,15 @@ export type CanvasElement = {
   // IMAGE properties
   src?: string
   objectFit?: 'cover' | 'contain' | 'fill'
+  // IMAGE filters (CSS filter values)
+  imgBrightness?: number   // 0–200 (100 = none)
+  imgContrast?: number     // 0–200 (100 = none)
+  imgSaturation?: number  // 0–200 (100 = none)
+  imgBlur?: number         // 0–20 px
+  imgGrayscale?: number   // 0–100 (%)
+  imgSepia?: number       // 0–100 (%)
+  imgInvert?: number      // 0–100 (%)
+  imgHueRotate?: number   // 0–360 (deg)
   // SHADOW
   boxShadow?: string
 }
@@ -68,7 +94,7 @@ export type CanvasPreset = {
   description: string
 }
 
-// Social media canvas presets
+// Social media canvas presets (includes Adsterra ad sizes for ad-aware designs)
 export const CANVAS_PRESETS: CanvasPreset[] = [
   { id: 'square',       name: 'Square (1:1)',       width: 1080, height: 1080, icon: '⬜', description: 'Instagram post, Facebook post' },
   { id: 'story',        name: 'Story (9:16)',       width: 1080, height: 1920, icon: '📱', description: 'Instagram Story, TikTok, Snapchat' },
@@ -78,6 +104,16 @@ export const CANVAS_PRESETS: CanvasPreset[] = [
   { id: 'a4-portrait',  name: 'A4 Portrait',          width: 794,  height: 1123, icon: '📄', description: 'Print-ready A4 document' },
   { id: 'logo',         name: 'Logo (512×512)',       width: 512,  height: 512,  icon: '🎨', description: 'Logo / icon design' },
   { id: 'banner',       name: 'Web Banner',            width: 1500, height: 500,  icon: '📊', description: 'Website hero banner' },
+  // ── Ad-aware (Adsterra dimensions) ───────────────────────────────────────
+  { id: 'ad-300x250',   name: 'Ad Banner 300×250',    width: 300,  height: 250,  icon: '📢', description: 'Adsterra medium rectangle' },
+  { id: 'ad-320x50',    name: 'Ad Banner 320×50',     width: 320,  height: 50,   icon: '📱', description: 'Adsterra mobile banner' },
+  { id: 'ad-728x90',    name: 'Ad Banner 728×90',     width: 728,  height: 90,   icon: '🏆', description: 'Adsterra leaderboard' },
+  // ── Additional social formats ────────────────────────────────────────────
+  { id: 'ig-reel',      name: 'Instagram Reel',        width: 1080, height: 1920, icon: '🎬', description: 'Reel / TikTok cover (9:16)' },
+  { id: 'pinterest',    name: 'Pinterest Pin',         width: 1000, height: 1500, icon: '📌', description: 'Pinterest pin (2:3)' },
+  { id: 'linkedin',     name: 'LinkedIn Post',         width: 1200, height: 627,  icon: '💼', description: 'LinkedIn share image' },
+  { id: 'fb-cover',      name: 'Facebook Cover',        width: 820,  height: 312,  icon: '👍', description: 'Facebook cover photo' },
+  { id: 'yt-channel',    name: 'YouTube Channel Art',   width: 2560, height: 1440, icon: '▶️', description: 'YouTube channel art' },
 ]
 
 // Background gradient presets
@@ -98,6 +134,94 @@ export const BACKGROUND_GRADIENTS: Record<string, string> = {
   'solid-black': '#000000',
   'solid-evergreen': '#0f4c3a',
   'solid-cream': '#faf8f3',
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Earnova color palettes — curated combinations based on the brand palette.
+// Used by the Brand Kit + color palette picker in the toolbar.
+// ──────────────────────────────────────────────────────────────────────────
+export type ColorPalette = {
+  id: string
+  name: string
+  colors: string[] // hex colors
+  description: string
+}
+
+export const COLOR_PALETTES: ColorPalette[] = [
+  {
+    id: 'evergreen-gold-berry',
+    name: 'Evergreen × Gold × Berry',
+    colors: ['#0f4c3a', '#c89b3c', '#b8345d', '#faf8f3', '#1a1a1a'],
+    description: 'Earnova signature — festive and premium',
+  },
+  {
+    id: 'festive-christmas',
+    name: 'Festive Christmas',
+    colors: ['#0f4c3a', '#c89b3c', '#d63d24', '#fef3c7', '#1a3a2a'],
+    description: 'Holiday warmth with red accents',
+  },
+  {
+    id: 'ocean-deep',
+    name: 'Ocean Deep',
+    colors: ['#0d0d0d', '#0891b2', '#2563eb', '#dbeafe', '#1e293b'],
+    description: 'Cool blues for tech / business',
+  },
+  {
+    id: 'royal-purple',
+    name: 'Royal Purple',
+    colors: ['#2d1b4e', '#7c3aed', '#c026d3', '#f3e8ff', '#1a1a2e'],
+    description: 'Bold and creative',
+  },
+  {
+    id: 'sunset-bloom',
+    name: 'Sunset Bloom',
+    colors: ['#f59e0b', '#ef4444', '#ec4899', '#fef3c7', '#7c2d12'],
+    description: 'Warm pinks and oranges',
+  },
+  {
+    id: 'forest-sage',
+    name: 'Forest Sage',
+    colors: ['#0f4c3a', '#8b9d77', '#5a7c65', '#f0f4ec', '#2c3e2d'],
+    description: 'Natural earthy greens',
+  },
+  {
+    id: 'midnight-gold',
+    name: 'Midnight Gold',
+    colors: ['#1a1a2e', '#16213e', '#c89b3c', '#faf8f3', '#0f0f1e'],
+    description: 'Dark with gold accents — luxury',
+  },
+  {
+    id: 'pastel-soft',
+    name: 'Pastel Soft',
+    colors: ['#fde2e4', '#fad2e1', '#c5dedd', '#dbe7e4', '#99c1b9'],
+    description: 'Soft and dreamy',
+  },
+]
+
+// ──────────────────────────────────────────────────────────────────────────
+// Text gradient presets — used by the "gradient text" text effect.
+// Each value is a CSS background gradient; the renderer applies it via
+// `background-clip: text` so the gradient becomes the text fill color.
+// ──────────────────────────────────────────────────────────────────────────
+export const TEXT_GRADIENTS: Record<string, string> = {
+  'gold-shine': 'linear-gradient(90deg, #c89b3c 0%, #f5d76e 50%, #c89b3c 100%)',
+  'evergreen-gold': 'linear-gradient(90deg, #0f4c3a 0%, #c89b3c 100%)',
+  'berry-sunset': 'linear-gradient(90deg, #b8345d 0%, #d97706 100%)',
+  'ocean-deep': 'linear-gradient(90deg, #0891b2 0%, #2563eb 100%)',
+  'royal-purple': 'linear-gradient(90deg, #7c3aed 0%, #c026d3 100%)',
+  'rainbow': 'linear-gradient(90deg, #ff0080 0%, #ff8c00 25%, #ffd700 50%, #00cc66 75%, #00aaff 100%)',
+  'sunset': 'linear-gradient(90deg, #f59e0b 0%, #ef4444 50%, #ec4899 100%)',
+  'neon': 'linear-gradient(90deg, #00ff88 0%, #00aaff 50%, #ff00ff 100%)',
+}
+
+// Image filter presets (label → CSS filter string)
+export const IMAGE_FILTER_PRESETS: Record<string, string> = {
+  'none': 'none',
+  'warm': 'saturate(1.3) contrast(1.05) brightness(1.05) sepia(0.15)',
+  'cool': 'saturate(1.1) contrast(1.05) brightness(0.97) hue-rotate(180deg) invert(0.05)',
+  'vintage': 'sepia(0.4) contrast(1.1) saturate(0.85) brightness(1.05)',
+  'bw': 'grayscale(1) contrast(1.1)',
+  'dramatic': 'contrast(1.4) saturate(1.3) brightness(0.95)',
 }
 
 // Font family presets
@@ -125,11 +249,58 @@ export const STICKER_EMOJIS = [
 
 // Shape presets
 export const SHAPES: Array<{ type: ShapeType; icon: string; label: string }> = [
-  { type: 'rect', icon: '⬜', label: 'Rectangle' },
-  { type: 'circle', icon: '⚪', label: 'Circle' },
+  { type: 'rect',     icon: '⬜', label: 'Rectangle' },
+  { type: 'circle',   icon: '⚪', label: 'Circle' },
   { type: 'triangle', icon: '🔺', label: 'Triangle' },
-  { type: 'line', icon: '➖', label: 'Line' },
+  { type: 'line',     icon: '➖', label: 'Line' },
+  { type: 'star',     icon: '⭐', label: 'Star' },
+  { type: 'heart',    icon: '❤️', label: 'Heart' },
+  { type: 'arrow',    icon: '➡️', label: 'Arrow' },
+  { type: 'hexagon',  icon: '⬡', label: 'Hexagon' },
+  { type: 'pentagon', icon: '⬠', label: 'Pentagon' },
 ]
+
+// ──────────────────────────────────────────────────────────────────────────
+// Clip-path polygons for the non-trivial shapes. Used by the renderer
+// (canvas-editor.tsx renderInner) and any preview tiles.
+// ──────────────────────────────────────────────────────────────────────────
+export const SHAPE_CLIP_PATHS: Record<ShapeType, string | null> = {
+  rect:     null,
+  circle:   null, // rendered via border-radius: 50%
+  triangle: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+  line:     null, // rendered as a flat colored bar
+  star:     'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
+  heart:    'polygon(50% 100%, 0% 35%, 0% 15%, 15% 0%, 35% 0%, 50% 18%, 65% 0%, 85% 0%, 100% 15%, 100% 35%)',
+  arrow:    'polygon(0% 35%, 60% 35%, 60% 10%, 100% 50%, 60% 90%, 60% 65%, 0% 65%)',
+  hexagon:  'polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%)',
+  pentagon: 'polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)',
+}
+
+// Default text effect values (used by the image filter reset / new image element)
+export const DEFAULT_IMAGE_FILTERS = {
+  imgBrightness: 100,
+  imgContrast: 100,
+  imgSaturation: 100,
+  imgBlur: 0,
+  imgGrayscale: 0,
+  imgSepia: 0,
+  imgInvert: 0,
+  imgHueRotate: 0,
+}
+
+// Build a CSS filter string from an element's filter props.
+export function buildImageFilter(el: CanvasElement): string {
+  const parts: string[] = []
+  if (el.imgBrightness != null && el.imgBrightness !== 100) parts.push(`brightness(${el.imgBrightness}%)`)
+  if (el.imgContrast != null && el.imgContrast !== 100) parts.push(`contrast(${el.imgContrast}%)`)
+  if (el.imgSaturation != null && el.imgSaturation !== 100) parts.push(`saturate(${el.imgSaturation}%)`)
+  if (el.imgBlur && el.imgBlur > 0) parts.push(`blur(${el.imgBlur}px)`)
+  if (el.imgGrayscale && el.imgGrayscale > 0) parts.push(`grayscale(${el.imgGrayscale}%)`)
+  if (el.imgSepia && el.imgSepia > 0) parts.push(`sepia(${el.imgSepia}%)`)
+  if (el.imgInvert && el.imgInvert > 0) parts.push(`invert(${el.imgInvert}%)`)
+  if (el.imgHueRotate && el.imgHueRotate > 0) parts.push(`hue-rotate(${el.imgHueRotate}deg)`)
+  return parts.length ? parts.join(' ') : 'none'
+}
 
 // Generate a unique element ID
 export function genElementId(): string {
@@ -160,6 +331,9 @@ export function createTextElement(text: string = 'Your text here', x = 100, y = 
     textShadow: '0 2px 8px rgba(0,0,0,0.3)',
     padding: 8,
     borderRadius: 0,
+    textStrokeWidth: 0,
+    textStrokeColor: '#000000',
+    textTransform: 'none',
   }
 }
 
@@ -203,7 +377,7 @@ export function createStickerElement(emoji: string, x = 100, y = 100): CanvasEle
   }
 }
 
-// Create an image element
+// Create an image element (with default filter values)
 export function createImageElement(src: string, x = 100, y = 100): CanvasElement {
   return {
     id: genElementId(),
@@ -219,6 +393,7 @@ export function createImageElement(src: string, x = 100, y = 100): CanvasElement
     src,
     objectFit: 'cover',
     borderRadius: 12,
+    ...DEFAULT_IMAGE_FILTERS,
   }
 }
 
@@ -337,6 +512,20 @@ export const CANVAS_TEMPLATES: Array<{
       { ...createStickerElement('🎆', 750, 600), fontSize: 80 },
       { ...createStickerElement('✨', 100, 200), fontSize: 50 },
       { ...createStickerElement('✨', 900, 400), fontSize: 50 },
+    ],
+  },
+  {
+    id: 'ad-banner-promo',
+    name: 'Ad Banner Promo',
+    presetId: 'ad-728x90',
+    background: 'evergreen-gold',
+    icon: '📢',
+    description: 'Leaderboard ad — Adsterra 728×90',
+    elements: [
+      { ...createShapeElement('rect', 8, 8), width: 712, height: 74, fill: 'transparent', borderColor: '#c89b3c', borderWidth: 2, borderRadius: 8, opacity: 0.5 },
+      { ...createTextElement('🚀 Earnova', 16, 22), width: 200, height: 48, fontSize: 28, fontWeight: 'bold', color: '#faf8f3' },
+      { ...createTextElement('Earn while you create — join free today', 220, 22), width: 360, height: 48, fontSize: 16, fontWeight: 'normal', color: '#fef3c7' },
+      { ...createTextElement('Sign Up', 600, 25), width: 110, height: 40, fontSize: 18, color: '#0f4c3a', backgroundColor: '#c89b3c', borderRadius: 20, padding: 8 },
     ],
   },
 ]
