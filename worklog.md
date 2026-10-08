@@ -1485,3 +1485,54 @@ Stage Summary:
   3. **EarnovaStudioView** (rewrite) — hub mode shows "Your projects" (skeletons/empty/grid of ProjectCards) + "Create new" (12 tiles). Editor mode wraps StudioProjectEditor with FloatingOrbs + mesh-bg ambient. Optimistic delete + revert. Confetti on create + save.
 - 3 new component files (~2,672 lines total) + 1 bug fix in the pre-existing AI stub provider. All 'use client' components use safeFetch + useConfetti + match the established design language (ambient mesh-bg + FloatingOrbs, glass-strong cards, gradient-text-evergreen titles, TiltCard, StaggerContainer reveals, mobile-first responsive, error/empty/loading states).
 - API contracts unchanged — the editor + view consume the existing /api/studio/projects + /api/studio/ai/generate endpoints without modification. The AI provider is a stub (returns template content per type + prompt keywords) and can be swapped for real providers via src/lib/ai/index.ts without any UI changes.
+
+---
+Task ID: 29
+Agent: frontend-styling-expert
+Task: Build a Canva-like studio editor with drag-and-drop elements, layers panel, properties panel, toolbar, template gallery, and image export — replacing the current form-based studio editor.
+
+Work Log:
+- Read worklog + canvas-types.ts (full type definitions + 6 templates + 8 presets + 16 gradients + 7 fonts + 48 stickers + 4 shapes).
+- Read existing studio-project-editor.tsx (1229 lines) + earnova-studio-view.tsx (622 lines) + project-preview.tsx + safe-fetch.ts + confetti.tsx to understand patterns + API contracts.
+- Inspected /api/studio/projects (GET/POST) + /api/studio/projects/[id] (GET/PATCH/DELETE) routes. Confirmed the project `data` field is JSON `Record<string, any>` — so canvas state is stored at `data.canvas: CanvasData`.
+- Confirmed `html-to-image@^1.11.13` is already installed.
+
+Files created:
+1. **src/components/studio/emoji-picker.tsx** (125 lines) — `EmojiPicker` popover-triggered grid of all 48 STICKER_EMOJIS (6 rows × 8 cols) + bare `EmojiGrid` for use inside properties-panel. Custom trigger child support.
+2. **src/components/studio/properties-panel.tsx** (786 lines) — `PropertiesPanel` for the right top half. Two modes: canvas properties (preset, custom W/H, background grid) when nothing selected OR type-specific element editor. Common: position/size/rotation/opacity/layer-order/delete. TEXT: textarea content, font family dropdown, font size, padding, line height, letter spacing, bold/italic/underline toggles, align toggles, text color, background color (transparent option), border radius, text shadow (off/soft/glow presets). SHAPE: 4 shape types (rect/circle/triangle/line), fill, border color, border width, border radius. STICKER: emoji grid, font size slider. IMAGE: URL textarea, object fit dropdown, border radius. Small reusable helpers: FieldRow, NumberInput, ColorField, SliderRow, StyleToggle, SectionTitle. Exports `ElementIcon` (reused by layers-panel).
+3. **src/components/studio/layers-panel.tsx** (222 lines) — `LayersPanel` for the right bottom half. Lists elements sorted by zIndex DESC (topmost first). Each row: drag handle (GripVertical), icon, name, eye/lock/delete buttons. HTML5 native drag-and-drop to reorder layers. "Add Layer" button at bottom. Auto-derives layer names from element text/shape/emoji.
+4. **src/components/studio/canvas-toolbar.tsx** (363 lines) — left sidebar with 5 sections: Add element (text, 4 shape buttons, sticker popover, image URL dialog), Templates (grid of all 6 CANVAS_TEMPLATES with gradient preview thumbnails), Canvas (preset selector + 16 background gradient swatches), Export (PNG via html-to-image, JSON download), History & zoom (undo/redo buttons + zoom out/percent/zoom in + 100%/Fit). Uses Dialog for image URL input. Brand strip + unsaved-changes indicator at top.
+5. **src/components/studio/canvas-editor.tsx** (1220 lines) — the heart of the studio. Three-panel desktop layout (280px toolbar / flex canvas / 300px right panel with PropertiesPanel on top + LayersPanel fixed 260px at bottom). Mobile collapses to Tabbed bottom-sheet UI (Add/Props/Layers tabs) + floating quick-add buttons. Full features:
+   - Canvas state in `CanvasData` form, initialized from `project.data.canvas` or default square.
+   - History stack (max 50 entries) with undo/redo; commits on mouseup after drag/resize/rotate, on every other mutation, plus Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z keyboard shortcuts.
+   - Drag (mouse + touch): mouse-down on element starts drag, mousemove updates x/y (10px grid snap when grid toggle is on, clamped to viewport via canvas-relative coords), mouseup commits to history. Window-level listeners (re-bound on zoom change).
+   - Resize: 4 corner handles (tl/tr/bl/br) — each handle recomputes x/y/width/height to maintain opposite corner position.
+   - Rotate: handle above element (connected by line) — computes angle from element center, supports Shift+drag to snap to 15° increments.
+   - Selection: blue evergreen outline + 4 corner handles + rotate handle. Click empty canvas = deselect.
+   - Keyboard: Delete/Backspace removes selected; Arrow keys nudge 1px (Shift = 10px); Ctrl/Cmd+D duplicates; Ctrl/Cmd+Z undo; Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redo. Skips when focus is in INPUT/TEXTAREA/SELECT/contenteditable.
+   - Zoom: 0.1× to 2× range. Auto-fits on mount and whenever canvas size changes (computed against viewport with 80px padding). Zoom in/out/reset/fit buttons.
+   - Background grid toggle (10px snap during drag).
+   - Element rendering by type: TEXT (styled div with all typography props), SHAPE (rect/circle/triangle via clip-path/line as thin div), STICKER (emoji at fontSize), IMAGE (img with objectFit).
+   - Layer operations: bring forward / send backward / bring to front / send to back; HTML5 drag-to-reorder in layers panel.
+   - Save / Publish: PATCH /api/studio/projects/[id] with `{ title, data: { canvas: canvasData } }` (plus isPublished on publish). Dirty flag tracking.
+   - Export PNG: html-to-image `toPng()` with `pixelRatio: 2`, override `transform/borderRadius/boxShadow` for clean rectangle output.
+   - Export JSON: Blob download of full CanvasData.
+   - Top bar: Exit button, inline-editable title, unsaved/Live badges, grid toggle (desktop), Save + Publish buttons.
+   - Canvas rendering: outer wrapper sized to `width × zoom` × `height × zoom`; inner canvas at real pixel dimensions with `transform: scale(zoom)` for transform-origin top-left. Selection handles sized with `1/zoom` so they remain visually consistent across zoom levels.
+   - Exports `StudioProject` type (re-used by earnova-studio-view).
+
+Files modified:
+6. **src/components/views/earnova-studio-view.tsx** — full rewrite (811 lines). Hub mode: hero header (gradient + FloatingOrbs + Sparkles), "Your projects" grid (each card shows a mini canvas preview with the project's actual background gradient + element count), template gallery (6 templates with gradient thumbnails), 12 format tiles (each creates a canvas project with appropriate preset + background + a starter title text element centered on the canvas), "Blank canvas" dialog with preset picker (8 presets as visual tiles + title input), footer hint card. Editor mode: renders full-screen CanvasEditor with confetti layer. ProjectCard now shows a live mini-preview (the actual canvas background gradient) + element count + AI badge. BlankCanvasDialog split into a parent (manages open state) + BlankCanvasForm child (owns title/preset state — remounts on open via `key={open ? 'open' : 'closed'}` to satisfy React 19's "no setState in effect" lint rule). All API calls via safeFetch; confetti on create + save.
+
+Verification:
+- `bun run lint` — passes (exit 0, no output).
+- `bunx tsc --noEmit` — passes (exit 0, no output).
+- `DATABASE_URL=… bun run build` — succeeds: "✓ Compiled successfully in 19.2s", "✓ Generating static pages using 1 worker (51/51) in 721.8ms". Exit 0.
+
+Stage Summary:
+- Phase 29 replaces the simple form-based studio editor with a full Canva-like canvas studio. 6 new files (5 in src/components/studio/, 1 rewrite of src/components/views/earnova-studio-view.tsx), ~3,529 lines total.
+- Canvas data is stored at `project.data.canvas: CanvasData` (compatible with existing 12 StudioProjectType values — no schema migration needed). Existing projects without `data.canvas` fall back to a default square canvas.
+- The new studio hub keeps the 12 format tiles (now they create canvas projects with appropriate preset + background) AND adds a template gallery (6 pre-designed layouts that load into the canvas editor with fresh element IDs) AND a blank-canvas dialog with the 8 social-media size presets.
+- Editor features: drag/move (mouse + touch), 4-corner resize, top-handle rotate (with 15° shift-snap), 50-entry undo/redo (Ctrl+Z/Y), delete-key + arrow-nudge (Shift = 10px), Ctrl+D duplicate, zoom 0.1×-2× (fit on mount, fit-to-viewport button, 100% reset), 10px grid snap toggle, layer reorder (drag in layers panel), per-element lock/visibility toggles, full type-specific property editors, PNG export at 2× pixel ratio, JSON export.
+- Mobile-responsive: 3-panel desktop layout collapses to a Tabbed bottom-sheet UI (Add/Props/Layers tabs) + floating quick-add buttons (text/shape/sticker/image) when not on the Add tab.
+- Old `src/components/studio/studio-project-editor.tsx` is no longer imported anywhere (left in place as reference; can be deleted in a follow-up).
