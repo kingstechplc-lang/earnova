@@ -5,15 +5,22 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu'
 import { safeFetch } from '@/lib/safe-fetch'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { CountUp } from '@/components/animated/count-up'
 import { FollowButton } from '@/components/social/follow-button'
 import { FollowersDialog } from '@/components/social/followers-dialog'
+import { ReportDialog } from '@/components/social/report-dialog'
 import { useCurrentUser } from '@/components/social/use-current-user'
+import { toast } from '@/hooks/use-toast'
 import {
   Share2, ExternalLink, ChevronLeft, MapPin, Globe2, Clock, Sparkles,
-  FileText, Eye, AlertCircle, Users, UserCheck,
+  FileText, Eye, AlertCircle, Users, UserCheck, Flag, MoreVertical,
+  ShieldOff, VolumeOff, Ban, Volume2,
 } from 'lucide-react'
 import type { View } from '@/app/page'
 
@@ -54,6 +61,12 @@ export default function PublicProfileView({ username, navigate }: { username: st
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogTab, setDialogTab] = useState<'followers' | 'following'>('followers')
 
+  // Trust & Safety — block/mute state + report dialog.
+  const [blocked, setBlocked] = useState(false)
+  const [muted, setMuted] = useState(false)
+  const [trustActionPending, setTrustActionPending] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
+
   // Visitor auth — fetched via /api/auth/me on mount. isOwn is true when the
   // visitor is looking at their own profile (in which case we hide the Follow
   // button since you can't follow yourself).
@@ -85,7 +98,7 @@ export default function PublicProfileView({ username, navigate }: { username: st
     if (!username) return
     let cancelled = false
     ;(async () => {
-      const [followRes, followersRes, followingRes] = await Promise.all([
+      const [followRes, followersRes, followingRes, blockRes] = await Promise.all([
         // Follow status — only meaningful if logged in (the API returns 401
         // otherwise, which we ignore).
         currentUser
@@ -93,6 +106,10 @@ export default function PublicProfileView({ username, navigate }: { username: st
           : Promise.resolve({ data: null, error: null, status: 0 } as const),
         safeFetch<{ followers?: { id: string }[]; nextCursor: string | null }>(`/api/followers/${encodeURIComponent(username)}?limit=50`),
         safeFetch<{ following?: { id: string }[]; nextCursor: string | null }>(`/api/following/${encodeURIComponent(username)}?limit=50`),
+        // Block status — also requires login.
+        currentUser
+          ? safeFetch<{ blocked: boolean }>(`/api/block/${encodeURIComponent(username)}`)
+          : Promise.resolve({ data: null, error: null, status: 0 } as const),
       ])
       if (cancelled) return
       if (!followRes.error && followRes.data) {
@@ -108,9 +125,53 @@ export default function PublicProfileView({ username, navigate }: { username: st
         const more = !!followingRes.data.nextCursor
         setFollowingCount(more ? 50 : list.length)
       }
+      if (!blockRes.error && blockRes.data) {
+        setBlocked(!!blockRes.data.blocked)
+      }
     })()
     return () => { cancelled = true }
   }, [username, currentUser])
+
+  async function toggleBlock() {
+    if (!currentUser || !profile?.username) return
+    setTrustActionPending(true)
+    const method = blocked ? 'DELETE' : 'POST'
+    const res = await safeFetch<{ blocked?: boolean }>(`/api/block/${encodeURIComponent(profile.username)}`, { method })
+    setTrustActionPending(false)
+    if (res.error) {
+      toast({ title: 'Action failed', description: res.error, variant: 'destructive' })
+      return
+    }
+    const nextBlocked = method === 'DELETE' ? false : true
+    setBlocked(nextBlocked)
+    if (nextBlocked) {
+      // Blocking auto-unfollows — sync the follow state.
+      setFollowing(false)
+      toast({ title: 'Blocked', description: `@${profile.username} can no longer interact with you.` })
+    } else {
+      toast({ title: 'Unblocked', description: `@${profile.username} can now interact with you again.` })
+    }
+  }
+
+  async function toggleMute() {
+    if (!currentUser || !profile?.username) return
+    setTrustActionPending(true)
+    const method = muted ? 'DELETE' : 'POST'
+    const res = await safeFetch<{ muted?: boolean }>(`/api/mute/${encodeURIComponent(profile.username)}`, { method })
+    setTrustActionPending(false)
+    if (res.error) {
+      toast({ title: 'Action failed', description: res.error, variant: 'destructive' })
+      return
+    }
+    const nextMuted = method === 'DELETE' ? false : true
+    setMuted(nextMuted)
+    toast({
+      title: nextMuted ? 'Muted' : 'Unmuted',
+      description: nextMuted
+        ? `@${profile.username}'s content will be hidden from your feeds.`
+        : `@${profile.username}'s content will appear in your feeds again.`,
+    })
+  }
 
   if (loading) {
     return (
@@ -246,33 +307,110 @@ export default function PublicProfileView({ username, navigate }: { username: st
 
             {/* Follow + Share actions */}
             <div className="flex flex-col items-center md:items-end gap-2">
-              {!isOwn && profile.username && (
-                <FollowButton
-                  username={profile.username}
-                  initialFollowing={following}
-                  currentUser={currentUser}
-                  variant="hero"
-                  onLogin={() => navigate({ name: 'login' })}
-                  onFollowingChange={(f) => {
-                    setFollowing(f)
-                    // Keep follower count in sync (the visitor just became a
-                    // follower — or stopped being one).
-                    setFollowersCount(prev => Math.max(0, prev + (f ? 1 : -1)))
+              <div className="flex items-center gap-2 flex-wrap justify-center md:justify-end">
+                {!isOwn && profile.username && (
+                  <FollowButton
+                    username={profile.username}
+                    initialFollowing={following}
+                    currentUser={currentUser}
+                    variant="hero"
+                    onLogin={() => navigate({ name: 'login' })}
+                    onFollowingChange={(f) => {
+                      setFollowing(f)
+                      // Keep follower count in sync (the visitor just became a
+                      // follower — or stopped being one).
+                      setFollowersCount(prev => Math.max(0, prev + (f ? 1 : -1)))
+                    }}
+                  />
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    const url = `${window.location.origin}/#/profile/${profile.username}`
+                    navigator.clipboard.writeText(url)
+                    toast({ title: 'Profile link copied' })
                   }}
-                />
+                  className="bg-cream/15 text-cream hover:bg-cream/25 border-cream/20 backdrop-blur-sm btn-glow overflow-hidden"
+                >
+                  <Share2 className="h-4 w-4 mr-1.5" /> Share
+                </Button>
+                {/* Trust & safety menu: Report, Block, Mute.
+                    Hidden for the visitor's own profile (no self-block/report). */}
+                {!isOwn && profile.username && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="inline-flex items-center justify-center h-9 w-9 rounded-md bg-cream/15 text-cream hover:bg-cream/25 border-cream/20 backdrop-blur-sm btn-glow overflow-hidden transition-colors"
+                        aria-label="More actions"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Trust &amp; Safety
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onClick={() => currentUser ? setReportOpen(true) : navigate({ name: 'login' })}
+                        className="text-cranberry focus:text-cranberry focus:bg-cranberry/5 cursor-pointer"
+                      >
+                        <Flag className="h-4 w-4 mr-2" /> Report @{profile.username}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => currentUser ? toggleBlock() : navigate({ name: 'login' })}
+                        disabled={trustActionPending}
+                        className="cursor-pointer"
+                      >
+                        {blocked ? (
+                          <>
+                            <Ban className="h-4 w-4 mr-2 text-evergreen" />
+                            <span className="text-evergreen">Unblock user</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShieldOff className="h-4 w-4 mr-2" />
+                            Block user
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => currentUser ? toggleMute() : navigate({ name: 'login' })}
+                        disabled={trustActionPending}
+                        className="cursor-pointer"
+                      >
+                        {muted ? (
+                          <>
+                            <Volume2 className="h-4 w-4 mr-2 text-evergreen" />
+                            <span className="text-evergreen">Unmute user</span>
+                          </>
+                        ) : (
+                          <>
+                            <VolumeOff className="h-4 w-4 mr-2" />
+                            Mute user
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+              {/* Blocked / muted banner */}
+              {(blocked || muted) && (
+                <div className="flex flex-wrap gap-2 justify-center md:justify-end">
+                  {blocked && (
+                    <Badge variant="outline" className="bg-cranberry/10 text-cranberry border-cranberry/30">
+                      <ShieldOff className="h-3 w-3 mr-1" /> Blocked
+                    </Badge>
+                  )}
+                  {muted && (
+                    <Badge variant="outline" className="bg-gold/10 text-gold-dark border-gold/30">
+                      <VolumeOff className="h-3 w-3 mr-1" /> Muted
+                    </Badge>
+                  )}
+                </div>
               )}
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  const url = `${window.location.origin}/#/profile/${profile.username}`
-                  navigator.clipboard.writeText(url)
-                  alert('Profile link copied')
-                }}
-                className="bg-cream/15 text-cream hover:bg-cream/25 border-cream/20 backdrop-blur-sm btn-glow overflow-hidden"
-              >
-                <Share2 className="h-4 w-4 mr-1.5" /> Share
-              </Button>
             </div>
           </motion.div>
         </div>
@@ -428,6 +566,19 @@ export default function PublicProfileView({ username, navigate }: { username: st
             navigate({ name: 'public-profile', username: otherUsername })
           }}
           onLogin={() => navigate({ name: 'login' })}
+        />
+      )}
+
+      {/* Report dialog — opened from the trust & safety dropdown menu. */}
+      {profile?.id && profile?.username && (
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          entityType="USER"
+          entityId={profile.id}
+          entityName={`${profile.name || profile.username}'s profile`}
+          currentUser={currentUser}
+          onLoginRedirect={() => navigate({ name: 'login' })}
         />
       )}
     </div>

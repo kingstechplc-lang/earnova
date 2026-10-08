@@ -57,6 +57,15 @@ model User {
   triggeredNotifications Notification[] @relation("NotificationActor")  // notifications I caused
   notificationPreferences NotificationPreference[]
   milestones        UserMilestone[]
+  // Trust & Safety (Phase 9)
+  reportsFiled     Report[]              @relation("ReportReporter")
+  reportsResolved  Report[]              @relation("ReportResolver")
+  blocksInitiated  Block[]               @relation("BlockBlocker")
+  blocksReceived    Block[]               @relation("BlockBlocked")
+  mutesInitiated   Mute[]                @relation("MuteMuter")
+  mutesReceived     Mute[]                @relation("MuteMuted")
+  verificationRequests VerificationRequest[]
+  verificationReviews  VerificationRequest[] @relation("VerificationReviewer")
 
   @@index([role])
   @@index([emailVerified])
@@ -1104,6 +1113,151 @@ model UserMilestone {
 
   @@unique([userId, milestoneId])  // prevents duplicate milestone awards
   @@index([userId, claimed])
+}
+
+// ─── TRUST & SAFETY (Phase 9) ───────────────────────────────────────────────
+//
+// Per spec section 35 (TRUST & SAFETY) + sections 36-39:
+//   - Reports: users can report profiles, pages, posts, comments, links, ads
+//   - Block/mute: users can block other users + hide their content
+//   - Copyright workflow: structured copyright reporting process
+//   - Verification: verified creator / verified business with real review
+//
+// Per spec section 26: "Do NOT automatically punish legitimate viral activity
+// solely because it is high volume." Risk levels are LOW/MEDIUM/HIGH/CRITICAL.
+
+enum ReportReason {
+  SPAM
+  SCAM
+  MALWARE
+  HARASSMENT
+  IMPERSONATION
+  COPYRIGHT
+  ADULT_CONTENT
+  ILLEGAL_ACTIVITY
+  HATEFUL_CONTENT
+  VIOLENCE
+  MISLEADING_CONTENT
+  OTHER
+}
+
+enum ReportEntityType {
+  USER
+  PAGE
+  POST
+  COMMENT
+  LINK
+  AD
+}
+
+enum ReportStatus {
+  PENDING
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+  ESCALATED
+}
+
+model Report {
+  id              String           @id @default(cuid())
+  reporterId      String           // who filed the report
+  entityType      ReportEntityType
+  entityId        String           // the ID of the reported entity
+  reason          ReportReason
+  description     String?          // additional details from the reporter
+  evidence        String?          // JSON: URLs, screenshots, etc.
+  status          ReportStatus     @default(PENDING)
+  // Admin resolution fields
+  resolvedById    String?          // admin/moderator who resolved
+  resolution       String?          // explanation of action taken
+  resolutionAction String?         // "warning", "suspension", "ban", "content_removed", "no_action"
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  resolvedAt       DateTime?
+
+  reporter        User             @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolver        User?            @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])     // find reports about an entity
+  @@index([status, createdAt])        // admin queue: pending reports by date
+  @@index([reporterId])
+  @@index([createdAt])
+}
+
+// Block — user A blocks user B. Blocked content is excluded from feeds,
+// search, notifications, and recommendations for the blocking user.
+model Block {
+  id          String   @id @default(cuid())
+  blockerId   String   // the user who blocks
+  blockedId   String   // the user being blocked
+  createdAt   DateTime @default(now())
+
+  blocker    User @relation("BlockBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked     User @relation("BlockBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])  // prevents duplicate blocks
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+// Mute — user A mutes user B. Muted users' content is hidden from the
+// muting user's feed, but the muted user can still follow/react/comment
+// (they just don't appear in the muter's discovery surfaces).
+// Unlike block, mute is one-directional + less severe.
+model Mute {
+  id          String   @id @default(cuid())
+  muterId     String   // the user who mutes
+  mutedId     String   // the user being muted
+  createdAt   DateTime @default(now())
+
+  muter       User @relation("MuteMuter", fields: [muterId], references: [id], onDelete: Cascade)
+  muted        User @relation("MuteMuted", fields: [mutedId], references: [id], onDelete: Cascade)
+
+  @@unique([muterId, mutedId])
+  @@index([muterId])
+  @@index([mutedId])
+}
+
+// Verification request — per spec section 39 (IMPERSONATION / VERIFICATION):
+// "Verification should represent a real verification process."
+// Users submit evidence (identity docs, social links, business registration).
+// Admins review + approve/deny. Verified users get a badge.
+enum VerificationType {
+  CREATOR
+  BUSINESS
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+model VerificationRequest {
+  id              String             @id @default(cuid())
+  userId          String
+  type            VerificationType    @default(CREATOR)
+  // User-submitted evidence
+  realName        String
+  bio             String?             // why they should be verified
+  websiteUrl      String?
+  socialLinks     String?             // JSON: [{platform, url}]
+  evidenceUrls    String?             // JSON: [url1, url2] — docs, screenshots
+  // Admin review
+  status          VerificationStatus  @default(PENDING)
+  reviewedById    String?
+  reviewNotes     String?             // admin notes on the decision
+  reviewedAt      DateTime?
+  expiresAt       DateTime?            // verification may expire (e.g., annual)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer        User?  @relation("VerificationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([userId])
 }
 
 // ─── COMPLIANCE (Chapter 6) ──────────────────────────────────────────────────

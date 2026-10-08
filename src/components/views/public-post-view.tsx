@@ -15,11 +15,17 @@ import { renderPostContent } from '@/lib/render-post-content'
 import { AdSlot } from '@/components/ad/ad-slot'
 import { EngagementBar } from '@/components/social/engagement-bar'
 import { CommentsSection } from '@/components/social/comments-section'
+import { ReportDialog } from '@/components/social/report-dialog'
 import { useCurrentUser } from '@/components/social/use-current-user'
 import {
   Share2, ChevronLeft, AlertCircle, Eye, Heart, MessageCircle,
-  Sparkles, Layers, Clock, Link as LinkIcon,
+  Sparkles, Layers, Clock, Link as LinkIcon, Flag, MoreVertical,
+  ShieldOff, VolumeOff, Ban, Volume2,
 } from 'lucide-react'
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu'
 import type { View } from '@/app/page'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -107,6 +113,12 @@ export default function PublicPostView({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Trust & safety state — report dialog + block/mute of the post's author.
+  const [reportOpen, setReportOpen] = useState(false)
+  const [blocked, setBlocked] = useState(false)
+  const [muted, setMuted] = useState(false)
+  const [trustActionPending, setTrustActionPending] = useState(false)
+
   // Visitor auth — fetched via /api/auth/me so we know whether to render the
   // engagement bar / comment box (logged in) or the "Log in to ..." CTAs.
   // We don't pass a profileUserId — the post view doesn't have an "own
@@ -190,6 +202,61 @@ export default function PublicPostView({
     } catch {
       // user dismissed share sheet — silent
     }
+  }
+
+  // ── Fetch block state of the post's author (when logged in) ─────────────
+  // Lets the engagement row render the correct "Blocked" / "Muted" badges and
+  // the dropdown toggle correctly.
+  useEffect(() => {
+    if (!currentUser || !data?.post?.author?.username) return
+    let cancelled = false
+    ;(async () => {
+      const authorUsername = data.post.author.username!
+      const blockRes = await safeFetch<{ blocked: boolean }>(`/api/block/${encodeURIComponent(authorUsername)}`)
+      if (cancelled) return
+      if (!blockRes.error && blockRes.data) setBlocked(!!blockRes.data.blocked)
+    })()
+    return () => { cancelled = true }
+  }, [currentUser, data?.post?.author?.username])
+
+  async function toggleBlockAuthor() {
+    const authorUsername = data?.post?.author?.username
+    if (!currentUser || !authorUsername) return
+    setTrustActionPending(true)
+    const method = blocked ? 'DELETE' : 'POST'
+    const res = await safeFetch<{ blocked?: boolean }>(`/api/block/${encodeURIComponent(authorUsername)}`, { method })
+    setTrustActionPending(false)
+    if (res.error) {
+      toast({ title: 'Action failed', description: res.error, variant: 'destructive' })
+      return
+    }
+    setBlocked(method === 'POST')
+    toast({
+      title: method === 'POST' ? 'Blocked' : 'Unblocked',
+      description: method === 'POST'
+        ? `@${authorUsername} can no longer interact with you.`
+        : `@${authorUsername} can now interact with you again.`,
+    })
+  }
+
+  async function toggleMuteAuthor() {
+    const authorUsername = data?.post?.author?.username
+    if (!currentUser || !authorUsername) return
+    setTrustActionPending(true)
+    const method = muted ? 'DELETE' : 'POST'
+    const res = await safeFetch<{ muted?: boolean }>(`/api/mute/${encodeURIComponent(authorUsername)}`, { method })
+    setTrustActionPending(false)
+    if (res.error) {
+      toast({ title: 'Action failed', description: res.error, variant: 'destructive' })
+      return
+    }
+    setMuted(method === 'POST')
+    toast({
+      title: method === 'POST' ? 'Muted' : 'Unmuted',
+      description: method === 'POST'
+        ? `@${authorUsername}'s content will be hidden from your feeds.`
+        : `@${authorUsername}'s content will appear in your feeds again.`,
+    })
   }
 
   // ── Loading state ──────────────────────────────────────────────────────
@@ -384,11 +451,82 @@ export default function PublicPostView({
                 )}
               </span>
             </button>
-            {publishedDate && (
-              <span className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
-                <Clock className="h-3 w-3" /> {publishedDate}
-              </span>
-            )}
+            {/* Trust & safety badges + menu — right-aligned next to the date */}
+            <div className="ml-auto flex items-center gap-2 flex-shrink-0">
+              {blocked && (
+                <Badge variant="outline" className="bg-cranberry/10 text-cranberry border-cranberry/30">
+                  <ShieldOff className="h-2.5 w-2.5 mr-0.5" /> Blocked
+                </Badge>
+              )}
+              {muted && (
+                <Badge variant="outline" className="bg-gold/10 text-gold-dark border-gold/30">
+                  <VolumeOff className="h-2.5 w-2.5 mr-0.5" /> Muted
+                </Badge>
+              )}
+              {publishedDate && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3" /> {publishedDate}
+                </span>
+              )}
+              {post.author.username && currentUser?.id !== post.author.id && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
+                      aria-label="More actions"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Trust &amp; Safety
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={() => setReportOpen(true)}
+                      className="text-cranberry focus:text-cranberry focus:bg-cranberry/5 cursor-pointer"
+                    >
+                      <Flag className="h-4 w-4 mr-2" /> Report this post
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={toggleBlockAuthor}
+                      disabled={trustActionPending}
+                      className="cursor-pointer"
+                    >
+                      {blocked ? (
+                        <>
+                          <Ban className="h-4 w-4 mr-2 text-evergreen" />
+                          <span className="text-evergreen">Unblock author</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldOff className="h-4 w-4 mr-2" />
+                          Block author
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={toggleMuteAuthor}
+                      disabled={trustActionPending}
+                      className="cursor-pointer"
+                    >
+                      {muted ? (
+                        <>
+                          <Volume2 className="h-4 w-4 mr-2 text-evergreen" />
+                          <span className="text-evergreen">Unmute author</span>
+                        </>
+                      ) : (
+                        <>
+                          <VolumeOff className="h-4 w-4 mr-2" />
+                          Mute author
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </motion.div>
 
           {/* Engagement stats */}
@@ -569,6 +707,18 @@ export default function PublicPostView({
           )}
         </article>
       </div>
+
+      {/* Report dialog — opened from the trust & safety dropdown menu in the
+          author row. */}
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        entityType="POST"
+        entityId={post.id}
+        entityName={post.title}
+        currentUser={currentUser}
+        onLoginRedirect={() => navigate({ name: 'login' })}
+      />
     </div>
   )
 }

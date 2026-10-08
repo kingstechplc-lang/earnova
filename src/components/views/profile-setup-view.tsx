@@ -13,8 +13,9 @@ import { useConfetti } from '@/components/animated/confetti'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import {
   Sparkles, Check, X, User, Link2, Eye,
-  Loader2, AtSign, MapPin, Globe2, AlertCircle, RefreshCw,
+  Loader2, AtSign, MapPin, Globe2, AlertCircle, RefreshCw, ShieldOff,
 } from 'lucide-react'
+import { BlockMuteSection } from '@/components/social/block-mute-section'
 import type { View, CurrentUser } from '@/app/page'
 
 type SocialLink = { id?: string; platform: string; url: string; label?: string }
@@ -461,6 +462,20 @@ export default function ProfileSetupView({ user, navigate }: { user: CurrentUser
           >
             + Add link
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Block / mute management — Trust & Safety Phase 9 */}
+      <Card className="mb-6 overflow-hidden glass-strong shadow-festive">
+        <div className="h-1.5 w-full bg-gradient-to-r from-cranberry via-berry to-gold" />
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ShieldOff className="h-5 w-5 text-cranberry" />
+            Blocked &amp; muted users
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <BlockMuteSection navigate={navigate} />
         </CardContent>
       </Card>
 

@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ChevronLeft, ShieldAlert, ShieldCheck, Zap, Activity, Megaphone, Network, Sliders, Users, FileText, Clock, LayoutGrid,
+  ChevronLeft, ShieldAlert, ShieldCheck, Zap, Activity, Megaphone, Network, Sliders, Users, FileText, Clock, LayoutGrid, Flag, BadgeCheck,
 } from 'lucide-react'
 import { FloatingOrbs } from '@/components/animated/floating-orbs'
 import { FadeIn } from '@/components/animated/motion'
@@ -22,9 +22,11 @@ import { PagesSection } from '@/components/admin/pages-section'
 import { PlatformIntegrationsSection } from '@/components/admin/platform-integrations-section'
 import { ReviewsSection } from '@/components/admin/reviews-section'
 import { IntegrationsSection } from '@/components/admin/integrations-section'
+import { ReportsSection } from '@/components/admin/reports-section'
+import { VerificationSection } from '@/components/admin/verification-section'
 import type { View, CurrentUser } from '@/app/page'
 
-type Tab = 'overview' | 'campaigns' | 'platform-ads' | 'networks' | 'compatibility' | 'slot-config' | 'policy' | 'users' | 'pages' | 'reviews' | 'integrations'
+type Tab = 'overview' | 'campaigns' | 'platform-ads' | 'networks' | 'compatibility' | 'slot-config' | 'policy' | 'users' | 'pages' | 'reviews' | 'reports' | 'verification' | 'integrations'
 
 const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; adminOnly?: boolean }> = [
   { id: 'overview', label: 'Overview', icon: <Activity className="h-4 w-4" /> },
@@ -35,9 +37,11 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode; adminOnly?: b
   { id: 'compatibility', label: 'Compatibility', icon: <Sliders className="h-4 w-4" />, adminOnly: true },
   { id: 'slot-config', label: 'Slot config', icon: <LayoutGrid className="h-4 w-4" />, adminOnly: true },
   { id: 'policy', label: 'Policy', icon: <Sliders className="h-4 w-4" />, adminOnly: true },
+  { id: 'reviews', label: 'Reviews', icon: <Clock className="h-4 w-4" /> },
+  { id: 'reports', label: 'Reports', icon: <Flag className="h-4 w-4" /> },
+  { id: 'verification', label: 'Verification', icon: <BadgeCheck className="h-4 w-4" /> },
   { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" />, adminOnly: true },
   { id: 'pages', label: 'Pages', icon: <FileText className="h-4 w-4" /> },
-  { id: 'reviews', label: 'Reviews', icon: <Clock className="h-4 w-4" /> },
 ]
 
 type StatsData = {
@@ -195,6 +199,8 @@ export default function AdminView({
               {tab === 'users' && user.role === 'ADMIN' && <UsersSection />}
               {tab === 'pages' && <PagesSection />}
               {tab === 'reviews' && <ReviewsSection />}
+              {tab === 'reports' && <ReportsSection />}
+              {tab === 'verification' && <VerificationSection />}
             </>
           )}
         </motion.div>
